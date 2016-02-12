@@ -1,4 +1,5 @@
 import math
+
 import numpy as np
 
 safe_list = ['acos', 'asin', 'atan', 'atan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp', 'fabs', 'floor',
@@ -13,6 +14,14 @@ for k in safe_list:
     """
     safe_dict.update({'{}'.format(k): getattr(locals().get("math"), k)})
 safe_dict.update({'abs': abs})
+
+
+def intersection(list1, list2):
+    for vari in list1:
+        if vari in list2:
+            return True
+        else:
+            return False
 
 
 def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
@@ -349,70 +358,111 @@ def mpintegrator(ode, yi, t, h, method=None, eta=None):
 
 def main():
     import os
-
-    n = int(input("Please enter the order of the system: N = "))
-    if input("Would you like to enter the system in vector form? ").replace(" ", "").lower() in ["yes", "1", "y"]:
-        vectorised = 1
-    else:
-        vectorised = 0
-    eqn = []
-    y_i = []
-    stpsz = 1
-    tlim = [0., 1.]
-    if vectorised == 0:
-        for i in range(n):
-            eqn.append(input("Please enter the ode using y_# and t as the variables: y_" + str(i) + "' = "))
-            eqn[i] = eqn[i].replace('^', '**')
+    import sys
+    term_args = sys.argv
+    eqn = y_i = tlim = savedir = stpsz = intmethod = n = plotbool = None
+    if len(term_args) == 1:
+        n = int(input("Please enter the order of the system: N = "))
+        if input("Would you like to enter the system in vector form? ").replace(" ", "").lower() in ["yes", "1", "y"]:
+            vectorised = 1
+        else:
+            vectorised = 0
+        eqn = []
+        y_i = []
+        stpsz = 1
+        tlim = [0., 1.]
+        if vectorised == 0:
+            for i in range(n):
+                eqn.append(input("Please enter the ode using y_# and t as the variables: y_" + str(i) + "' = "))
+                eqn[i] = eqn[i].replace('^', '**')
+                print(eqn)
+                y_i.append([float(input("Please enter the initial value for this variable: y(" + str(i) + ") = "))])
+                tlim = [float(input("Please enter the initial time: t_initial = ")),
+                        float(input("Please enter the final time: t_final = "))]
+                stpsz = float(input("Please enter a step size for the integration: h = "))
+        else:
+            eqn = [equn.replace("^", "**") for equn in input("Please enter each ode separated by a comma using y_n as the "
+                                                             "variables for n between 0 and {}: "
+                                                             "\n".format(n - 1)).replace(" ", "").split(",")]
             print(eqn)
-            y_i.append([float(input("Please enter the initial value for this variable: y(" + str(i) + ") = "))])
-            tlim = [float(input("Please enter the initial time: t_initial = ")),
-                    float(input("Please enter the final time: t_final = "))]
-            stpsz = float(input("Please enter a step size for the integration: h = "))
-    else:
-        eqn = [equn.replace("^", "**") for equn in input("Please enter each ode separated by a comma using y_n as the "
-                                                         "variables for n between 0 and {}: "
-                                                         "\n".format(n - 1)).replace(" ", "").split(",")]
-        print(eqn)
-        while len(eqn) != n:
-            eqn = [equn.replace("^", "**") for equn in input("You have entered {} odes when {} odes were required. "
-                                                             "\n".format(len(eqn), n)).replace(" ", "").split(",")]
-        y_i = [[float(y_initial)] for y_initial in input("Please enter the initial values separated by a comma for each"
-                                                         " y_n for n between "
-                                                         "0 and {}: \n".format(n - 1)).replace(" ", "").split(",")]
-        while len(y_i) != n:
-            y_i = [[float(y_initial)] for y_initial in input("You have entered {} initial conditions "
-                                                             "when {} initial conditions were required. "
-                                                             "\n".format(len(y_i), n)).replace(" ", "").split(",")]
-        time_param = input("Please enter the lower and upper time limits, and step size separated by commas: "
-                           "\n").replace(" ", "").split(",")
-        while len(time_param) != 3:
-            time_param = input("You have entered {} parameters when 3 were required. "
-                               "\n".format(len(time_param))).replace(" ", "").split(",")
-        tlim = [float(time_param[0]), float(time_param[1])]
-        stpsz = float(time_param[2])
-    if not input("Would you like to explicitly choose the method of integration? ").replace(' ', '').lower() in \
-            ["no", "0", "do not do this to me", ""]:
-        print("Choose from one of the following methods: ")
-        shorthand = {"RK4": "Explicit Runge-Kutta 4", "Euler": "Forward Euler"}
-        c = 1
-        for keys in sorted(available_methods.keys()):
-            print("{}: {}".format(c, keys), end=', ')
-            shorthand.update({str(c): keys})
-            c += 1
-        print("\n")
-        intmethod = input("Please enter the name of the method you would like to use, "
-                          "you may use numbers to refer to the methods available: ")
-        if intmethod in shorthand:
-            intmethod = shorthand[intmethod]
-        while intmethod not in available_methods.keys():
-            intmethod = input("That is not an available method, "
-                              "please enter the name of the method you would like to use: ")
+            while len(eqn) != n:
+                eqn = [equn.replace("^", "**") for equn in input("You have entered {} odes when {} odes were required. "
+                                                                 "\n".format(len(eqn), n)).replace(" ", "").split(",")]
+            y_i = [[float(y_initial)] for y_initial in input("Please enter the initial values separated "
+                                                             "by a comma for each y_n for n between "
+                                                             "0 and {}: \n".format(n - 1)).replace(" ", "").split(",")]
+            while len(y_i) != n:
+                y_i = [[float(y_initial)] for y_initial in input("You have entered {} initial conditions "
+                                                                 "when {} initial conditions were required. "
+                                                                 "\n".format(len(y_i), n)).replace(" ", "").split(",")]
+            time_param = input("Please enter the lower and upper time limits, and step size separated by commas: "
+                               "\n").replace(" ", "").split(",")
+            while len(time_param) != 3:
+                time_param = input("You have entered {} parameters when 3 were required. "
+                                   "\n".format(len(time_param))).replace(" ", "").split(",")
+            tlim = [float(time_param[0]), float(time_param[1])]
+            stpsz = float(time_param[2])
+        if not input("Would you like to explicitly choose the method of integration? ").replace(' ', '').lower() in \
+                ["no", "0", "do not do this to me", ""]:
+            print("Choose from one of the following methods: ")
+            shorthand = {"RK4": "Explicit Runge-Kutta 4", "Euler": "Forward Euler"}
+            c = 1
+            for keys in sorted(available_methods.keys()):
+                print("{}: {}".format(c, keys), end=', ')
+                shorthand.update({str(c): keys})
+                c += 1
+            print("\n")
+            intmethod = input("Please enter the name of the method you would like to use, "
+                              "you may use numbers to refer to the methods available: ")
             if intmethod in shorthand:
                 intmethod = shorthand[intmethod]
+            while intmethod not in available_methods.keys():
+                intmethod = input("That is not an available method, "
+                                  "please enter the name of the method you would like to use: ")
+                if intmethod in shorthand:
+                    intmethod = shorthand[intmethod]
+        else:
+            intmethod = "Explicit Runge-Kutta 4"
+        plotbool = input("Would you like to make some basic plots? (Yes: 1, No: 0) : ")
+        savedir = input("Please enter the path to save data and plots to: ")
+    elif "-t" in term_args:
+        fl_name = term_args[1]
+        for i in range(10):
+            try:
+                param_txt = open(fl_name, 'r')
+                n = float(param_txt.readline().replace('\n', ""))
+                eqn = [equn.replace("^", "**") for equn in
+                       param_txt.readline().replace(" ", "").replace('\n', "").split(",")]
+                y_i = [[float(y_initial)] for y_initial in
+                       param_txt.readline().replace(" ", "").replace('\n', "").split(",")]
+                tlim = param_txt.readline().replace(" ", "").replace('\n', "").split(",")
+                stpsz = float(tlim[2])
+                tlim = [float(tlim[0]), float(tlim[1])]
+                plotbool = param_txt.readline().replace('\n', "")
+                savedir = os.path.dirname(fl_name.name)
+                nl = param_txt.readline().replace('\n', "")
+                if nl is not '':
+                    intmethod = nl
+                else:
+                    intmethod = "Explicit Runge-Kutta 4"
+            except FileNotFoundError:
+                fl_name = input("File not found, please enter a valid filename and path: ")
+    elif intersection(['-eqn', '-o', '-tp', '-y_i', '-m'], term_args):
+        try:
+            eqn = [vari for vari in term_args[term_args.index("-eqn") + 1:term_args.index("-o") - 1]]
+            savedir = term_args[term_args.index('-o') + 1]
+            tlim = [float(vari) for vari in term_args[term_args.index("-tp") + 1:term_args.index("-y_i") - 2]]
+            stpsz = float(term_args[term_args.index("-y_i") - 1])
+            y_i = [[float(vari)] for vari in term_args[term_args.index("-y_i") + 1:term_args.index("-m") - 1]]
+            intmethod = term_args[term_args.index("-m") + 1]
+            plotbool = '0'
+            n = len(eqn)
+        except IndexError:
+            print("You are missing one or more arguments")
+            quit()
     else:
-        intmethod = "Explicit Runge-Kutta 4"
-    plotbool = input("Would you like to make some basic plots? (Yes: 1, No: 0) : ")
-    savedir = input("Please enter the path to save data and plots to: ")
+        print("You have entered an invalid set of arguments; quitting...")
+        quit()
 
     reservedchars = ['<', '>', '"', '/', '|', '?', '*']
 
@@ -500,7 +550,9 @@ def main():
                 ax.grid(True, which='both', linewidth=0.075)
                 fig[i].savefig("{}{}.pdf".format(savedir, titles[i][0]), bbox_inches='tight')
                 fig[i].savefig("{}{}.png".format(savedir, titles[i][0]), bbox_inches='tight')
-
+        if len(term_args) > 1:
+            for i in range(n):
+                print("y_{}: {}".format(n, res[i][-1]))
 
 if __name__ == "__main__":
     main()
