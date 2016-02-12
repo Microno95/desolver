@@ -44,6 +44,7 @@ Several different integration methods have been implemented and several interfac
 3. Parameters from the Command Line/Terminal
 	
 	**WARNING: This interface is still experimental and requires improvement.**
+
 	When you run the script with the optional arguments:
 	- -eqn "...ode 1..." "...ode 2..." ... "...ode n..."
 	- -y_i y_0(0) y_1(0) ... y_n(0)
