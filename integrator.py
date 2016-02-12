@@ -1,6 +1,5 @@
 import math
 import numpy as np
-import multiprocessing as mp
 
 safe_list = ['acos', 'asin', 'atan', 'atan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp', 'fabs', 'floor',
              'fmod', 'frexp', 'hypot', 'ldexp', 'log', 'log10', 'modf', 'pi', 'pow', 'radians', 'sin', 'sinh', 'sqrt',
@@ -8,18 +7,19 @@ safe_list = ['acos', 'asin', 'atan', 'atan2', 'ceil', 'cos', 'cosh', 'degrees', 
 safe_dict = {}
 
 for k in safe_list:
+    """
+    Building a dictionary containing functions that are acceptable for use in the odes in order to make it more
+    difficult for end-users to run malicious code.
+    """
     safe_dict.update({'{}'.format(k): getattr(locals().get("math"), k)})
 safe_dict.update({'abs': abs})
-
-
-def worker(varis):
-    varis[-1].put((varis[0], eval(varis[-2])))
 
 
 def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
     """
     Uses the bisection method to find the zeroes of the function defined in cstring.
-    Designed to be used as a method to find the value of the next y_#.
+    Designed to be used as a method to find the value of the next y_# in the implementation of the
+    Backward Euler and Implicit Midpoint methods.
     """
     import copy as cpy
     if iterlimit is None:
@@ -91,6 +91,10 @@ def explicitrk4(ode, vardict, soln, h):
 def explicitmidpoint(ode, vardict, soln, h):
     """
     Implementation of the Explicit Midpoint method.
+    Ode is a list of strings with the expressions defining the odes.
+    Vardict is a dictionary containing the current variables.
+    Soln is the list containing the computed values for the odes.
+    h is the step-size in computing the next value of the variable(s)
     """
     aux = []
     eqnum = len(ode)
@@ -113,6 +117,10 @@ def explicitmidpoint(ode, vardict, soln, h):
 def implicitmidpoint(ode, vardict, soln, h):
     """
     Implementation of the Implicit Midpoint method.
+    Ode is a list of strings with the expressions defining the odes.
+    Vardict is a dictionary containing the current variables.
+    Soln is the list containing the computed values for the odes.
+    h is the step-size in computing the next value of the variable(s)
     """
     eqnum = len(ode)
     for vari in range(eqnum):
@@ -130,6 +138,10 @@ def implicitmidpoint(ode, vardict, soln, h):
 def heuns(ode, vardict, soln, h):
     """
     Implementation of Heun's method.
+    Ode is a list of strings with the expressions defining the odes.
+    Vardict is a dictionary containing the current variables.
+    Soln is the list containing the computed values for the odes.
+    h is the step-size in computing the next value of the variable(s)
     """
     aux = []
     eqnum = len(ode)
@@ -151,6 +163,10 @@ def heuns(ode, vardict, soln, h):
 def backeuler(ode, vardict, soln, h):
     """
     Implementation of the Implicit/Backward Euler method.
+    Ode is a list of strings with the expressions defining the odes.
+    Vardict is a dictionary containing the current variables.
+    Soln is the list containing the computed values for the odes.
+    h is the step-size in computing the next value of the variable(s)
     """
     eqnum = len(ode)
     for vari in range(eqnum):
@@ -168,6 +184,10 @@ def backeuler(ode, vardict, soln, h):
 def foreuler(ode, vardict, soln, h):
     """
     Implementation of the Explicit/Forward Euler method.
+    Ode is a list of strings with the expressions defining the odes.
+    Vardict is a dictionary containing the current variables.
+    Soln is the list containing the computed values for the odes.
+    h is the step-size in computing the next value of the variable(s)
     """
     aux = []
     eqnum = len(ode)
@@ -182,25 +202,13 @@ def foreuler(ode, vardict, soln, h):
     vardict.update({'t': vardict['t'] + h[0]})
 
 
-def mforeuler(ode, vardict, soln, h, pool):
-    eqnum = len(ode)
-    for vari in range(eqnum):
-        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
-    work_queue = []
-    done_queue = mp.Manager().Queue()
-    for vari in range(len(ode)):
-        work_queue.append((vari, ode[vari], vardict, h,
-                           "seval(varis[1], **varis[2]) * varis[3][0] + varis[2]['y_{}'.format(varis[0])]", done_queue))
-    pool.imap_unordered(worker, work_queue)
-    while not done_queue.empty():
-        varis = done_queue.get()
-        vardict.update({"y_{}".format(varis[0]): varis[1]})
-        soln[varis[0]].append(varis[1])
-
-
 def eulertrap(ode, vardict, soln, h):
     """
     Implementation of the Euler-Trapezoidal method.
+    Ode is a list of strings with the expressions defining the odes.
+    Vardict is a dictionary containing the current variables.
+    Soln is the list containing the computed values for the odes.
+    h is the step-size in computing the next value of the variable(s)
     """
     aux = []
     eqnum = len(ode)
@@ -224,6 +232,10 @@ def eulertrap(ode, vardict, soln, h):
 def adaptiveheuneuler(ode, vardict, soln, h, tol=0):
     """
     Implementation of the Adaptive Heun-Euler method.
+    Ode is a list of strings with the expressions defining the odes.
+    Vardict is a dictionary containing the current variables.
+    Soln is the list containing the computed values for the odes.
+    h is the step-size in computing the next value of the variable(s)
     """
     if tol == 0:
         tol = 10e-6
@@ -258,6 +270,10 @@ def adaptiveheuneuler(ode, vardict, soln, h, tol=0):
 def sympforeuler(ode, vardict, soln, h):
     """
     Implementation of the Symplectic Euler method.
+    Ode is a list of strings with the expressions defining the odes.
+    Vardict is a dictionary containing the current variables.
+    Soln is the list containing the computed values for the odes.
+    h is the step-size in computing the next value of the variable(s)
     """
     aux = []
     eqnum = len(ode)
@@ -278,7 +294,7 @@ available_methods = {"Explicit Runge-Kutta 4": explicitrk4, "Explicit Midpoint":
                      "Symplectic Forward Euler": sympforeuler, "Adaptive Heunn-Euler": adaptiveheuneuler,
                      "Heun's": heuns, "Backward Euler": backeuler, "Euler-Trapezoidal": eulertrap,
                      "Predictor-Corrector Euler": eulertrap, "Implicit Midpoint": implicitmidpoint,
-                     "mForward Euler": mforeuler, "Forward Euler": foreuler}
+                     "Forward Euler": foreuler}
 
 
 def mpintegrator(ode, yi, t, h, method=None, eta=None):
@@ -303,7 +319,6 @@ def mpintegrator(ode, yi, t, h, method=None, eta=None):
     soln.append([t[0]])
     vardict = {'t': t[0]}
     currenttime = t[0]
-    pool = mp.Pool(processes=mp.cpu_count())
     while abs(vardict['t']) < abs(t[1]):
         if eta == 1:
             time_remaining[0] = tm.perf_counter()
@@ -312,10 +327,7 @@ def mpintegrator(ode, yi, t, h, method=None, eta=None):
             currenttime = t[0] + steps * heff[0]
         else:
             currenttime = vardict['t']
-        if method == mforeuler:
-            method(ode, vardict, soln, heff, pool)
-        else:
-            method(ode, vardict, soln, heff)
+        method(ode, vardict, soln, heff)
         soln[-1].append(vardict['t'])
         if eta:
             time_remaining[1] = 0.9 * time_remaining[1] + ((steps_total - steps) *
@@ -332,13 +344,11 @@ def mpintegrator(ode, yi, t, h, method=None, eta=None):
         sys.stdout.write("\r100%  ")
     else:
         print("100%")
-    pool.close()
-    pool.join()
     return soln
 
 
 def main():
-    """import os
+    import os
 
     n = int(input("Please enter the order of the system: N = "))
     if input("Would you like to enter the system in vector form? ").replace(" ", "").lower() in ["yes", "1", "y"]:
@@ -414,29 +424,11 @@ def main():
         savedir += "\ ".strip()
 
     if not os.path.isdir(savedir):
-        os.makedirs(savedir)"""
+        os.makedirs(savedir)
 
-    eqn = ['0.1*y_0', '0.1*y_0', '0.1*y_0', '0.1*y_0']
-    y_i = [[1.0], [1.0], [1.0], [1.0]]
-    tlim = [0, 10]
-    stpsz = 1
-    n = 4
-    savedir = r"E:\ "
-    plotbool = "0"
+    res = mpintegrator(eqn, y_i, tlim, stpsz, method=intmethod, eta=0)
 
-    import timeit as tmt
-
-    def timerres1():
-        res = mpintegrator(eqn, y_i, tlim, stpsz, method="Forward Euler", eta=0)
-
-    def timerres2():
-        res = mpintegrator(eqn, y_i, tlim, stpsz, method="mForward Euler", eta=0)
-
-    print(tmt.timeit(timerres1, number=5)/5.)
-
-    print(tmt.timeit(timerres2, number=5)/5.)
-
-    """vardicto = {}
+    vardicto = {}
     vardicto.update({'t': res[-1]})
 
     for i in range(n):
@@ -507,7 +499,7 @@ def main():
                 ax.set_ylabel(titles[i][2])
                 ax.grid(True, which='both', linewidth=0.075)
                 fig[i].savefig("{}{}.pdf".format(savedir, titles[i][0]), bbox_inches='tight')
-                fig[i].savefig("{}{}.png".format(savedir, titles[i][0]), bbox_inches='tight')"""
+                fig[i].savefig("{}{}.png".format(savedir, titles[i][0]), bbox_inches='tight')
 
 
 if __name__ == "__main__":
