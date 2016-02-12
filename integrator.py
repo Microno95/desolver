@@ -1,3 +1,14 @@
+"""
+/* Copyright (C) 2016 Ekin Ozturk - All Rights Reserved
+ * You may use, distribute and modify this code under the
+ * terms of the MIT License (MIT).
+ *
+ * You should have received a copy of the MIT License (MIT) with
+ * this file. If not, please write to: ekin4ozturk@gmail.com,
+ * or visit: https://github.com/Microno95/pintegrator
+ */
+"""
+
 import math
 
 import numpy as np
@@ -303,7 +314,8 @@ available_methods = {"Explicit Runge-Kutta 4": explicitrk4, "Explicit Midpoint":
                      "Symplectic Forward Euler": sympforeuler, "Adaptive Heunn-Euler": adaptiveheuneuler,
                      "Heun's": heuns, "Backward Euler": backeuler, "Euler-Trapezoidal": eulertrap,
                      "Predictor-Corrector Euler": eulertrap, "Implicit Midpoint": implicitmidpoint,
-                     "Forward Euler": foreuler}
+                     "Forward Euler": foreuler, "RK4": explicitrk4, "Midpoint": explicitmidpoint,
+                     "Euler": foreuler}
 
 
 def mpintegrator(ode, yi, t, h, method=None, eta=None):
@@ -361,7 +373,9 @@ def main():
     import sys
     term_args = sys.argv
     eqn = y_i = tlim = savedir = stpsz = intmethod = n = plotbool = None
-    if len(term_args) == 1:
+    if intersection(["-help", "-h", "?", "/help"], term_args):
+        print(open(".\Documentation.txt", 'r').read())
+    elif len(term_args) == 1 and not intersection(["-help", "-h", "?", "/help"], term_args):
         n = int(input("Please enter the order of the system: N = "))
         if input("Would you like to enter the system in vector form? ").replace(" ", "").lower() in ["yes", "1", "y"]:
             vectorised = 1
@@ -381,8 +395,8 @@ def main():
                         float(input("Please enter the final time: t_final = "))]
                 stpsz = float(input("Please enter a step size for the integration: h = "))
         else:
-            eqn = [equn.replace("^", "**") for equn in input("Please enter each ode separated by a comma using y_n as the "
-                                                             "variables for n between 0 and {}: "
+            eqn = [equn.replace("^", "**") for equn in input("Please enter each ode separated by a comma using "
+                                                             "y_n as the variables for n between 0 and {}: "
                                                              "\n".format(n - 1)).replace(" ", "").split(",")]
             print(eqn)
             while len(eqn) != n:
@@ -426,37 +440,39 @@ def main():
         plotbool = input("Would you like to make some basic plots? (Yes: 1, No: 0) : ")
         savedir = input("Please enter the path to save data and plots to: ")
     elif "-t" in term_args:
-        fl_name = term_args[1]
+        fl_name = os.curdir + "/" + term_args[2]
+        print(fl_name)
         for i in range(10):
             try:
                 param_txt = open(fl_name, 'r')
-                n = float(param_txt.readline().replace('\n', ""))
                 eqn = [equn.replace("^", "**") for equn in
                        param_txt.readline().replace(" ", "").replace('\n', "").split(",")]
+                n = len(eqn)
                 y_i = [[float(y_initial)] for y_initial in
                        param_txt.readline().replace(" ", "").replace('\n', "").split(",")]
                 tlim = param_txt.readline().replace(" ", "").replace('\n', "").split(",")
                 stpsz = float(tlim[2])
                 tlim = [float(tlim[0]), float(tlim[1])]
                 plotbool = param_txt.readline().replace('\n', "")
-                savedir = os.path.dirname(fl_name.name)
+                savedir = os.path.dirname(param_txt.name)
                 nl = param_txt.readline().replace('\n', "")
-                if nl is not '':
+                if nl is not '' and nl not in available_methods:
                     intmethod = nl
                 else:
                     intmethod = "Explicit Runge-Kutta 4"
             except FileNotFoundError:
                 fl_name = input("File not found, please enter a valid filename and path: ")
-    elif intersection(['-eqn', '-o', '-tp', '-y_i', '-m'], term_args):
+    elif intersection(['-eqn', '-y_i', '-tp', '-o', '-m'], term_args):
         try:
-            eqn = [vari for vari in term_args[term_args.index("-eqn") + 1:term_args.index("-o") - 1]]
+            eqn = [vari for vari in term_args[term_args.index("-eqn") + 1:term_args.index("-y_i")]]
             savedir = term_args[term_args.index('-o') + 1]
-            tlim = [float(vari) for vari in term_args[term_args.index("-tp") + 1:term_args.index("-y_i") - 2]]
-            stpsz = float(term_args[term_args.index("-y_i") - 1])
-            y_i = [[float(vari)] for vari in term_args[term_args.index("-y_i") + 1:term_args.index("-m") - 1]]
+            tlim = [float(vari) for vari in term_args[term_args.index("-tp") + 1:term_args.index("-o") - 1]]
+            stpsz = float(term_args[term_args.index("-o") - 1])
+            y_i = [[float(vari)] for vari in term_args[term_args.index("-y_i") + 1:term_args.index("-tp")]]
             intmethod = term_args[term_args.index("-m") + 1]
             plotbool = '0'
             n = len(eqn)
+            print(eqn, y_i, savedir, tlim, stpsz, intmethod, plotbool, n)
         except IndexError:
             print("You are missing one or more arguments")
             quit()
@@ -465,6 +481,8 @@ def main():
         quit()
 
     reservedchars = ['<', '>', '"', '/', '|', '?', '*']
+
+    print("potato")
 
     for i in reservedchars:
         while i in savedir:
@@ -498,10 +516,12 @@ def main():
     initial_cond = ""
 
     for kp in range(n):
-        initial_cond += "y_{}({}) = {}\n".format(kp, tlim[0], y_i[kp][0])
-    for kp in range(2):
-        initial_cond += "t_{} = {}\n".format(kp, tlim[kp])
-    initial_cond += "Step Size - h = {}\n".format(stpsz)
+        initial_cond += "Equation {}: Dy_{} = {}\n".format(kp + 1, kp, eqn[kp])
+        initial_cond += "Initial Value {}: y_{}({}) = {}\n".format(kp + 1, kp, tlim[0], y_i[kp][0])
+        initial_cond += "Final Value {}: y_{}({}) = {}\n".format(kp + 1, kp, tlim[1], res[kp][-1])
+    initial_cond += "Initial Time: t_i = {}\n".format(tlim[0])
+    initial_cond += "Final Time: t_f = {}\n".format(tlim[1])
+    initial_cond += "Step Size: h = {}\n".format(stpsz)
 
     file = open("{}initialcond.txt".format(savedir), 'w')
     file.truncate()
