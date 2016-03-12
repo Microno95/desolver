@@ -307,7 +307,8 @@ class odesystem:
             init_namespace()
         self.equ = equ
         self.y = y_i
-        self.soln = y_i
+        self.soln = [[i] for i in self.y]
+		self.soln.append([self.t])
         self.t = t[0]
         self.t0 = t[0]
         self.t1 = t[1]
@@ -381,11 +382,10 @@ class odesystem:
             tf = t
         else:
             tf = self.t1
-        steps_total = (tf - self.t0) / heff[0]
+        steps_total = (tf - self.t) / heff[0]
         time_remaining = [0, 0]
-        soln = [[i] for i in self.y]
-        soln.append([self.t0])
-        vardict = {'t': self.t0}
+        soln = self.soln
+        vardict = {'t': self.t}
         vardict.update(self.consts)
         currenttime = self.t0
         while abs(vardict['t']) < abs(tf):
