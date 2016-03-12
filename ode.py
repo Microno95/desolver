@@ -211,7 +211,7 @@ def adaptiveheuneuler(ode, vardict, soln, h, tol=0):
         aux[vari][1] = seval(ode[vari], **vardict)
     err = 0.
     for vari in range(eqnum):
-        temp_error = np.absolute(np.subtract(aux[vari][0] * h[0], (aux[vari][0] + aux[vari][1]) * 0.5 * h[0]))
+        temp_error = numpy.absolute(numpy.subtract(aux[vari][0] * h[0], (aux[vari][0] + aux[vari][1]) * 0.5 * h[0]))
         if temp_error > err:
             err = temp_error
     if err > tol:
@@ -269,7 +269,6 @@ def init_namespace(package="numpy"):
                              "Forward Euler": foreuler}
     else:
         pass
-
 
 
 class warning():
