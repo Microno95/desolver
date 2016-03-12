@@ -308,6 +308,7 @@ class DifferentialSystem:
         self.equ = equ
         self.y = y_i
         self.soln = y_i
+        self.t = t[0]
         self.t0 = t[0]
         self.t1 = t[1]
         self.consts = consts
@@ -413,3 +414,4 @@ class DifferentialSystem:
         else:
             print("100%")
         self.soln = soln
+        self.t = soln[-1][-1]
