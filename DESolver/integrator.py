@@ -1,4 +1,4 @@
-import odesolver
+from DESolver import odesolver
 
 
 def main():
