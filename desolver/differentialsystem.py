@@ -289,7 +289,7 @@ class LengthError(Exception):
         Exception.__init__(self, *args, **kwargs)
 
 
-class DifferentialSystem:
+class odesystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
     def __init__(self, equ, y_i, t, varcomplex=0, savetraj=0, stpsz=1.0, eta=0, **consts):
         if len(equ) > len(y_i):
