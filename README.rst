@@ -1,4 +1,4 @@
-# desolver
+# DESolver
 The purpose of the integrator python script is to provide a straightforward interface for numerically integrating
 systems of linear and non-linear first-order Ordinary Differential Equations, and plotting the results.
 Several different integration methods have been implemented and several interfacing methods exist for using the script.
