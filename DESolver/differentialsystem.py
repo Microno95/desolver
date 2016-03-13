@@ -366,13 +366,15 @@ class odesystem:
                   "call availmethods() to see what these are")
 
     def addequ(self, eq, ic):
-        for equation, icond in zip(eq, ic):
-            self.equ.append(equation)
-            self.y.append(icond)
-        solntime = self.soln[-1]
-        self.soln = [[i] for i in self.y]
-        self.soln.append(solntime)
-        self.eqnum += len(eq)
+        if eq and ic:
+            for equation, icond in zip(eq, ic):
+                self.equ.append(equation)
+                self.y.append(icond)
+            solntime = self.soln[-1]
+            self.soln = [[i] for i in self.y]
+            self.soln.append(solntime)
+            self.eqnum += len(eq)
+            self.t = self.t0
 
     def delequ(self, indices):
         if len(indices) > self.eqnum:
