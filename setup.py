@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='DESolver',
-      version='1.0.9',
+      version='1.0.10',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
@@ -27,7 +27,6 @@ setup(name='DESolver',
 
           # Specify the Python versions you support here. In particular, ensure
           # that you indicate whether you support Python 2, Python 3 or both.
-          'Programming Language :: Python :: 2.7',
           'Programming Language :: Python :: 3',
           'Programming Language :: Python :: 3.3',
           'Programming Language :: Python :: 3.4',

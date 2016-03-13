@@ -405,7 +405,9 @@ class odesystem:
 
     def showsys(self):
         for i in range(self.eqnum):
-            print("Equation {}\ny_{}({}) = {}\ndy_{} = {}".format(i, i, self.t0, self.y[i], i, self.equ[i]))
+            print("Equation {}\ny_{}({}) = {}\ndy_{} = {}\ny_{}({}) = {}".format(i, i, self.t0, self.y[i], i,
+                                                                                 self.equ[i], i, self.t,
+                                                                                 self.soln[i][-1]))
         if self.consts:
             print("The constants that have been defined for this system are: ")
             print(self.consts)
