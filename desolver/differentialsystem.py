@@ -291,7 +291,7 @@ class LengthError(Exception):
 
 class odesystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
-    def __init__(self, equ, y_i, t, varcomplex=0, savetraj=0, stpsz=1.0, eta=0, **consts):
+    def __init__(self, equ=[], y_i=[], t=[0, 0], varcomplex=0, savetraj=0, stpsz=1.0, eta=0, **consts):
         if len(equ) > len(y_i):
             raise LengthError("There are more equations than initial conditions!")
         elif len(equ) < len(y_i):
@@ -327,7 +327,16 @@ class odesystem:
             self.y.append(icond)
             self.soln.append(icond)
         self.eqnum += len(eq)
-
+	
+	def chgendtime(self, t):
+		self.t1 = t
+	
+	def chgbegtime(self, t):
+		self.t0 = t
+		
+	def chgcurtime(self, t):
+		self.t = t
+	
     def delequ(self, indices):
         if len(indices) > self.eqnum:
             raise LengthError("You've specified the removal of more equations than there exists!")

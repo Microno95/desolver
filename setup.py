@@ -3,13 +3,13 @@
 from distutils.core import setup
 
 setup(name='DESolver',
-      version='1.0',
+      version='1.01',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
-	  install_requires=['numpy', 'cmath'],
+	  install_requires=['numpy'],
 	  license='MIT',
-      url='https://github.com/Microno95/pintegrator',
+      url='https://github.com/Microno95/desolver',
       packages=['desolver'],
 	  classifiers=[
         # How mature is this project? Common values are
@@ -27,6 +27,7 @@ setup(name='DESolver',
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
+		'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
