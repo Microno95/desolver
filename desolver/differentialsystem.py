@@ -291,7 +291,7 @@ class LengthError(Exception):
 
 class odesystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
-    def __init__(self, equ=[], y_i=[], t=[0, 0], varcomplex=0, savetraj=0, stpsz=1.0, eta=0, **consts):
+    def __init__(self, equ=(), y_i=(), t=(0, 0), varcomplex=0, savetraj=0, stpsz=1.0, eta=0, **consts):
         if len(equ) > len(y_i):
             raise LengthError("There are more equations than initial conditions!")
         elif len(equ) < len(y_i):
@@ -314,19 +314,13 @@ class odesystem:
         self.soln.append([self.t])
         self.consts = consts
         self.traj = savetraj
+        self.method = None
         if (stpsz < 0 and t[1] - t[0] > 0) or (stpsz > 0 and t[1] - t[0] < 0):
-            self.h = -1*stpsz
+            self.dt = -1*stpsz
         else:
-            self.h = stpsz
+            self.dt = stpsz
         self.eta = eta
         self.eqnum = len(equ)
-
-    def addequ(self, eq, ic):
-        for icond, equation in zip(eq,ic):
-            self.equ.append(equation)
-            self.y.append(icond)
-            self.soln.append(icond)
-        self.eqnum += len(eq)
 
     def chgendtime(self, t):
         self.t1 = t
@@ -336,6 +330,47 @@ class odesystem:
 
     def chgcurtime(self, t):
         self.t = t
+
+    def chgtime(self, t=()):
+        if len(t) == 1:
+            warning("You have passed an array of that only contains one element, "
+                    "this will be taken as the current time.")
+            self.t = t[0]
+        elif len(t) == 2:
+            self.t0 = t[0]
+            self.t1 = t[1]
+        elif len(t) == 3:
+            self.t = t[0]
+            self.t0 = t[1]
+            self.t1 = t[2]
+        elif len(t) > 3:
+            warning("You have passed an array longer than 3 elements, "
+                    "the first three will be taken as the principle values.")
+            self.t = t[0]
+            self.t0 = t[1]
+            self.t1 = t[2]
+        else:
+            warning("You have passed an array that is empty, this doesn't make sense.")
+
+    def setstepsize(self, h):
+        self.dt = h
+
+    def availmethods(self):
+        return available_methods
+
+    def setmethod(self, method):
+        if method in available_methods.keys():
+            self.method = method
+        else:
+            print("The method you selected does not exist in the list of available method, "
+                  "call availmethods() to see what these are")
+
+    def addequ(self, eq, ic):
+        for equation, icond in zip(eq, ic):
+            self.equ.append(equation)
+            self.y.append(icond)
+            self.soln.append(icond)
+        self.eqnum += len(eq)
 
     def delequ(self, indices):
         if len(indices) > self.eqnum:
@@ -372,15 +407,19 @@ class odesystem:
         if self.consts:
             print("The constants that have been defined for this system are: ")
             print(self.consts)
+        print("The time limits for this system are:\n "
+              "t0 = [], t1 = [], t_current = {}, step_size = []".format(self.t0, self.t1, self.t, self.dt))
+
     def addconsts(self, **additional_constants):
         self.consts.update(additional_constants)
 
-    def remconsts(self, constants_removal=[]):
+    def remconsts(self, **constants_removal):
         for i in constants_removal:
-            if key in self.consts:
+            if i in self.consts.keys():
                 del self.consts[i]
 
-    def integrate(self, t=None, method=None):
+    def integrate(self, t=None):
+        method = self.method
         if method is None:
             method = available_methods["Explicit Runge-Kutta 4"]
         else:
@@ -395,7 +434,7 @@ class odesystem:
             import time as tm
             import sys
             eta = 1
-        heff = [self.h]
+        heff = [self.dt]
         steps = 1
         if t:
             tf = t
