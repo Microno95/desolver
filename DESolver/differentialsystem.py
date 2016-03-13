@@ -305,8 +305,8 @@ class odesystem:
             init_namespace("cmath")
         else:
             init_namespace()
-        self.equ = equ
-        self.y = y_i
+        self.equ = list(equ)
+        self.y = list(y_i)
         self.t = t[0]
         self.t0 = t[0]
         self.t1 = t[1]
