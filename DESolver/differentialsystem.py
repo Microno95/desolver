@@ -311,7 +311,7 @@ class odesystem:
         self.t0 = t[0]
         self.t1 = t[1]
         self.soln = [[i] for i in self.y]
-        self.soln.append([self.t])
+        self.soln.append([t[0]])
         self.consts = consts
         self.traj = savetraj
         self.method = None
@@ -369,7 +369,9 @@ class odesystem:
         for equation, icond in zip(eq, ic):
             self.equ.append(equation)
             self.y.append(icond)
-            self.soln.append(icond)
+        solntime = self.soln[-1]
+        self.soln = [[i] for i in self.y]
+        self.soln.append(solntime)
         self.eqnum += len(eq)
 
     def delequ(self, indices):
