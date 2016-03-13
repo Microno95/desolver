@@ -308,7 +308,7 @@ class odesystem:
         self.equ = equ
         self.y = y_i
         self.soln = [[i] for i in self.y]
-		self.soln.append([self.t])
+        self.soln.append([self.t])
         self.t = t[0]
         self.t0 = t[0]
         self.t1 = t[1]
@@ -338,7 +338,8 @@ class odesystem:
         self.eqnum -= len(indices)
 
     def showequ(self):
-        [print("dy_{} = ".format(i) + self.equ[i]) for i in range(self.eqnum)]
+        for i in range(self.eqnum):
+            print("dy_{} = ".format(i) + self.equ[i])
         return self.equ
 
     def numequ(self):
@@ -346,20 +347,29 @@ class odesystem:
         return self.eqnum
 
     def initcond(self):
-        [print("y_{}({}) = {}".format(i, self.t0, self.y[i])) for i in range(self.eqnum)]
+        for i in range(self.eqnum):
+            print("y_{}({}) = {}".format(i, self.t0, self.y[i]))
         return self.y
 
     def finalcond(self, p=1):
         if p:
-            [print("y_{}({}) = {}".format(i, self.t1, self.soln[i][-1])) for i in range(self.eqnum)]
+            for i in range(self.eqnum):
+                print("y_{}({}) = {}".format(i, self.t1, self.soln[i][-1]))
         return self.soln
 
     def showsys(self):
         for i in range(self.eqnum):
             print("Equation {}\ny_{}({}) = {}\ndy_{} = {}".format(i, i, self.t0, self.y[i], i, self.equ[i]))
-        if len(self.consts):
+        if self.consts:
             print("The constants that have been defined for this system are: ")
             print(self.consts)
+    def addconsts(self, **additional_constants):
+        self.consts.update(additional_constants)
+
+    def remconsts(self, constants_removal=[]):
+        for i in constants_removal:
+            if key in self.consts:
+                del self.consts[i]
 
     def integrate(self, t=None, method=None):
         if method is None:
