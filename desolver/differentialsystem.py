@@ -307,11 +307,11 @@ class odesystem:
             init_namespace()
         self.equ = equ
         self.y = y_i
-        self.soln = [[i] for i in self.y]
-        self.soln.append([self.t])
         self.t = t[0]
         self.t0 = t[0]
         self.t1 = t[1]
+        self.soln = [[i] for i in self.y]
+        self.soln.append([self.t])
         self.consts = consts
         self.traj = savetraj
         if (stpsz < 0 and t[1] - t[0] > 0) or (stpsz > 0 and t[1] - t[0] < 0):
