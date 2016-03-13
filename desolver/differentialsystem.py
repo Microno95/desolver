@@ -327,16 +327,16 @@ class odesystem:
             self.y.append(icond)
             self.soln.append(icond)
         self.eqnum += len(eq)
-	
-	def chgendtime(self, t):
-		self.t1 = t
-	
-	def chgbegtime(self, t):
-		self.t0 = t
-		
-	def chgcurtime(self, t):
-		self.t = t
-	
+
+    def chgendtime(self, t):
+        self.t1 = t
+
+    def chgbegtime(self, t):
+        self.t0 = t
+
+    def chgcurtime(self, t):
+        self.t = t
+
     def delequ(self, indices):
         if len(indices) > self.eqnum:
             raise LengthError("You've specified the removal of more equations than there exists!")
