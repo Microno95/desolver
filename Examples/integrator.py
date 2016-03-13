@@ -1,4 +1,4 @@
-from DESolver import odesolver
+import DESolver as odesolver
 
 
 def main():
@@ -54,10 +54,12 @@ def main():
             eqn = [i for i in argu[argu.index('-eqn') + 1:argu.index('-y_i')]]
             tlim = [float(i) for i in argu[argu.index('-tp') + 1:argu.index('-o')]]
             n = len(eqn)
+            stpsz = tlim[-1]
+            tlim = tlim[0:2]
         except ValueError:
             raise ValueError
 
-    intobj = odesolver.DifferentialSystem(eqn, y_i, tlim, savetraj=1, stpsz=stpsz, eta=1)
+    intobj = odesolver.odesystem(eqn, y_i, tlim, savetraj=1, stpsz=stpsz, eta=1)
     if '-m' not in sys.argv:
         if not input("Would you like to explicitly choose the method of integration? ").replace(' ', '').lower() in \
                 ["no", "0", "do not do this to me", ""]:
@@ -100,7 +102,8 @@ def main():
     if not os.path.isdir(savedir):
         os.makedirs(savedir)
 
-    intobj.integrate(method=intmethod)
+    intobj.setmethod(intmethod)
+    intobj.integrate()
 
     res = intobj.finalcond(p=0)
     vardicto = {}

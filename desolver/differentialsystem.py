@@ -408,7 +408,7 @@ class odesystem:
             print("The constants that have been defined for this system are: ")
             print(self.consts)
         print("The time limits for this system are:\n "
-              "t0 = [], t1 = [], t_current = {}, step_size = []".format(self.t0, self.t1, self.t, self.dt))
+              "t0 = {}, t1 = {}, t_current = {}, step_size = {}".format(self.t0, self.t1, self.t, self.dt))
 
     def addconsts(self, **additional_constants):
         self.consts.update(additional_constants)
