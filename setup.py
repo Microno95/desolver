@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='DESolver',
-      version='1.0.12',
+      version='1.1.0',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
@@ -17,9 +17,13 @@ setup(name='DESolver',
           #   4 - Beta
           #   5 - Production/Stable
           'Development Status :: 3 - Alpha',
-
+		  
+		  'Environment :: Console',
           # Indicate who your project is intended for
           'Intended Audience :: Developers',
+		  'Intended Audience :: Science/Research',
+		  'Intended Audience :: Education'
+		  'Intended Audience :: End Users/Desktop'
           'Topic :: Scientific/Engineering :: Mathematics',
 
           # Pick your license as you wish (should match "license" above)

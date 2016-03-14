@@ -271,14 +271,9 @@ def init_namespace(package="numpy"):
         pass
 
 
-class warning():
-    def __init__(self, *messages):
-        print("Warning!", end=" ")
-        for i in messages:
-            print(i, end=" ")
-        print('')
-
-
+def warning(message):
+	print(message)
+		
 class VariableMissing(Exception):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
@@ -287,7 +282,6 @@ class VariableMissing(Exception):
 class LengthError(Exception):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
-
 
 class odesystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
