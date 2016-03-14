@@ -23,7 +23,7 @@ setup(name='DESolver',
           'Intended Audience :: Developers',
 		  'Intended Audience :: Science/Research',
 		  'Intended Audience :: Education',
-		  'Intended Audience :: End Users/Desktop'
+		  'Intended Audience :: End Users/Desktop',
           'Topic :: Scientific/Engineering :: Mathematics',
 
           # Pick your license as you wish (should match "license" above)
