@@ -22,7 +22,7 @@ setup(name='DESolver',
           # Indicate who your project is intended for
           'Intended Audience :: Developers',
 		  'Intended Audience :: Science/Research',
-		  'Intended Audience :: Education'
+		  'Intended Audience :: Education',
 		  'Intended Audience :: End Users/Desktop'
           'Topic :: Scientific/Engineering :: Mathematics',
 
