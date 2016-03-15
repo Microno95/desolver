@@ -316,7 +316,7 @@ class odesystem:
 		self.t0 = t[0]
 		self.t1 = t[1]
 		self.soln = [numpy.resize(i, n) for i in self.y]
-		self.soln.append(numpy.resize([t[0]], n))
+		self.soln.append([t[0]])
 		self.consts = consts
 		for k in self.consts:
 			self.consts.update({k: numpy.resize(self.consts[k], n)})
@@ -377,7 +377,7 @@ class odesystem:
 			for equation, icond in zip(eq, ic):
 				self.equ.append(equation)
 				self.y.append(numpy.resize(icond, self.dim))
-			solntime = numpy.resize(self.soln[-1], self.dim)
+			solntime = self.soln[-1]
 			self.soln = [numpy.array(numpy.resize([i], self.dim)) for i in self.y]
 			self.soln.append([solntime])
 			self.eqnum += len(eq)
@@ -431,6 +431,18 @@ class odesystem:
 			if i in self.consts.keys():
 				del self.consts[i]
 
+	def reset(self, t=self.t0):
+		if t != self.t0:
+			k = numpy.array(self.soln[-1])
+			ind = numpy.argmin(numpy.power(k - t, 2))
+			for i, k in enumerate(soln):
+				self.soln[i] = numpy.delete(k, numpy.s_[ind + 1:], axis=0)
+		else:
+			for i, k in enumerate(soln):
+				self.soln[i] = numpy.array(k[0])
+		self.t = t
+			
+	
 	def integrate(self, t=None):
 		method = self.method
 		if method is None:
