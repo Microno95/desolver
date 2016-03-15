@@ -379,7 +379,7 @@ class odesystem:
 				self.y.append(numpy.resize(icond, self.dim))
 			solntime = self.soln[-1]
 			self.soln = [numpy.array(numpy.resize([i], self.dim)) for i in self.y]
-			self.soln.append([solntime])
+			self.soln.append(solntime)
 			self.eqnum += len(eq)
 			self.t = self.t0
 
@@ -434,12 +434,12 @@ class odesystem:
 	def reset(self, t=None):
 		if t is not None:
 			k = numpy.array(self.soln[-1])
-			ind = numpy.argmin(numpy.power(k - t, 2))
-			for i, k in enumerate(soln):
-				self.soln[i] = numpy.delete(k, numpy.s_[ind + 1:], axis=0)
+			ind = numpy.argmin(numpy.square(numpy.subtract(k, t)))
+			for i, k in enumerate(self.soln):
+				self.soln[i] = list(numpy.delete(k, numpy.s_[ind + 1:], axis=0))
 		else:
-			for i, k in enumerate(soln):
-				self.soln[i] = numpy.array(k[0])
+			for i, k in enumerate(self.soln):
+				self.soln[i] = k[0]
 		self.t = t
 			
 	
