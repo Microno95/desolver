@@ -431,8 +431,8 @@ class odesystem:
 			if i in self.consts.keys():
 				del self.consts[i]
 
-	def reset(self, t=self.t0):
-		if t != self.t0:
+	def reset(self, t=None):
+		if t is not None:
 			k = numpy.array(self.soln[-1])
 			ind = numpy.argmin(numpy.power(k - t, 2))
 			for i, k in enumerate(soln):
