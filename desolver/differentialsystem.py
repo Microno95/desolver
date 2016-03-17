@@ -434,6 +434,15 @@ class odesystem:
             if i in self.consts.keys():
                 del self.consts[i]
 
+    def chgdim(self, m=None):
+        if m is not None:
+            self.dim = (1, *m)
+            self.y = [numpy.resize(i, m) for i in self.y]
+            solntime = self.soln[-1]
+            self.soln = [numpy.resize(i, m) for i in self.soln[:-1]]
+            self.soln.append(solntime)
+
+
     def reset(self, t=None):
         if t is not None:
             k = numpy.array(self.soln[-1])
@@ -476,7 +485,7 @@ class odesystem:
         while abs(vardict['t']) < abs(tf):
             try:
                 if heff[0] != heff[1]:
-                    steps_total = (tf - self.t) / heff[0]
+                    steps_total *= heff[1] / heff[0]
                     heff[1] = heff[0]
                 if eta == 1:
                     time_remaining[0] = tm.perf_counter()
@@ -487,7 +496,10 @@ class odesystem:
                 else:
                     currenttime = vardict['t']
                 method(self.equ, vardict, soln, heff)
-                soln[-1].append(vardict['t'])
+                if self.traj:
+                    soln[-1].append(vardict['t'])
+                else:
+                    soln = [i[-1] for i in soln]
                 if eta:
                     time_remaining[1] = 0.9 * time_remaining[1] + ((steps_total - steps) *
                                                                    0.1 * (tm.perf_counter() - time_remaining[0]))
