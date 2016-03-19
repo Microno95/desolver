@@ -46,7 +46,8 @@ def explicitrk4(ode, vardict, soln, h):
     """
     eqnum = len(ode)
     dim = soln[0][0].shape
-    aux = numpy.resize([0.], (eqnum, 4, *dim))
+    dim = tuple([eqnum, 4].append(dim))
+    aux = numpy.resize([0.], dim)
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -81,7 +82,8 @@ def explicitmidpoint(ode, vardict, soln, h):
     """
     eqnum = len(ode)
     dim = soln[0][0].shape
-    aux = numpy.resize([0.], (eqnum, 1, *dim))
+    dim = tuple([eqnum, 2].append(dim))
+    aux = numpy.resize([0.], dim)
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -124,7 +126,8 @@ def heuns(ode, vardict, soln, h):
     """
     eqnum = len(ode)
     dim = soln[0][0].shape
-    aux = numpy.resize([0.], (eqnum, 2, *dim))
+    dim = tuple([eqnum, 2].append(dim))
+    aux = numpy.resize([0.], dim)
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -166,7 +169,8 @@ def foreuler(ode, vardict, soln, h):
     """
     eqnum = len(ode)
     dim = soln[0][0].shape
-    aux = numpy.resize([0.], (eqnum, 1, *dim))
+    dim = tuple([eqnum, 1].append(dim))
+    aux = numpy.resize([0.], dim)
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -185,7 +189,8 @@ def eulertrap(ode, vardict, soln, h):
     """
     eqnum = len(ode)
     dim = soln[0][0].shape
-    aux = numpy.resize([0.], (eqnum, 3, *dim))
+    dim = tuple([eqnum, 3].append(dim))
+    aux = numpy.resize([0.], dim)
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -210,7 +215,8 @@ def adaptiveheuneuler(ode, vardict, soln, h, tol=10e-14):
     """
     eqnum = len(ode)
     dim = soln[0][0].shape
-    aux = numpy.resize([0.], (eqnum, 2, *dim))
+    dim = tuple([eqnum, 2].append(dim))
+    aux = numpy.resize([0.], dim)
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -245,7 +251,8 @@ def sympforeuler(ode, vardict, soln, h):
     """
     eqnum = len(ode)
     dim = soln[0][0].shape
-    aux = numpy.resize([0.], (eqnum, 1, *dim))
+    dim = tuple([eqnum, 1].append(dim))
+    aux = numpy.resize([0.], dim)
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -436,7 +443,7 @@ class odesystem:
 
     def chgdim(self, m=None):
         if m is not None:
-            self.dim = (1, *m)
+            self.dim = tuple([1].extend(m))
             self.y = [numpy.resize(i, m) for i in self.y]
             solntime = self.soln[-1]
             self.soln = [numpy.resize(i, m) for i in self.soln[:-1]]
