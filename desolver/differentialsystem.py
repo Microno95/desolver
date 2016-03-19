@@ -1,6 +1,7 @@
 import numpy
 
 
+# noinspection PyUnusedLocal
 def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
     """
     Uses the bisection method to find the zeros of the function defined in cstring.
@@ -70,7 +71,7 @@ def explicitrk4(ode, vardict, soln, h):
         vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][3]})
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1] +
-                                             (aux[vari][0] + aux[vari][1] * 2 + aux[vari][2] * 2 + aux[vari][3]) / 6})
+                       (aux[vari][0] + aux[vari][1] * 2 + aux[vari][2] * 2 + aux[vari][3]) / 6})
         pt = soln[vari]
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
@@ -306,8 +307,9 @@ class LengthError(Exception):
         Exception.__init__(self, *args, **kwargs)
 
 
-class odesystem:
+class OdeSystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
+
     def __init__(self, n=(1,), equ=(), y_i=(), t=(0, 0), savetraj=0, stpsz=1.0, eta=0, **consts):
         if len(equ) > len(y_i):
             raise LengthError("There are more equations than initial conditions!")
@@ -326,13 +328,14 @@ class odesystem:
         self.t0 = t[0]
         self.t1 = t[1]
         self.soln = [numpy.resize(i, n) for i in self.y]
+        # noinspection PyTypeChecker
         self.soln.append([t[0]])
         self.consts = consts
         for k in self.consts:
             self.consts.update({k: numpy.resize(self.consts[k], n)})
         self.traj = savetraj
         self.method = None
-        if (stpsz < 0 and t[1] - t[0] > 0) or (stpsz > 0 and t[1] - t[0] < 0):
+        if (stpsz < 0 < t[0] - t[1]) or (stpsz > 0 > t[0] - t[1]):
             self.dt = -1 * stpsz
         else:
             self.dt = stpsz
@@ -372,7 +375,8 @@ class odesystem:
     def setstepsize(self, h):
         self.dt = h
 
-    def availmethods(self):
+    @staticmethod
+    def availmethods():
         return available_methods
 
     def setmethod(self, method):
@@ -448,7 +452,6 @@ class odesystem:
             solntime = self.soln[-1]
             self.soln = [numpy.resize(i, m) for i in self.soln[:-1]]
             self.soln.append(solntime)
-
 
     def reset(self, t=None):
         if t is not None:
