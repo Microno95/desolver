@@ -46,9 +46,11 @@ def explicitrk4(ode, vardict, soln, h):
     h is the step-size in computing the next value of the variable(s)
     """
     eqnum = len(ode)
-    dim = soln[0][0].shape
-    dim = tuple([eqnum, 4].append(dim))
+    dim = [eqnum, 4]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
     aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -82,9 +84,11 @@ def explicitmidpoint(ode, vardict, soln, h):
     Implementation of the Explicit Midpoint method.
     """
     eqnum = len(ode)
-    dim = soln[0][0].shape
-    dim = tuple([eqnum, 2].append(dim))
+    dim = [eqnum, 2]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
     aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -126,9 +130,11 @@ def heuns(ode, vardict, soln, h):
     Implementation of Heun's method.
     """
     eqnum = len(ode)
-    dim = soln[0][0].shape
-    dim = tuple([eqnum, 2].append(dim))
+    dim = [eqnum, 2]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
     aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -169,9 +175,11 @@ def foreuler(ode, vardict, soln, h):
     Implementation of the Explicit/Forward Euler method.
     """
     eqnum = len(ode)
-    dim = soln[0][0].shape
-    dim = tuple([eqnum, 1].append(dim))
+    dim = [eqnum, 1]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
     aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -189,9 +197,11 @@ def eulertrap(ode, vardict, soln, h):
     Implementation of the Euler-Trapezoidal method.
     """
     eqnum = len(ode)
-    dim = soln[0][0].shape
-    dim = tuple([eqnum, 3].append(dim))
+    dim = [eqnum, 3]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
     aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -215,9 +225,11 @@ def adaptiveheuneuler(ode, vardict, soln, h, tol=10e-14):
     Implementation of the Adaptive Heun-Euler method.
     """
     eqnum = len(ode)
-    dim = soln[0][0].shape
-    dim = tuple([eqnum, 2].append(dim))
+    dim = [eqnum, 2]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
     aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -251,9 +263,11 @@ def sympforeuler(ode, vardict, soln, h):
     Implementation of the Symplectic Euler method.
     """
     eqnum = len(ode)
-    dim = soln[0][0].shape
-    dim = tuple([eqnum, 1].append(dim))
+    dim = [eqnum, 1]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
     aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -459,10 +473,14 @@ class OdeSystem:
             ind = numpy.argmin(numpy.square(numpy.subtract(k, t)))
             for i, k in enumerate(self.soln):
                 self.soln[i] = list(numpy.delete(k, numpy.s_[ind + 1:], axis=0))
+            self.t = t
         else:
             for i, k in enumerate(self.soln):
-                self.soln[i] = k[0]
-        self.t = t
+                if i + 1 < self.eqnum:
+                    self.soln[i] = k[0]
+                else:
+                    self.soln[i] = k
+            self.t = 0
 
     def integrate(self, t=None):
         method = self.method
