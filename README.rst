@@ -3,6 +3,14 @@ The purpose of the integrator python script is to provide a straightforward inte
 systems of linear and non-linear first-order Ordinary Differential Equations, and plotting the results.
 Several different integration methods have been implemented and several interfacing methods exist for using the script.
 
+#To Install:
+Just type
+
+	pip install DESolver
+or
+
+	conda install DESolver
+
 ##Implemented Integration Methods
 1. Explicit Runge-Kutta 4
 2. Forward Euler
@@ -46,11 +54,11 @@ Several different integration methods have been implemented and several interfac
 	**WARNING: This interface is still experimental and requires improvement.**
 
 	When you run the script with the optional arguments:
-	-eqn "...ode 1..." "...ode 2..." ... "...ode n..." / 
-	-y_i y_0(0) y_1(0) ... y_n(0) / 
-	-tp t_initial t_final step_size / 
-	-o "output directory location" / 
-	-m "method of integration" / 
+	- -eqn "...ode 1..." "...ode 2..." ... "...ode n..."
+	- -y_i y_0(0) y_1(0) ... y_n(0)
+	- -tp t_initial t_final step_size
+	- -o "output directory location"
+	- -m "method of integration"
 	
 	In that order, the script will run and give the relevant output to the directory you have specified.
 
