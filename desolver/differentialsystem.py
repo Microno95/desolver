@@ -341,7 +341,7 @@ class OdeSystem:
         self.t = t[0]
         self.t0 = t[0]
         self.t1 = t[1]
-        self.soln = [numpy.resize(i, n) for i in self.y]
+        self.soln = [[numpy.resize(i, n)] for i in self.y]
         # noinspection PyTypeChecker
         self.soln.append([t[0]])
         self.consts = consts
@@ -406,7 +406,7 @@ class OdeSystem:
                 self.equ.append(equation)
                 self.y.append(numpy.resize(icond, self.dim))
             solntime = self.soln[-1]
-            self.soln = [numpy.array(numpy.resize([i], self.dim)) for i in self.y]
+            self.soln = [[numpy.resize([i], self.dim)] for i in self.y]
             self.soln.append(solntime)
             self.eqnum += len(eq)
             self.t = self.t0
@@ -464,7 +464,7 @@ class OdeSystem:
             self.dim = tuple([1] + list(m))
             self.y = [numpy.resize(i, m) for i in self.y]
             solntime = self.soln[-1]
-            self.soln = [numpy.resize(i, m) for i in self.soln[:-1]]
+            self.soln = [[numpy.resize(i, m)] for i in self.soln[:-1]]
             self.soln.append(solntime)
 
     def reset(self, t=None):
@@ -475,11 +475,11 @@ class OdeSystem:
                 self.soln[i] = list(numpy.delete(k, numpy.s_[ind + 1:], axis=0))
             self.t = t
         else:
-            for i, k in enumerate(self.soln):
-                if i + 1 < self.eqnum:
-                    self.soln[i] = k[0]
+            for i in range(self.eqnum + 1):
+                if i < self.eqnum:
+                    self.soln[i] = [self.y[i]]
                 else:
-                    self.soln[i] = k
+                    self.soln[i] = 0
             self.t = 0
 
     def integrate(self, t=None):
@@ -527,7 +527,8 @@ class OdeSystem:
                 if self.traj:
                     soln[-1].append(vardict['t'])
                 else:
-                    soln = [i[-1] for i in soln]
+                    soln = [[i[-1]] for i in soln[:-1]]
+                    soln.append([vardict['t']])
                 if eta:
                     time_remaining[1] = 0.9 * time_remaining[1] + ((steps_total - steps) *
                                                                    0.1 * (tm.perf_counter() - time_remaining[0]))
