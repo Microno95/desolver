@@ -3,12 +3,13 @@
 from distutils.core import setup
 
 setup(name='DESolver',
-      version='1.1.15',
+      version='1.1.16',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
       install_requires=['numpy'],
       license='MIT',
+      keywords=['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode'],
       url='https://github.com/Microno95/desolver',
       packages=['desolver'],
       classifiers=[
