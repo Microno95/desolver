@@ -337,7 +337,7 @@ class OdeSystem:
         init_namespace()
         self.equ = list(equ)
         self.y = [numpy.resize(i, n) for i in y_i]
-        self.dim = tuple([1].extend(n))
+        self.dim = tuple([1] + list(n))
         self.t = t[0]
         self.t0 = t[0]
         self.t1 = t[1]
