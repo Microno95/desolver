@@ -461,7 +461,7 @@ class OdeSystem:
 
     def chgdim(self, m=None):
         if m is not None:
-            self.dim = tuple([1].extend(m))
+            self.dim = tuple([1] + list(m))
             self.y = [numpy.resize(i, m) for i in self.y]
             solntime = self.soln[-1]
             self.soln = [numpy.resize(i, m) for i in self.soln[:-1]]
