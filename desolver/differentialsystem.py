@@ -9,11 +9,11 @@ def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
     """
     import copy as cpy
     if iterlimit is None:
-        iterlimit = 52
+        iterlimit = 64
     r = 0
     temp_vardict = cpy.deepcopy(vardict)
     temp_vardict.update({'t': vardict['t'] + m * h[0]})
-    while numpy.sum(numpy.abs(numpy.subtract(high, low))) > 10e-15 and r < iterlimit:
+    while numpy.sum(numpy.abs(numpy.subtract(high, low))) > 1e-14 and r < iterlimit:
         temp_vardict.update({'y_{}'.format(n): (low + high) * 0.5})
         if r > iterlimit:
             break
@@ -24,6 +24,28 @@ def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
             high = c
         r += 1
     vardict.update({'y_{}'.format(n): vardict['y_{}'.format(n)] + (low + high) * 0.5 / m})
+
+
+def extrap(x, xdata, ydata):
+    coeff = []
+    xlen = len(xdata)
+    coeff.append([0, ydata[0]])
+    for j in range(1, xlen):
+        try:
+            coeff.append([0, ydata[j]])
+            for k in range(2, j + 1):
+                if numpy.all([(i < 5e-14) for i in numpy.abs(coeff[-2][-1] - coeff[-1][-1])]):
+                    raise StopIteration
+                t1 = xdata[j] - xdata[j - k + 1]
+                s1 = (x - xdata[j - k + 1])
+                s2 = (x - xdata[j])
+                p1 = s1 * coeff[j][k - 1] - s2 * coeff[j - 1][k - 1]
+                p1 /= t1
+                coeff[j].append(p1)
+        except StopIteration:
+            coeff.pop()
+            break
+    return coeff
 
 
 def seval(string, **kwargs):
@@ -49,7 +71,10 @@ def explicitrk4(ode, vardict, soln, h):
     dim = [eqnum, 4]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
-    aux = numpy.resize([0.], dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
@@ -87,7 +112,10 @@ def explicitmidpoint(ode, vardict, soln, h):
     dim = [eqnum, 2]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
-    aux = numpy.resize([0.], dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
@@ -133,7 +161,10 @@ def heuns(ode, vardict, soln, h):
     dim = [eqnum, 2]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
-    aux = numpy.resize([0.], dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
@@ -178,7 +209,10 @@ def foreuler(ode, vardict, soln, h):
     dim = [eqnum, 1]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
-    aux = numpy.resize([0.], dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
@@ -200,7 +234,10 @@ def eulertrap(ode, vardict, soln, h):
     dim = [eqnum, 3]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
-    aux = numpy.resize([0.], dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
@@ -220,7 +257,7 @@ def eulertrap(ode, vardict, soln, h):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
-def adaptiveheuneuler(ode, vardict, soln, h, tol=10e-14):
+def adaptiveheuneuler(ode, vardict, soln, h, tol=5e-16):
     """
     Implementation of the Adaptive Heun-Euler method.
     """
@@ -228,7 +265,10 @@ def adaptiveheuneuler(ode, vardict, soln, h, tol=10e-14):
     dim = [eqnum, 2]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
-    aux = numpy.resize([0.], dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
@@ -266,7 +306,10 @@ def sympforeuler(ode, vardict, soln, h):
     dim = [eqnum, 1]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
-    aux = numpy.resize([0.], dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
@@ -391,6 +434,7 @@ class OdeSystem:
 
     @staticmethod
     def availmethods():
+        print(available_methods.keys())
         return available_methods
 
     def setmethod(self, method):
