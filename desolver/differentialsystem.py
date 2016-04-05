@@ -104,6 +104,89 @@ def explicitrk4(ode, vardict, soln, h):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
+def explicitrk45(ode, vardict, soln, h, tol=0.9):
+    """
+    Implementation of the Explicit Runge-Kutta-Fehlberg method.
+    Ode is a list of strings with the expressions defining the odes.
+    Vardict is a dictionary containing the current variables.
+    Soln is the list containing the computed values for the odes.
+    h is the step-size in computing the next value of the variable(s)
+    """
+    eqnum = len(ode)
+    dim = [eqnum, 6]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
+    t_initial = vardict['t']
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
+    for vari in range(eqnum):
+        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
+    for vari in range(eqnum):
+        aux[vari][0] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    for vari in range(eqnum):
+        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][0] * 0.25})
+    vardict.update({'t': t_initial + 0.25 * h[0]})
+    for vari in range(eqnum):
+        aux[vari][1] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    for vari in range(eqnum):
+        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][0] * 3.0/32.0 + aux[vari][1] * 9.0/32})
+    for vari in range(eqnum):
+        aux[vari][2] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    vardict.update({'t': t_initial + 0.375 * h[0]})
+    for vari in range(eqnum):
+        vardict.update({"y_{}".format(vari): soln[vari][-1] + (1932.0 * aux[vari][0] - 7200.0 * aux[vari][1] +
+                                                               7296.0 * aux[vari][2])})
+    vardict.update({'t': t_initial + (12.0/13.0) * h[0]})
+    for vari in range(eqnum):
+        aux[vari][3] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    for vari in range(eqnum):
+        vardict.update({"y_{}".format(vari): soln[vari][-1] + (439.0 * aux[vari][0] / 216.0 - 8.0 * aux[vari][1] +
+                                                               3680.0 * aux[vari][2] / 513.0 -
+                                                               845.0 * aux[vari][3] / 4104.0)})
+    vardict.update({'t': t_initial + h[0]})
+    for vari in range(eqnum):
+        aux[vari][4] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    for vari in range(eqnum):
+        vardict.update({"y_{}".format(vari): (soln[vari][-1] -
+                                              8.0 * aux[vari][0] / 27.0 + 2.0 * aux[vari][1] -
+                                              3544.0 * aux[vari][2] / 2565.0 + 1859.0 * aux[vari][3] / 4104.0 -
+                                              11.0 * aux[vari][4] / 40.0)})
+    vardict.update({'t': t_initial + 0.5 * h[0]})
+    for vari in range(eqnum):
+        aux[vari][5] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    est = []
+    coeff = []
+    for vari in range(eqnum):
+        est.append([])
+        coeff.append([])
+        coeff[vari].append(25.0 * aux[vari][0] / 216.0 + 1408.0 * aux[vari][2] / 2565.0 +
+                           2197.0 * aux[vari][3] / 4104.0 - 0.2 * aux[vari][4])
+        coeff[vari].append(16.0 * aux[vari][0] / 135.0 + 6656.0 * aux[vari][2] / 12825.0 +
+                           28561.0 * aux[vari][3] / 56430.0 - 9.0 * aux[vari][4] / 50.0 + 2.0 * aux[vari][5] / 55.0)
+        est[vari].append(soln[vari][-1] + coeff[vari][0])
+        est[vari].append(soln[vari][-1] + coeff[vari][1])
+    est = [numpy.amax(numpy.abs(numpy.ravel(i[1] - i[0]))) for i in est]
+    if numpy.any([(i > 1e-15) for i in est]):
+        for vari in range(eqnum):
+            vardict.update({'y_{}'.format(vari): soln[vari][-1]})
+        vardict.update({'t': t_initial})
+        h[1] = h[0]
+        h[0] = h[0] * tol * (1e-15 / numpy.amax(est)) ** (6.0 ** -1.0)
+        explicitrk45(ode, vardict, soln, h)
+    else:
+        h[1] = h[0]
+        h[0] /= tol / 2.0
+        for vari in range(eqnum):
+            vardict.update({'y_{}'.format(vari): soln[vari][-1] + coeff[vari][0]})
+            vardict.update({'t': t_initial + h[0]})
+            pt = soln[vari]
+            kt = numpy.array([soln[vari][-1] + coeff[vari][0]])
+            soln[vari] = numpy.concatenate((pt, kt))
+
+
 def explicitmidpoint(ode, vardict, soln, h):
     """
     Implementation of the Explicit Midpoint method.
@@ -345,7 +428,7 @@ def init_namespace():
                              "Symplectic Forward Euler": sympforeuler, "Adaptive Heun-Euler": adaptiveheuneuler,
                              "Heun's": heuns, "Backward Euler": backeuler, "Euler-Trapezoidal": eulertrap,
                              "Predictor-Corrector Euler": eulertrap, "Implicit Midpoint": implicitmidpoint,
-                             "Forward Euler": foreuler}
+                             "Forward Euler": foreuler, "Runge-Kutta-Fehlberg": explicitrk45}
     else:
         pass
 
