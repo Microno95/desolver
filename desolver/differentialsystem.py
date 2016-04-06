@@ -98,7 +98,7 @@ def explicitrk4(ode, vardict, soln, h):
         vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][3]})
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1] +
-                       (aux[vari][0] + aux[vari][1] * 2 + aux[vari][2] * 2 + aux[vari][3]) / 6})
+                                             (aux[vari][0] + aux[vari][1] * 2 + aux[vari][2] * 2 + aux[vari][3]) / 6})
         pt = soln[vari]
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
@@ -157,33 +157,31 @@ def explicitrk45(ode, vardict, soln, h, tol=0.9):
     vardict.update({'t': t_initial + 0.5 * h[0]})
     for vari in range(eqnum):
         aux[vari][5] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
-    est = []
     coeff = []
     for vari in range(eqnum):
-        est.append([])
         coeff.append([])
-        coeff[vari].append(25.0 * aux[vari][0] / 216.0 + 1408.0 * aux[vari][2] / 2565.0 +
+        coeff[vari].append(soln[vari][-1] + 25.0 * aux[vari][0] / 216.0 + 1408.0 * aux[vari][2] / 2565.0 +
                            2197.0 * aux[vari][3] / 4104.0 - 0.2 * aux[vari][4])
-        coeff[vari].append(16.0 * aux[vari][0] / 135.0 + 6656.0 * aux[vari][2] / 12825.0 +
+        coeff[vari].append(soln[vari][-1] + 16.0 * aux[vari][0] / 135.0 + 6656.0 * aux[vari][2] / 12825.0 +
                            28561.0 * aux[vari][3] / 56430.0 - 9.0 * aux[vari][4] / 50.0 + 2.0 * aux[vari][5] / 55.0)
-        est[vari].append(soln[vari][-1] + coeff[vari][0])
-        est[vari].append(soln[vari][-1] + coeff[vari][1])
-    est = [numpy.amax(numpy.abs(numpy.ravel(i[1] - i[0]))) for i in est]
-    if numpy.any([(i > 1e-15) for i in est]):
+    est = [numpy.amax(numpy.abs(numpy.ravel((i[1] - i[0])))) for i in coeff]
+    if numpy.amax(est) != 0:
+        h[1] = h[0]
+        h[0] = h[0] * tol * \
+               (abs(numpy.amax(numpy.maximum(numpy.ravel(coeff), [1]))) * 5e-16 / numpy.amax(est)) ** (1.0 / 6.0)
+        if h[0] > h[2]:
+            h[0] = h[2]
+    if numpy.any([(i > abs(numpy.amax(numpy.maximum(numpy.ravel(coeff), [1])) * 5e-16)) for i in est]):
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): soln[vari][-1]})
         vardict.update({'t': t_initial})
-        h[1] = h[0]
-        h[0] = h[0] * tol * (1e-15 / numpy.amax(est)) ** (6.0 ** -1.0)
         explicitrk45(ode, vardict, soln, h)
     else:
-        h[1] = h[0]
-        h[0] /= tol / 2.0
         for vari in range(eqnum):
-            vardict.update({'y_{}'.format(vari): soln[vari][-1] + coeff[vari][0]})
+            vardict.update({'y_{}'.format(vari): coeff[vari][1]})
             vardict.update({'t': t_initial + h[0]})
             pt = soln[vari]
-            kt = numpy.array([soln[vari][-1] + coeff[vari][0]])
+            kt = numpy.array([coeff[vari][1]])
             soln[vari] = numpy.concatenate((pt, kt))
 
 
@@ -428,7 +426,7 @@ def init_namespace():
                              "Symplectic Forward Euler": sympforeuler, "Adaptive Heun-Euler": adaptiveheuneuler,
                              "Heun's": heuns, "Backward Euler": backeuler, "Euler-Trapezoidal": eulertrap,
                              "Predictor-Corrector Euler": eulertrap, "Implicit Midpoint": implicitmidpoint,
-                             "Forward Euler": foreuler, "Runge-Kutta-Fehlberg": explicitrk45}
+                             "Forward Euler": foreuler, "Adaptive Runge-Kutta-Fehlberg": explicitrk45}
     else:
         pass
 
@@ -484,16 +482,20 @@ class OdeSystem:
 
     def chgendtime(self, t):
         self.t1 = t
+        if not (abs(self.t0) < abs(self.t) < abs(self.t1)):
+            self.t = self.t0
 
     def chgbegtime(self, t):
         self.t0 = t
+        if not (abs(self.t0) < abs(self.t) < abs(self.t1)):
+            self.t = self.t0
 
     def chgcurtime(self, t):
         self.t = t
 
     def chgtime(self, t=()):
         if len(t) == 1:
-            warning("You have passed an array of that only contains one element, "
+            warning("You have passed an array that only contains one element, "
                     "this will be taken as the current time.")
             self.t = t[0]
         elif len(t) == 2:
@@ -588,7 +590,12 @@ class OdeSystem:
 
     def chgdim(self, m=None):
         if m is not None:
-            self.dim = tuple([1] + list(m))
+            if isinstance(m, float):
+                raise ValueError('The dimension of a system cannot be a float')
+            elif isinstance(m, int):
+                self.dim = (1, m,)
+            else:
+                self.dim = tuple([1] + list(m))
             self.y = [numpy.resize(i, m) for i in self.y]
             solntime = self.soln[-1]
             self.soln = [[numpy.resize(i, m)] for i in self.soln[:-1]]
@@ -619,37 +626,33 @@ class OdeSystem:
             except KeyError:
                 print("Method not available, defaulting to RK4 Method")
                 method = available_methods["Explicit Runge-Kutta 4"]
-        if not self.eta:
-            eta = 0
-        elif self.eta:
+        eta = self.eta
+        if self.eta:
             import time as tm
             import sys
-            eta = 1
         heff = [self.dt, self.dt]
-        steps = 1
         if t:
             tf = t
         else:
             tf = self.t1
-        steps_total = (tf - self.t) / heff[0]
+        steps = 0
+        if tf - self.t < 0:
+            heff = [-1.0 * abs(i) for i in heff]
+        heff.append(tf)
         time_remaining = [0, 0]
         soln = self.soln
         vardict = {'t': self.t}
         vardict.update(self.consts)
-        currenttime = self.t0
-        while abs(vardict['t']) < abs(tf):
+        while (self.t + heff[0] < tf and heff[0] > 0) or (self.t + heff[0] > tf and heff[0] < 0):
             try:
                 if heff[0] != heff[1]:
-                    steps_total *= heff[1] / heff[0]
                     heff[1] = heff[0]
-                if eta == 1:
+                if method not in [explicitrk45, adaptiveheuneuler]:
+                    vardict.update({'t': self.t0 + steps * heff[0]})
+                    # Avoids floating point precision errors by setting t to current time
+                self.t = vardict['t']
+                if eta:
                     time_remaining[0] = tm.perf_counter()
-                if "adaptive" not in method.__name__.lower().strip():
-                    vardict.update(
-                        {'t': currenttime})  # Avoids floating point precision errors by setting t to current time
-                    currenttime = self.t0 + steps * heff[0]
-                else:
-                    currenttime = vardict['t']
                 method(self.equ, vardict, soln, heff)
                 if self.traj:
                     soln[-1].append(vardict['t'])
@@ -657,21 +660,24 @@ class OdeSystem:
                     soln = [[i[-1]] for i in soln[:-1]]
                     soln.append([vardict['t']])
                 if eta:
-                    time_remaining[1] = 0.9 * time_remaining[1] + ((steps_total - steps) *
-                                                                   0.1 * (tm.perf_counter() - time_remaining[0]))
+                    temp_time = 0.8 * time_remaining[1] + (((tf - self.t) / heff[0]) *
+                                                           0.2 * (tm.perf_counter() - time_remaining[0]))
+                    if numpy.abs(time_remaining[1]/temp_time - 1) > 0.2:
+                        time_remaining[1] = temp_time
                     sys.stdout.flush()
                     sys.stdout.write(
-                        "\r{}% ----- ETA: {}".format(round(currenttime * 100 / (self.t1 - self.t0), ndigits=3),
-                                                     "{} minutes and {} seconds".format(
-                                                         int(time_remaining[1] / 60.),
-                                                         int(time_remaining[1] - int(
-                                                             time_remaining[1] / 60) * 60))))
+                        "\r{:.3f}% ----- approx. ETA: {} -- Current Time and Stepsize: {:.4e} and {:.4e}".format(
+                            round(100 - abs(tf - self.t) * 100 / abs(tf - self.t0), ndigits=3),
+                            "{} minutes and {} seconds".format(
+                                int(time_remaining[1] / 60.),
+                                int(time_remaining[1] - int(
+                                    time_remaining[1] / 60) * 60)), self.t, heff[0]))
                 steps += 1
             except KeyboardInterrupt:
                 break
         if eta:
             sys.stdout.flush()
-            sys.stdout.write("\r100%  ")
+            sys.stdout.write("\r100%  \n")
         else:
             print("100%")
         self.soln = soln
