@@ -1,4 +1,10 @@
 import numpy
+import sys
+import time as tm
+
+safe_dict = {}
+available_methods = {}
+methods_inv_order = {}
 
 
 # noinspection PyUnusedLocal
@@ -432,11 +438,17 @@ def init_namespace():
         pass
     if 'available_methods' not in globals():
         global available_methods
+        global methods_inv_order
         available_methods = {"Explicit Runge-Kutta 4": explicitrk4, "Explicit Midpoint": explicitmidpoint,
                              "Symplectic Forward Euler": sympforeuler, "Adaptive Heun-Euler": adaptiveheuneuler,
                              "Heun's": heuns, "Backward Euler": backeuler, "Euler-Trapezoidal": eulertrap,
                              "Predictor-Corrector Euler": eulertrap, "Implicit Midpoint": implicitmidpoint,
                              "Forward Euler": foreuler, "Adaptive Runge-Kutta-Fehlberg": explicitrk45}
+        methods_inv_order = {"Explicit Runge-Kutta 4": 1.0/5.0, "Explicit Midpoint": 1.0/2.0,
+                             "Symplectic Forward Euler": 1.0, "Adaptive Heun-Euler": 1.0/3.0,
+                             "Heun's": 1.0/2.0, "Backward Euler": 0, "Euler-Trapezoidal": eulertrap,
+                             "Predictor-Corrector Euler": 1.0/3.0, "Implicit Midpoint": 0,
+                             "Forward Euler": 1.0, "Adaptive Runge-Kutta-Fehlberg": 1.0/5.0}
     else:
         pass
 
@@ -535,11 +547,15 @@ class OdeSystem:
         print(available_methods.keys())
         return available_methods
 
-    def setmethod(self, method):
+    def setmethod(self, method, auto_calc_dt=0):
         if method in available_methods.keys():
             self.method = method
+            if auto_calc_dt:
+                alt_h = (self.t1 - self.t) * (self.relative_error_bound ** methods_inv_order[method])
+                if alt_h < self.dt:
+                    self.dt = alt_h
         else:
-            print("The method you selected does not exist in the list of available method, "
+            print("The method you selected does not exist in the list of available methods, "
                   "call availmethods() to see what these are")
 
     def addequ(self, eq, ic):
@@ -640,9 +656,6 @@ class OdeSystem:
                 print("Method not available, defaulting to RK4 Method")
                 method = available_methods["Explicit Runge-Kutta 4"]
         eta = self.eta
-        if self.eta:
-            import time as tm
-            import sys
         heff = [self.dt, self.dt]
         if t:
             tf = t
@@ -680,20 +693,21 @@ class OdeSystem:
                                                            0.2 * (tm.perf_counter() - time_remaining[0]))
                     if temp_time != 0 and numpy.abs(time_remaining[1]/temp_time - 1) > 0.2:
                         time_remaining[1] = temp_time
-                    sys.stdout.write(
-                        "\r{:.3f}% ----- approx. ETA: {} -- Current Time and Step Size: {:.4e} and {:.4e}".format(
+                    sys.stdout.flush()
+                    print('\r', end='')
+                    print(
+                        "{:.3f}% ----- approx. ETA: {} -- Current Time and Step Size: {:.4e} and {:.4e}".format(
                             round(100 - abs(tf - self.t) * 100 / abs(tf - self.t0), ndigits=3),
                             "{} minutes and {} seconds".format(
                                 int(time_remaining[1] / 60.),
                                 int(time_remaining[1] - int(
-                                    time_remaining[1] / 60) * 60)), self.t, heff[0]))
-                    sys.stdout.flush()
+                                    time_remaining[1] / 60) * 60)), self.t, heff[0]), end='')
                 steps += 1
             except KeyboardInterrupt:
                 break
         if eta:
             sys.stdout.flush()
-            sys.stdout.write("\r100%  \n")
+            print("\r100%")
         else:
             print("100%")
         self.soln = soln
