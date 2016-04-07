@@ -176,7 +176,8 @@ def explicitrk45(ode, vardict, soln, h, relerr, tol=0.8):
     error_coeff_array = [numpy.resize(i, dim) for i in error_coeff_array]
     est = [numpy.abs(numpy.sum(aux[vari] * error_coeff_array)) for vari in range(eqnum)]
     est = numpy.amax(est) * abs((h[2] - t_initial) / h[0])
-    delta = numpy.maximum(numpy.amax(numpy.ravel(numpy.abs(coeff))), numpy.array([1.0]))
+    delta_prime = numpy.ravel(numpy.abs(coeff))
+    delta = numpy.maximum(numpy.amin(delta_prime[numpy.nonzero(delta_prime)]), numpy.array([1.0]))
     # print(coeff)
     if est != 0:
         h[1] = h[0]
@@ -423,7 +424,7 @@ def sympforeuler(ode, vardict, soln, h, relerr):
 
 
 def init_namespace():
-    if 'safe_dict' not in globals():
+    if len(safe_dict) == 0:
         import numpy
         safe_list = ['arccos', 'arcsin', 'arctan', 'arctan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp', 'abs',
                      'fabs', 'floor', 'fmod', 'frexp', 'hypot', 'ldexp', 'log', 'log10', 'modf', 'pi', 'power',
@@ -436,7 +437,7 @@ def init_namespace():
             safe_dict.update({'{}'.format(k): getattr(locals().get("numpy"), k)})
     else:
         pass
-    if 'available_methods' not in globals():
+    if len(available_methods) == 0 or len(methods_inv_order) == 0:
         global available_methods
         global methods_inv_order
         available_methods = {"Explicit Runge-Kutta 4": explicitrk4, "Explicit Midpoint": explicitmidpoint,
@@ -494,7 +495,7 @@ class OdeSystem:
         for k in self.consts:
             self.consts.update({k: numpy.resize(self.consts[k], n)})
         self.traj = savetraj
-        self.method = None
+        self.method = "Explicit Runge-Kutta 4"
         if (stpsz < 0 < t[0] - t[1]) or (stpsz > 0 > t[0] - t[1]):
             self.dt = -1 * stpsz
         else:
@@ -539,21 +540,22 @@ class OdeSystem:
     def setstepsize(self, h):
         self.dt = h
 
-    def setrelerr(self, relative_err):
+    def setrelerr(self, relative_err, auto_calc_dt=0):
         self.relative_error_bound = relative_err
+        if auto_calc_dt:
+            alt_h = float(self.t1 - self.t) * (self.relative_error_bound ** methods_inv_order[self.method])
+            if alt_h < self.dt and alt_h != 0:
+                self.dt = alt_h
+                print('Time step, dt, set to: {:.4e}'.format(self.dt))
 
     @staticmethod
     def availmethods():
         print(available_methods.keys())
         return available_methods
 
-    def setmethod(self, method, auto_calc_dt=0):
+    def setmethod(self, method):
         if method in available_methods.keys():
             self.method = method
-            if auto_calc_dt:
-                alt_h = (self.t1 - self.t) * (self.relative_error_bound ** methods_inv_order[method])
-                if alt_h < self.dt:
-                    self.dt = alt_h
         else:
             print("The method you selected does not exist in the list of available methods, "
                   "call availmethods() to see what these are")
@@ -677,8 +679,8 @@ class OdeSystem:
                     heff[1] = heff[0]
                 if eta:
                     time_remaining[0] = tm.perf_counter()
-                if abs(heff[0] + self.t) - abs(tf) > abs(tf) * 4e-16:
-                    heff[0] = tf - self.t
+                if abs(heff[0] + self.t) - abs(tf) > abs(tf) * 4e-15:
+                    heff[0] = (tf - self.t) * 0.5
                 elif heff[0] == 0:
                     heff[0] = 1e-15
                 method(self.equ, vardict, soln, heff, self.relative_error_bound)
@@ -689,8 +691,8 @@ class OdeSystem:
                     soln = [[i[-1]] for i in soln[:-1]]
                     soln.append([vardict['t']])
                 if eta:
-                    temp_time = 0.8 * time_remaining[1] + (((tf - self.t) / heff[0]) *
-                                                           0.2 * (tm.perf_counter() - time_remaining[0]))
+                    temp_time = 0.4 * time_remaining[1] + (((tf - self.t) / heff[0]) *
+                                                           0.6 * (tm.perf_counter() - time_remaining[0]))
                     if temp_time != 0 and numpy.abs(time_remaining[1]/temp_time - 1) > 0.2:
                         time_remaining[1] = temp_time
                     sys.stdout.flush()
