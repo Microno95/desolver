@@ -59,7 +59,7 @@ def seval(string, **kwargs):
     return eval(string, safeglobals, safe_dict)
 
 
-def explicitrk4(ode, vardict, soln, h):
+def explicitrk4(ode, vardict, soln, h, relerr):
     """
     Implementation of the Explicit Runge-Kutta 4 method.
     Ode is a list of strings with the expressions defining the odes.
@@ -104,7 +104,7 @@ def explicitrk4(ode, vardict, soln, h):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
-def explicitrk45(ode, vardict, soln, h, tol=0.85):
+def explicitrk45(ode, vardict, soln, h, relerr, tol=0.8):
     """
     Implementation of the Explicit Runge-Kutta-Fehlberg method.
     Ode is a list of strings with the expressions defining the odes.
@@ -122,8 +122,6 @@ def explicitrk45(ode, vardict, soln, h, tol=0.85):
     else:
         aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
-    if abs(h[0] + t_initial) - abs(h[2]) > abs(h[2]) * 4e-16:
-        h[0] = h[2] - t_initial
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -134,71 +132,71 @@ def explicitrk45(ode, vardict, soln, h, tol=0.85):
     for vari in range(eqnum):
         aux[vari][1] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + 3 * aux[vari][0] / 40 + 9 * aux[vari][1] / 40})
+        vardict.update({"y_{}".format(vari): soln[vari][-1] + 3.0 * aux[vari][0] / 40 + 9.0 * aux[vari][1] / 40})
     vardict.update({'t': t_initial + 3 * h[0] / 10})
     for vari in range(eqnum):
         aux[vari][2] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + (3 * aux[vari][0] - 9 * aux[vari][1] +
-                                                               12 * aux[vari][2]) / 10})
+        vardict.update({"y_{}".format(vari): soln[vari][-1] + (3.0 * aux[vari][0] - 9.0 * aux[vari][1] +
+                                                               12.0 * aux[vari][2]) / 10})
     vardict.update({'t': t_initial + 3 * h[0] / 5})
     for vari in range(eqnum):
         aux[vari][3] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): (soln[vari][-1] + -11 * aux[vari][0] / 54 - 5 * aux[vari][1] / 2 -
-                                              70 * aux[vari][2] / 27 - 35 * aux[vari][3] / 27)})
+        vardict.update({"y_{}".format(vari): (soln[vari][-1] - 11.0 * aux[vari][0] / 54 - 5.0 * aux[vari][1] / 2 -
+                                              70.0 * aux[vari][2] / 27 + 35.0 * aux[vari][3] / 27)})
     vardict.update({'t': t_initial + h[0]})
     for vari in range(eqnum):
         aux[vari][4] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): (soln[vari][-1] -
-                                              1631 * aux[vari][0] / 55296 + 175 * aux[vari][1] / 512 -
-                                              575 * aux[vari][2] / 13824 + 44275 * aux[vari][3] / 110592 -
-                                              253 * aux[vari][4] / 4096)})
-    vardict.update({'t': t_initial + 7 * h[0] / 8})
+        vardict.update({"y_{}".format(vari): (soln[vari][-1] +
+                                              1631.0 * aux[vari][0] / 55296 + 175.0 * aux[vari][1] / 512 +
+                                              575.0 * aux[vari][2] / 13824 + 44275.0 * aux[vari][3] / 110592 +
+                                              253.0 * aux[vari][4] / 4096)})
+    vardict.update({'t': t_initial + 7.0 * h[0] / 8})
     for vari in range(eqnum):
         aux[vari][5] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
     coeff = []
     for vari in range(eqnum):
         coeff.append([])
-        coeff[vari].append(soln[vari][-1] + 37 * aux[vari][0] / 378 + 250 * aux[vari][2] / 621 +
-                           125 * aux[vari][3] / 594 + 512 * aux[vari][4] / 1771)
-        coeff[vari].append(soln[vari][-1] + 2825 * aux[vari][0] / 27648 + 18575 * aux[vari][2] / 48384 +
-                           13525 * aux[vari][3] / 55296 + 277 * aux[vari][4] / 14336 + aux[vari][5] / 4)
+        coeff[vari].append(soln[vari][-1] + 37.0 * aux[vari][0] / 378 + 250.0 * aux[vari][2] / 621 +
+                           125.0 * aux[vari][3] / 594 + 512.0 * aux[vari][5] / 1771)
+        coeff[vari].append(soln[vari][-1] + 2825.0 * aux[vari][0] / 27648 + 18575.0 * aux[vari][2] / 48384 +
+                           13525.0 * aux[vari][3] / 55296 + 277.0 * aux[vari][4] / 14336 + aux[vari][5] / 4.0)
+
     error_coeff_array = [[37.0 / 378 - 2825.0 / 27648], [0], [250.0 / 621 - 18575.0 / 48384],
                          [125.0 / 594 - 13525.0 / 55296], [-277.0 / 14336],
-                         [512.0 / 1771 - 1.0 / 4]]
+                         [512.0 / 1771 - 1.0 / 4.0]]
     error_coeff_array = [numpy.resize(i, dim) for i in error_coeff_array]
     est = [numpy.abs(numpy.sum(aux[vari] * error_coeff_array)) for vari in range(eqnum)]
-    est = [numpy.sum(numpy.ravel(i)) for i in est]
-    est = numpy.amax(numpy.abs(est))
-    est *= (h[2]/h[0])
+    est = numpy.amax(est) * abs((h[2] - t_initial) / h[0])
+    delta = numpy.maximum(numpy.amax(numpy.ravel(numpy.abs(coeff))), numpy.array([1.0]))
     # print(coeff)
     if est != 0:
         h[1] = h[0]
         # print('\n\nest:', est, 'h:', h, 't_current:', t_initial)
-        if est > numpy.amax(numpy.ravel(coeff)) * 4e-15:
-            corr = h[0] * tol * (4e-16 / est) ** (1.0 / 4.0)
+        if est >= delta * relerr:
+            corr = h[0] * tol * (relerr / est) ** (1.0 / 5.0)
         else:
-            corr = h[0] * tol * (4e-16 / est) ** (1.0 / 5.0)
+            corr = h[0] * tol * (relerr / est) ** (1.0 / 4.0)
         if abs(corr + t_initial) <= abs(h[2]):
             h[0] = corr
         # print('\nest:', est, 'h:', h, 't_current:', t_initial, 'corr:', corr)
-    if est > 4e-16:
+    if est >= delta * relerr:
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): soln[vari][-1]})
         vardict.update({'t': t_initial})
-        explicitrk45(ode, vardict, soln, h)
+        explicitrk45(ode, vardict, soln, h, relerr)
     else:
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): coeff[vari][1]})
-            vardict.update({'t': t_initial + h[0]})
+            vardict.update({'t': t_initial + h[1]})
             pt = soln[vari]
             kt = numpy.array([coeff[vari][1]])
             soln[vari] = numpy.concatenate((pt, kt))
 
 
-def explicitmidpoint(ode, vardict, soln, h):
+def explicitmidpoint(ode, vardict, soln, h, relerr):
     """
     Implementation of the Explicit Midpoint method.
     """
@@ -228,7 +226,7 @@ def explicitmidpoint(ode, vardict, soln, h):
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
 
 
-def implicitmidpoint(ode, vardict, soln, h):
+def implicitmidpoint(ode, vardict, soln, h, relerr):
     """
     Implementation of the Implicit Midpoint method.
     """
@@ -247,7 +245,7 @@ def implicitmidpoint(ode, vardict, soln, h):
     vardict.update({'t': vardict['t'] + h[0]})
 
 
-def heuns(ode, vardict, soln, h):
+def heuns(ode, vardict, soln, h, relerr):
     """
     Implementation of Heun's method.
     """
@@ -276,7 +274,7 @@ def heuns(ode, vardict, soln, h):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
-def backeuler(ode, vardict, soln, h):
+def backeuler(ode, vardict, soln, h, relerr):
     """
     Implementation of the Implicit/Backward Euler method.
     """
@@ -295,7 +293,7 @@ def backeuler(ode, vardict, soln, h):
     vardict.update({'t': vardict['t'] + h[0]})
 
 
-def foreuler(ode, vardict, soln, h):
+def foreuler(ode, vardict, soln, h, relerr):
     """
     Implementation of the Explicit/Forward Euler method.
     """
@@ -320,7 +318,7 @@ def foreuler(ode, vardict, soln, h):
     vardict.update({'t': vardict['t'] + h[0]})
 
 
-def eulertrap(ode, vardict, soln, h):
+def eulertrap(ode, vardict, soln, h, relerr):
     """
     Implementation of the Euler-Trapezoidal method.
     """
@@ -351,7 +349,7 @@ def eulertrap(ode, vardict, soln, h):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
-def adaptiveheuneuler(ode, vardict, soln, h,  tol=5e-16):
+def adaptiveheuneuler(ode, vardict, soln, h, relerr, tol=0.9):
     """
     Implementation of the Adaptive Heun-Euler method.
     """
@@ -373,26 +371,25 @@ def adaptiveheuneuler(ode, vardict, soln, h,  tol=5e-16):
     vardict.update({'t': vardict['t'] + h[0]})
     for vari in range(eqnum):
         aux[vari][1] = numpy.resize(seval(ode[vari], **vardict), dim)
-    err = 0.
-    for vari in range(eqnum):
-        temp_error = numpy.array(
-            numpy.absolute(numpy.subtract(aux[vari][0] * h[0], (aux[vari][0] + aux[vari][1]) * 0.5 * h[0])))
-        if numpy.any([temp_error > err]):
-            err = temp_error
-    if numpy.any([err > tol]):
-        h[0] /= 2.0
-        adaptiveheuneuler(ode, vardict, soln, h)
+    err = [numpy.subtract(aux[vari][0] * h[0], (aux[vari][0] + aux[vari][1]) * 0.5 * h[0]) for vari in range(eqnum)]
+    err = numpy.abs([numpy.abs(i) for i in err])
+    err = numpy.amax(err)
+    err *= ((h[2] - vardict['t'] + h[0]) / h[0])
+    if numpy.any([err >= relerr]):
+        vardict.update({'t': vardict['t'] - h[0]})
+        h[0] *= tol * (relerr / err) ** (1.0 / 2.0)
+        adaptiveheuneuler(ode, vardict, soln, h, relerr)
     else:
-        if numpy.all([2 * err < tol]):
-            h[0] *= 2
+        if numpy.all([2 * err < relerr]):
+            h[0] *= tol * (relerr / err) ** (1.0 / 3.0)
         for vari in range(eqnum):
-            vardict.update({"y_{}".format(vari): soln[vari][-1] + h[0] * aux[vari][0]})
+            vardict.update({"y_{}".format(vari): soln[vari][-1] + (aux[vari][0] + aux[vari][1]) * 0.5 * h[0]})
             pt = soln[vari]
             kt = numpy.array([vardict['y_{}'.format(vari)]])
             soln[vari] = numpy.concatenate((pt, kt))
 
 
-def sympforeuler(ode, vardict, soln, h):
+def sympforeuler(ode, vardict, soln, h, relerr):
     """
     Implementation of the Symplectic Euler method.
     """
@@ -461,7 +458,7 @@ class LengthError(Exception):
 class OdeSystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
 
-    def __init__(self, n=(1,), equ=(), y_i=(), t=(0, 0), savetraj=0, stpsz=1.0, eta=0, **consts):
+    def __init__(self, n=(1,), equ=(), y_i=(), t=(0, 0), savetraj=0, stpsz=1.0, eta=0, relerr=4e-16, **consts):
         if len(equ) > len(y_i):
             raise LengthError("There are more equations than initial conditions!")
         elif len(equ) < len(y_i):
@@ -472,6 +469,7 @@ class OdeSystem:
             if 't' not in i and 'y_' not in i:
                 warning("Equation {} has no variables".format(k))
         init_namespace()
+        self.relative_error_bound = relerr
         self.equ = list(equ)
         self.y = [numpy.resize(i, n) for i in y_i]
         self.dim = tuple([1] + list(n))
@@ -528,6 +526,9 @@ class OdeSystem:
 
     def setstepsize(self, h):
         self.dt = h
+
+    def setrelerr(self, relative_err):
+        self.relative_error_bound = relative_err
 
     @staticmethod
     def availmethods():
@@ -667,19 +668,18 @@ class OdeSystem:
                     heff[0] = tf - self.t
                 elif heff[0] == 0:
                     heff[0] = 1e-15
-                method(self.equ, vardict, soln, heff)
+                method(self.equ, vardict, soln, heff, self.relative_error_bound)
                 self.t = vardict['t']
                 if self.traj:
                     soln[-1].append(vardict['t'])
                 else:
                     soln = [[i[-1]] for i in soln[:-1]]
                     soln.append([vardict['t']])
-                if eta and heff[0] != 0:
+                if eta:
                     temp_time = 0.8 * time_remaining[1] + (((tf - self.t) / heff[0]) *
                                                            0.2 * (tm.perf_counter() - time_remaining[0]))
                     if temp_time != 0 and numpy.abs(time_remaining[1]/temp_time - 1) > 0.2:
                         time_remaining[1] = temp_time
-                    sys.stdout.flush()
                     sys.stdout.write(
                         "\r{:.3f}% ----- approx. ETA: {} -- Current Time and Step Size: {:.4e} and {:.4e}".format(
                             round(100 - abs(tf - self.t) * 100 / abs(tf - self.t0), ndigits=3),
@@ -687,6 +687,7 @@ class OdeSystem:
                                 int(time_remaining[1] / 60.),
                                 int(time_remaining[1] - int(
                                     time_remaining[1] / 60) * 60)), self.t, heff[0]))
+                    sys.stdout.flush()
                 steps += 1
             except KeyboardInterrupt:
                 break
