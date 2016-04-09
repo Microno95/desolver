@@ -384,11 +384,13 @@ def adaptiveheuneuler(ode, vardict, soln, h, relerr, tol=0.9):
     err *= ((h[2] - vardict['t'] + h[0]) / h[0])
     if numpy.any([err >= relerr]):
         vardict.update({'t': vardict['t'] - h[0]})
-        h[0] *= tol * (relerr / err) ** (1.0 / 2.0)
+        if err != 0:
+            h[0] *= tol * (relerr / err) ** (1.0 / 2.0)
         adaptiveheuneuler(ode, vardict, soln, h, relerr)
     else:
-        if numpy.all([2 * err < relerr]):
-            h[0] *= tol * (relerr / err) ** (1.0 / 3.0)
+        if numpy.all([err ** 2.0 < relerr]) and err != 0:
+            h[0] *= (relerr / err) ** (1.0 / 3.0)
+            h[0] /= tol
         for vari in range(eqnum):
             vardict.update({"y_{}".format(vari): soln[vari][-1] + (aux[vari][0] + aux[vari][1]) * 0.5 * h[0]})
             pt = soln[vari]
@@ -447,8 +449,8 @@ def init_namespace():
                              "Forward Euler": foreuler, "Adaptive Runge-Kutta-Fehlberg": explicitrk45}
         methods_inv_order = {"Explicit Runge-Kutta 4": 1.0/5.0, "Explicit Midpoint": 1.0/2.0,
                              "Symplectic Forward Euler": 1.0, "Adaptive Heun-Euler": 1.0/3.0,
-                             "Heun's": 1.0/2.0, "Backward Euler": 0, "Euler-Trapezoidal": eulertrap,
-                             "Predictor-Corrector Euler": 1.0/3.0, "Implicit Midpoint": 0,
+                             "Heun's": 1.0/2.0, "Backward Euler": 1.0, "Euler-Trapezoidal": 1.0/3.0,
+                             "Predictor-Corrector Euler": 1.0/3.0, "Implicit Midpoint": 1.0,
                              "Forward Euler": 1.0, "Adaptive Runge-Kutta-Fehlberg": 1.0/5.0}
     else:
         pass
@@ -602,7 +604,7 @@ class OdeSystem:
         self.relative_error_bound = relative_err
         if auto_calc_dt:
             alt_h = float(self.t1 - self.t) * (self.relative_error_bound ** methods_inv_order[self.method])
-            if alt_h < self.dt and alt_h != 0:
+            if alt_h != 0:
                 self.dt = alt_h
                 print('Time step, dt, set to: {:.4e}'.format(self.dt))
 
@@ -767,7 +769,7 @@ class OdeSystem:
                 if i < self.eqnum:
                     self.soln[i] = [self.y[i]]
                 else:
-                    self.soln[i] = 0
+                    self.soln[i] = [0]
             self.t = 0
 
     def integrate(self, t=None):
@@ -803,18 +805,18 @@ class OdeSystem:
         soln = self.soln
         vardict = {'t': self.t}
         vardict.update(self.consts)
-        while heff[0] != 0 and abs(self.t) <= abs(tf * (1 - 4e-16)):
+        while heff[0] != 0 and abs(self.t) < abs(tf * (1 - 4e-16)):
             try:
                 if heff[0] != heff[1]:
                     heff[1] = heff[0]
                 if eta:
                     time_remaining[0] = tm.perf_counter()
-                if abs(heff[0] + self.t) - abs(tf) > abs(tf) * 4e-15:
+                if abs(heff[0] + self.t) - abs(tf) >= abs(tf) * 8e-16:
                     heff[0] = (tf - self.t) * 0.5
                 elif heff[1] == 0 and heff[0] == 0:
                     break
                 elif heff[0] == 0:
-                    heff[0] = (tf - self.t) * 0.03125
+                    heff[0] = (tf - self.t) * 0.25
                 method(self.equ, vardict, soln, heff, self.relative_error_bound)
                 self.t = vardict['t']
                 if self.traj:
