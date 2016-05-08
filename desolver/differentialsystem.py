@@ -110,7 +110,7 @@ def explicitrk4(ode, vardict, soln, h, relerr):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
-def explicitrk45(ode, vardict, soln, h, relerr, tol=0.8):
+def explicitrk45ck(ode, vardict, soln, h, relerr, tol=0.5):
     """
     Implementation of the Explicit Runge-Kutta-Fehlberg method.
     Ode is a list of strings with the expressions defining the odes.
@@ -175,25 +175,25 @@ def explicitrk45(ode, vardict, soln, h, relerr, tol=0.8):
                          [512.0 / 1771 - 1.0 / 4.0]]
     error_coeff_array = [numpy.resize(i, dim) for i in error_coeff_array]
     est = [numpy.abs(numpy.sum(aux[vari] * error_coeff_array)) for vari in range(eqnum)]
-    est = numpy.amax(est) * abs((h[2] - t_initial) / h[0])
-    delta_prime = numpy.ravel(numpy.abs(coeff))
-    delta = numpy.maximum(numpy.amin(delta_prime[numpy.nonzero(delta_prime)]), numpy.array([1.0]))
-    # print(coeff)
+    delta = numpy.abs(numpy.ravel([coeff[vari][0] + coeff[vari][1] for vari in range(eqnum)]))
+    delta = numpy.sum(delta) / len(delta)
+    est = numpy.sum(est) / len(est)
     if est != 0:
         h[1] = h[0]
-        # print('\n\nest:', est, 'h:', h, 't_current:', t_initial)
-        if est >= delta * relerr:
-            corr = h[0] * tol * (relerr / est) ** (1.0 / 5.0)
+        if est > delta * relerr:
+            corr = h[0] * tol * (delta * relerr / est) ** (1.0 / 5.0)
         else:
-            corr = h[0] * tol * (relerr / est) ** (1.0 / 4.0)
-        if abs(corr + t_initial) <= abs(h[2]):
-            h[0] = corr
-        # print('\nest:', est, 'h:', h, 't_current:', t_initial, 'corr:', corr)
-    if est >= delta * relerr:
+            corr = h[0] * tol * (delta * relerr / est) ** (1.0 / 4.0)
+        if abs(corr * 1.05 + t_initial) < abs(h[2]):
+            if corr != 0:
+                h[0] = corr
+        else:
+            h[0] = abs(h[2] - t_initial) / 2.0
+    if est > delta * relerr:
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): soln[vari][-1]})
         vardict.update({'t': t_initial})
-        explicitrk45(ode, vardict, soln, h, relerr)
+        explicitrk45ck(ode, vardict, soln, h, relerr)
     else:
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): coeff[vari][1]})
@@ -446,12 +446,12 @@ def init_namespace():
                              "Symplectic Forward Euler": sympforeuler, "Adaptive Heun-Euler": adaptiveheuneuler,
                              "Heun's": heuns, "Backward Euler": backeuler, "Euler-Trapezoidal": eulertrap,
                              "Predictor-Corrector Euler": eulertrap, "Implicit Midpoint": implicitmidpoint,
-                             "Forward Euler": foreuler, "Adaptive Runge-Kutta-Fehlberg": explicitrk45}
+                             "Forward Euler": foreuler, "Adaptive Runge-Kutta-Cash-Karp": explicitrk45ck}
         methods_inv_order = {"Explicit Runge-Kutta 4": 1.0/5.0, "Explicit Midpoint": 1.0/2.0,
                              "Symplectic Forward Euler": 1.0, "Adaptive Heun-Euler": 1.0/3.0,
                              "Heun's": 1.0/2.0, "Backward Euler": 1.0, "Euler-Trapezoidal": 1.0/3.0,
                              "Predictor-Corrector Euler": 1.0/3.0, "Implicit Midpoint": 1.0,
-                             "Forward Euler": 1.0, "Adaptive Runge-Kutta-Fehlberg": 1.0/5.0}
+                             "Forward Euler": 1.0, "Adaptive Runge-Kutta-Cash-Karp": 1.0/5.0}
     else:
         pass
 
@@ -607,6 +607,10 @@ class OdeSystem:
             if alt_h != 0:
                 self.dt = alt_h
                 print('Time step, dt, set to: {:.4e}'.format(self.dt))
+            if relative_err <= 5e-16:
+                print('This choice of relative error has been observed to cause issues with adaptive algorithms' +
+                      ' and may lead to instability.\nIt is advised that you manually set the time-step to an' +
+                      ' appropriate value and the relative error to 1e-15 or greater.\n\n')
 
     @staticmethod
     def availmethods():
@@ -811,13 +815,13 @@ class OdeSystem:
                     heff[1] = heff[0]
                 if eta:
                     time_remaining[0] = tm.perf_counter()
-                if abs(heff[0] + self.t) - abs(tf) >= abs(tf) * 8e-16:
-                    heff[0] = (tf - self.t) * 0.5
+                if abs(heff[0] * 1.03125 + self.t) - abs(tf) > abs(tf) * 4e-16:
+                    heff[0] = (tf - self.t)
                 elif heff[1] == 0 and heff[0] == 0:
                     break
-                elif heff[0] == 0:
-                    heff[0] = (tf - self.t) * 0.25
                 method(self.equ, vardict, soln, heff, self.relative_error_bound)
+                if heff[0] == 0:
+                    heff[0] = (tf - self.t) * 0.5
                 self.t = vardict['t']
                 if self.traj:
                     soln[-1].append(vardict['t'])
