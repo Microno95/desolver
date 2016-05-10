@@ -19,12 +19,12 @@ def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
     r = 0
     temp_vardict = cpy.deepcopy(vardict)
     temp_vardict.update({'t': vardict['t'] + m * h[0]})
-    while numpy.sum(numpy.abs(numpy.subtract(high, low))) > 1e-14 and r < iterlimit:
+    while numpy.amax(numpy.abs(numpy.subtract(high, low))) > 1e-14 and r < iterlimit:
         temp_vardict.update({'y_{}'.format(n): (low + high) * 0.5})
         if r > iterlimit:
             break
         c = eval(cstring)
-        if (c >= 0 and low >= 0) or (c < 0 and low < 0):
+        if (numpy.sum(c) >= 0 and numpy.sum(low) >= 0) or (numpy.sum(c) < 0 and numpy.sum(low) < 0):
             low = c
         else:
             high = c
@@ -169,7 +169,6 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, tol=0.5):
                            125.0 * aux[vari][3] / 594 + 512.0 * aux[vari][5] / 1771)
         coeff[vari].append(soln[vari][-1] + 2825.0 * aux[vari][0] / 27648 + 18575.0 * aux[vari][2] / 48384 +
                            13525.0 * aux[vari][3] / 55296 + 277.0 * aux[vari][4] / 14336 + aux[vari][5] / 4.0)
-
     error_coeff_array = [[37.0 / 378 - 2825.0 / 27648], [0], [250.0 / 621 - 18575.0 / 48384],
                          [125.0 / 594 - 13525.0 / 55296], [-277.0 / 14336],
                          [512.0 / 1771 - 1.0 / 4.0]]
@@ -178,17 +177,18 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, tol=0.5):
     delta = numpy.abs(numpy.ravel([coeff[vari][0] + coeff[vari][1] for vari in range(eqnum)]))
     delta = numpy.sum(delta) / len(delta)
     est = numpy.sum(est) / len(est)
+    vardict.update({'t': t_initial + h[0]})
     if est != 0:
         h[1] = h[0]
         if est > delta * relerr:
             corr = h[0] * tol * (delta * relerr / est) ** (1.0 / 5.0)
         else:
             corr = h[0] * tol * (delta * relerr / est) ** (1.0 / 4.0)
-        if abs(corr * 1.05 + t_initial) < abs(h[2]):
+        if abs(corr + t_initial) < abs(h[2]):
             if corr != 0:
                 h[0] = corr
         else:
-            h[0] = abs(h[2] - t_initial) / 2.0
+            h[0] = abs(h[2] - t_initial)
     if est > delta * relerr:
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): soln[vari][-1]})
@@ -197,7 +197,6 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, tol=0.5):
     else:
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): coeff[vari][1]})
-            vardict.update({'t': t_initial + h[1]})
             pt = soln[vari]
             kt = numpy.array([coeff[vari][1]])
             soln[vari] = numpy.concatenate((pt, kt))
@@ -243,8 +242,8 @@ def implicitmidpoint(ode, vardict, soln, h, relerr):
     for vari in range(eqnum):
         bisectroot(ode[vari], vari, h, 0.5, vardict, - soln[vari][-1] - h[0] * seval(ode[vari], **vardict),
                    soln[vari][-1] + h[0] * seval(ode[vari], **vardict),
-                   cstring="temp_vardict['y_{}'.format(n)] - h[0] * 0.5 * (seval(equn, **temp_vardict) "
-                           "+ seval(equn, **vardict)) - vardict['y_{}'.format(n)]")
+                   cstring="temp_vardict['y_{}'.format(n)] - vardict['y_{}'.format(n)] - "
+                           "h[0] * 0.5 * seval(equn, **vardict)")
     for vari in range(eqnum):
         pt = soln[vari]
         kt = numpy.array([vardict['y_{}'.format(vari)]])
@@ -815,11 +814,21 @@ class OdeSystem:
                     heff[1] = heff[0]
                 if eta:
                     time_remaining[0] = tm.perf_counter()
-                if abs(heff[0] * 1.03125 + self.t) - abs(tf) > abs(tf) * 4e-16:
+                if abs(heff[0] + self.t) > abs(tf):
                     heff[0] = (tf - self.t)
                 elif heff[1] == 0 and heff[0] == 0:
                     break
-                method(self.equ, vardict, soln, heff, self.relative_error_bound)
+                try:
+                    method(self.equ, vardict, soln, heff, self.relative_error_bound)
+                except RecursionError:
+                    print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. "
+                          "If this fails, either use a different relative error requirement or "
+                          "increase maximum recursion depth. Can also occur if the initial value of any "
+                          "variable is set to 0. In this case use a very small epsilon (like 5e-16) to prevent this "
+                          "from happening.")
+                    heff[1] = heff[0]
+                    heff[0] = 0.5 * heff[0]
+                    method(self.equ, vardict, soln, heff, self.relative_error_bound)
                 if heff[0] == 0:
                     heff[0] = (tf - self.t) * 0.5
                 self.t = vardict['t']
