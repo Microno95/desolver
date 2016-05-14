@@ -110,6 +110,54 @@ def explicitrk4(ode, vardict, soln, h, relerr):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
+def explicitgills(ode, vardict, soln, h, relerr):
+    """
+    Implementation of the Explicit Runge-Kutta 4 method.
+    Ode is a list of strings with the expressions defining the odes.
+    Vardict is a dictionary containing the current variables.
+    Soln is the list containing the computed values for the odes.
+    h is the step-size in computing the next value of the variable(s)
+    """
+    eqnum = len(ode)
+    dim = [eqnum, 4]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
+    for vari in range(eqnum):
+        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
+    for vari in range(eqnum):
+        aux[vari][0] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    for vari in range(eqnum):
+        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][0] * 0.5})
+    vardict.update({'t': vardict['t'] + 0.5 * h[0]})
+    for vari in range(eqnum):
+        aux[vari][1] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    for vari in range(eqnum):
+        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][0] * 0.4142135623730950 +
+                                             aux[vari][1] * 0.2928932188134524})
+    for vari in range(eqnum):
+        aux[vari][2] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    for vari in range(eqnum):
+        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][2]})
+    vardict.update({'t': vardict['t'] + 0.5 * h[0]})
+    for vari in range(eqnum):
+        aux[vari][3] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    for vari in range(eqnum):
+        vardict.update({"y_{}".format(vari): soln[vari][-1] - aux[vari][1] * 0.7071067811865475 +
+                                             aux[vari][2] * 1.7071067811865475})
+    for vari in range(eqnum):
+        vardict.update({'y_{}'.format(vari): (soln[vari][-1] +
+                                              (aux[vari][0] + aux[vari][1] * 0.585786437626905 +
+                                               aux[vari][2] * 3.4142135623730950 + aux[vari][3]) / 6)})
+        pt = soln[vari]
+        kt = numpy.array([vardict['y_{}'.format(vari)]])
+        soln[vari] = numpy.concatenate((pt, kt))
+
+
 def explicitrk45ck(ode, vardict, soln, h, relerr, tol=0.5):
     """
     Implementation of the Explicit Runge-Kutta-Fehlberg method.
@@ -431,26 +479,24 @@ def init_namespace():
                      'fabs', 'floor', 'fmod', 'frexp', 'hypot', 'ldexp', 'log', 'log10', 'modf', 'pi', 'power',
                      'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh', 'dot', 'vdot', 'outer', 'matmul',
                      'tensordot', 'inner', 'trace']
-        global safe_dict
-        safe_dict = {}
 
         for k in safe_list:
             safe_dict.update({'{}'.format(k): getattr(locals().get("numpy"), k)})
     else:
         pass
     if len(available_methods) == 0 or len(methods_inv_order) == 0:
-        global available_methods
-        global methods_inv_order
-        available_methods = {"Explicit Runge-Kutta 4": explicitrk4, "Explicit Midpoint": explicitmidpoint,
-                             "Symplectic Forward Euler": sympforeuler, "Adaptive Heun-Euler": adaptiveheuneuler,
-                             "Heun's": heuns, "Backward Euler": backeuler, "Euler-Trapezoidal": eulertrap,
-                             "Predictor-Corrector Euler": eulertrap, "Implicit Midpoint": implicitmidpoint,
-                             "Forward Euler": foreuler, "Adaptive Runge-Kutta-Cash-Karp": explicitrk45ck}
-        methods_inv_order = {"Explicit Runge-Kutta 4": 1.0/5.0, "Explicit Midpoint": 1.0/2.0,
-                             "Symplectic Forward Euler": 1.0, "Adaptive Heun-Euler": 1.0/3.0,
-                             "Heun's": 1.0/2.0, "Backward Euler": 1.0, "Euler-Trapezoidal": 1.0/3.0,
-                             "Predictor-Corrector Euler": 1.0/3.0, "Implicit Midpoint": 1.0,
-                             "Forward Euler": 1.0, "Adaptive Runge-Kutta-Cash-Karp": 1.0/5.0}
+        available_methods.update({"Explicit Runge-Kutta 4": explicitrk4, "Explicit Midpoint": explicitmidpoint,
+                                  "Symplectic Forward Euler": sympforeuler, "Adaptive Heun-Euler": adaptiveheuneuler,
+                                  "Heun's": heuns, "Backward Euler": backeuler, "Euler-Trapezoidal": eulertrap,
+                                  "Predictor-Corrector Euler": eulertrap, "Implicit Midpoint": implicitmidpoint,
+                                  "Forward Euler": foreuler, "Adaptive Runge-Kutta-Cash-Karp": explicitrk45ck,
+                                  "Explicit Gill's": explicitgills})
+        methods_inv_order.update({"Explicit Runge-Kutta 4": 1.0/5.0, "Explicit Midpoint": 1.0/2.0,
+                                  "Symplectic Forward Euler": 1.0, "Adaptive Heun-Euler": 1.0/3.0,
+                                  "Heun's": 1.0/2.0, "Backward Euler": 1.0, "Euler-Trapezoidal": 1.0/3.0,
+                                  "Predictor-Corrector Euler": 1.0/3.0, "Implicit Midpoint": 1.0,
+                                  "Forward Euler": 1.0, "Adaptive Runge-Kutta-Cash-Karp": 1.0/5.0,
+                                  "Explicit Gill's": 1.0/5.0})
     else:
         pass
 
