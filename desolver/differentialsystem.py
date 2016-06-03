@@ -1,4 +1,29 @@
+"""
+The MIT License (MIT)
+
+Copyright (c) 2016 Microno95
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
 import numpy
+import numpy.linalg
 import sys
 import time as tm
 
@@ -475,13 +500,17 @@ def sympforeuler(ode, vardict, soln, h, relerr):
 def init_namespace():
     if len(safe_dict) == 0:
         import numpy
-        safe_list = ['arccos', 'arcsin', 'arctan', 'arctan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp', 'abs',
+        safe_list_default = ['arccos', 'arcsin', 'arctan', 'arctan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp', 'abs',
                      'fabs', 'floor', 'fmod', 'frexp', 'hypot', 'ldexp', 'log', 'log10', 'modf', 'pi', 'power',
                      'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh', 'dot', 'vdot', 'outer', 'matmul',
                      'tensordot', 'inner', 'trace']
+        safe_list_linalg = ['norm', 'eig', 'eigh', 'eigvals', 'eigvalsh', 'norm', 'cond', 'det', 'matrix_rank',
+                            'slogdet', 'inv', 'pinv', 'tensorinv', 'matrix_power']
 
-        for k in safe_list:
+        for k in safe_list_default:
             safe_dict.update({'{}'.format(k): getattr(locals().get("numpy"), k)})
+        for k in safe_list_linalg:
+            safe_dict.update({'{}'.format(k): getattr(getattr(locals().get("numpy"), "linalg"), k)})
     else:
         pass
     if len(available_methods) == 0 or len(methods_inv_order) == 0:
