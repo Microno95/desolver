@@ -500,10 +500,10 @@ def sympforeuler(ode, vardict, soln, h, relerr):
 def init_namespace():
     if len(safe_dict) == 0:
         import numpy
-        safe_list_default = ['arccos', 'arcsin', 'arctan', 'arctan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp', 'abs',
-                     'fabs', 'floor', 'fmod', 'frexp', 'hypot', 'ldexp', 'log', 'log10', 'modf', 'pi', 'power',
-                     'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh', 'dot', 'vdot', 'outer', 'matmul',
-                     'tensordot', 'inner', 'trace']
+        safe_list_default = ['arccos', 'arcsin', 'arctan', 'arctan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp',
+                             'abs', 'fabs', 'floor', 'fmod', 'frexp', 'hypot', 'ldexp', 'log', 'log10', 'modf', 'pi',
+                             'power', 'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh', 'dot', 'vdot', 'outer', 'matmul',
+                             'tensordot', 'inner', 'trace', 'cross']
         safe_list_linalg = ['norm', 'eig', 'eigh', 'eigvals', 'eigvalsh', 'norm', 'cond', 'det', 'matrix_rank',
                             'slogdet', 'inv', 'pinv', 'tensorinv', 'matrix_power']
 
