@@ -2,7 +2,7 @@
 """
 The MIT License (MIT)
 
-Copyright (c) 2016 Microno95
+Copyright (c) 2016 Microno95, Ekin Ozturk
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,7 @@ SOFTWARE.
 from distutils.core import setup
 
 setup(name='DESolver',
-      version='1.1.33',
+      version='1.1.35',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',

@@ -1,7 +1,7 @@
 """
 The MIT License (MIT)
 
-Copyright (c) 2016 Microno95
+Copyright (c) 2016 Microno95, Ekin Ozturk
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ SOFTWARE.
 
 from .differentialsystem import *
 
-__all__ = ["odesystem", "bisectroot", "seval", "explicitrk4",
+__all__ = ["OdeSystem", "bisectroot", "seval", "explicitrk4",
            "explicitmidpoint", "implicitmidpoint", "heuns", "backeuler",
            "foreuler", "eulertrap", "adaptiveheuneuler", "explicitrk45ck",
            "sympforeuler", "init_namespace", "VariableMissing", "extrap",
