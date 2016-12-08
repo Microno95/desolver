@@ -595,9 +595,9 @@ class OdeSystem:
         self.traj = savetraj
         self.method = "Explicit Runge-Kutta 4"
         if (stpsz < 0 < t[0] - t[1]) or (stpsz > 0 > t[0] - t[1]):
-            self.dt = -1 * stpsz
-        else:
             self.dt = stpsz
+        else:
+            self.dt = -1 * stpsz
         self.eta = eta
         self.eqnum = len(equ)
 
