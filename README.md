@@ -12,15 +12,18 @@ or
 	conda install DESolver
 
 ##Implemented Integration Methods
-1. Explicit Runge-Kutta 4
-2. Forward Euler
-3. Backward Euler
-4. Implicit Midpoint
-5. Explicit Midpoint
-6. Adaptive Heunn-Euler
-7. Euler-Trapezoidal Method
-8. Heun's Method
-9. Symplectic Forward Euler
+1. Runge-Kutta 4
+2. Runga-Kutta 45 w\ Cash-Karp Coefficients
+3. Forward Euler
+4. Backward Euler
+5. Implicit Midpoint
+6. Explicit Midpoint
+7. Adaptive Heun-Euler
+8. Euler-Trapezoidal Method
+9. Heun's Method
+10. Symplectic Forward Euler
+11. Explicit Gill's
+
 
 		NOTE:   The Symplectic Foward Euler method takes the entered equations in pairs for integration. For example,
 						when integrating a system where the position is updated based on the intermediate future velocity
