@@ -34,7 +34,7 @@ available_methods = {}
 methods_inv_order = {}
 
 # This regex string will match any unacceptable arguments attempting to be passed to eval
-precautions_regex = r"(\.*\_*(builtins|class|os|shutil|sys|time|dict|tuple|list|module|super|name|subclasses|base|lambda)\_*)|(y_(\d*[^\s\+\-\/%(**)\d]\d*)+)" 
+precautions_regex = r"(\.*\_*(builtins|class|(?<!(c|C))os|shutil|sys|time|dict|tuple|list|module|super|name|subclasses|base|lambda)\_*)|(y_(\d*[^\s\+\-\/%(**)\d]\d*)+)" 
 
 
 error_coeff_arrayrk45 = [[-0.0042937748015873],
@@ -274,20 +274,16 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
                            13525.0 * aux[vari][3] / 55296 + 277.0 * aux[vari][4] / 14336 + aux[vari][5] / 4.0)
     error_coeff_array = [numpy.resize(i, dim) for i in error_coeff_arrayrk45]
     err_estimate = numpy.abs(numpy.ravel([numpy.sum(aux[vari] * error_coeff_array, axis=0) for vari in range(eqnum)])).max()
-    delta = numpy.abs(numpy.ravel([coeff[vari][0] for vari in range(eqnum)])).max()
     vardict.update({'t': t_initial + h[0]})
     if err_estimate != 0:
         h[1] = h[0]
-        if err_estimate >= delta * relerr:
-            corr = h[0] * tol * (delta * relerr / err_estimate) ** (1.0 / 4.0)
-        else:
-            corr = h[0] * tol * (delta * relerr / err_estimate) ** (1.0 / 3.0)
+        corr = h[0] * tol * (relerr * h[0] / err_estimate) ** (1.0 / 4.0)
         if abs(corr + t_initial) < abs(h[2]):
             if corr != 0:
                 h[0] = corr
         else:
             h[0] = abs(h[2] - t_initial)
-    if err_estimate > delta * relerr:
+    if err_estimate > relerr * h[0] / (tol ** 3):
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): soln[vari][-1]})
         vardict.update({'t': t_initial})
