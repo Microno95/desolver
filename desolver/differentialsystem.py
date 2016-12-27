@@ -26,7 +26,8 @@ import re
 import numpy
 import numpy.linalg
 import sys
-import time as tm
+import time
+import shutil
 
 safe_dict = {}
 available_methods = {}
@@ -50,8 +51,8 @@ def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
     """
     import copy as cpy
     if iterlimit is None:
-        iterlimit = 64
-    r = 0
+        iterlimit = 64 # Iteration limit for bisection method
+    r = 0 # Track iteration count
     temp_vardict = cpy.deepcopy(vardict)
     temp_vardict.update({'t': vardict['t'] + m * h[0]})
     while numpy.amax(numpy.abs(numpy.subtract(high, low))) > 1e-14 and r < iterlimit:
@@ -68,6 +69,16 @@ def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
 
 
 def extrap(x, xdata, ydata):
+    """
+    Richardson Extrapolation.
+    
+    Calculates the extrapolated values of a function evaluated at xdata
+    with the values ydata.
+    
+    Required Arguments:
+    x : The value(s) to extrapolate to (can be a numpy array)
+    xdata, ydata : Values at which a function is evaluated, the result of that evaluation
+    """
     coeff = []
     xlen = len(xdata)
     coeff.append([0, ydata[0]])
@@ -88,6 +99,17 @@ def extrap(x, xdata, ydata):
             break
     return coeff
 
+def convertSuffix(value=3661, suffixes=[' d', ' h', ' m', ' s'], ratios=[24, 60, 60], delimiter=':'):
+    """
+    Converts a base value into a human readable format with the given suffixes and ratios.    
+    """
+    tValue = value
+    outputValues = []
+    for i in ratios[::-1]:
+        outputValues.append(int(tValue % i))
+        tValue = (tValue - tValue % i) // i
+    outputValues.append(int(tValue))
+    return delimiter.join(["{:2d}{}".format(*i) for i in zip(outputValues[::-1], suffixes)])
 
 def seval(string, **kwargs):
     """
@@ -108,7 +130,7 @@ def explicitrk4(ode, vardict, soln, h, relerr):
     Soln is the list containing the computed values for the odes.
     h is the step-size in computing the next value of the variable(s)
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 4]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -153,7 +175,6 @@ def explicitgills(ode, vardict, soln, h, relerr):
     Soln is the list containing the computed values for the odes.
     h is the step-size in computing the next value of the variable(s)
     """
-    eqnum = len(ode)
     dim = [eqnum, 4]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -193,7 +214,7 @@ def explicitgills(ode, vardict, soln, h, relerr):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
-def explicitrk45ck(ode, vardict, soln, h, relerr, tol=0.5):
+def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
     """
     Implementation of the Explicit Runge-Kutta-Fehlberg method.
     Ode is a list of strings with the expressions defining the odes.
@@ -201,7 +222,6 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, tol=0.5):
     Soln is the list containing the computed values for the odes.
     h is the step-size in computing the next value of the variable(s)
     """
-    eqnum = len(ode)
     dim = [eqnum, 6]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -271,7 +291,7 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, tol=0.5):
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): soln[vari][-1]})
         vardict.update({'t': t_initial})
-        explicitrk45ck(ode, vardict, soln, h, relerr)
+        explicitrk45ck(ode, vardict, soln, h, relerr, eqnum)
     else:
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): coeff[vari][1]})
@@ -284,7 +304,7 @@ def explicitmidpoint(ode, vardict, soln, h, relerr):
     """
     Implementation of the Explicit Midpoint method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 2]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -314,7 +334,7 @@ def implicitmidpoint(ode, vardict, soln, h, relerr):
     """
     Implementation of the Implicit Midpoint method.
     """
-    eqnum = len(ode)
+    
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -333,7 +353,7 @@ def heuns(ode, vardict, soln, h, relerr):
     """
     Implementation of Heun's method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 2]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -362,7 +382,7 @@ def backeuler(ode, vardict, soln, h, relerr):
     """
     Implementation of the Implicit/Backward Euler method.
     """
-    eqnum = len(ode)
+    
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -381,7 +401,7 @@ def foreuler(ode, vardict, soln, h, relerr):
     """
     Implementation of the Explicit/Forward Euler method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 1]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -406,7 +426,7 @@ def eulertrap(ode, vardict, soln, h, relerr):
     """
     Implementation of the Euler-Trapezoidal method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 3]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -433,11 +453,11 @@ def eulertrap(ode, vardict, soln, h, relerr):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
-def adaptiveheuneuler(ode, vardict, soln, h, relerr, tol=0.9):
+def adaptiveheuneuler(ode, vardict, soln, h, relerr, eqnum, tol=0.9):
     """
     Implementation of the Adaptive Heun-Euler method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 2]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -464,7 +484,7 @@ def adaptiveheuneuler(ode, vardict, soln, h, relerr, tol=0.9):
         vardict.update({'t': vardict['t'] - h[0]})
         if err != 0:
             h[0] *= tol * (relerr / err)
-        adaptiveheuneuler(ode, vardict, soln, h, relerr)
+        adaptiveheuneuler(ode, vardict, soln, h, relerr, eqnum)
     else:
         if err < relerr and err != 0:
             h[0] *= (relerr / err) ** (1.0 / 2.0)
@@ -479,7 +499,7 @@ def sympforeuler(ode, vardict, soln, h, relerr):
     """
     Implementation of the Symplectic Euler method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 1]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -587,10 +607,7 @@ class OdeSystem:
                 warning("Equation {} has no variables".format(k))
         init_namespace()
         self.relative_error_bound = relerr
-        self.equ = list(equ)
-        for i in self.equ:
-            i = re.sub(precautions_regex, "LUBADUBDUB", i)
-            i = compile(i, '<string>', 'eval')
+        self.equ = [compile(re.sub(precautions_regex, "LUBADUBDUB", i), '<string>', 'eval') for i in equ]
         self.y = [numpy.resize(i, n) for i in y_i]
         self.dim = tuple([1] + list(n))
         self.t = float(t[0])
@@ -734,6 +751,8 @@ class OdeSystem:
         if eq and ic:
             for equation, icond in zip(eq, ic):
                 self.equ.append(equation)
+                self.equ[-1] = re.sub(precautions_regex, "LUBADUBDUB", self.equ[-1])
+                self.equ[-1] = compile(self.equ[-1], '<string>', 'eval')
                 self.y.append(numpy.resize(icond, self.dim))
             solntime = self.soln[-1]
             self.soln = [[numpy.resize([i], self.dim)] for i in self.y]
@@ -892,27 +911,27 @@ class OdeSystem:
         soln = self.soln
         vardict = {'t': self.t}
         vardict.update(self.consts)
+        etaString = ''
         while heff[0] != 0 and abs(self.t) < abs(tf * (1 - 4e-16)):
             try:
                 if heff[0] != heff[1]:
                     heff[1] = heff[0]
                 if eta:
-                    time_remaining[0] = tm.perf_counter()
+                    time_remaining[0] = time.perf_counter()
                 if abs(heff[0] + self.t) > abs(tf):
                     heff[0] = (tf - self.t)
                 elif heff[1] == 0 and heff[0] == 0:
                     break
                 try:
-                    self.method(self.equ, vardict, soln, heff, self.relative_error_bound)
+                    self.method(self.equ, vardict, soln, heff, self.relative_error_bound, self.eqnum)
                 except RecursionError:
                     print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. "
                           "If this fails, either use a different relative error requirement or "
                           "increase maximum recursion depth. Can also occur if the initial value of all "
-                          "variables are set to 0. In this case use a very small epsilon (like 5e-16) to prevent this "
-                          "from happening.")
+                          "variables are set to 0.")
                     heff[1] = heff[0]
                     heff[0] = 0.5 * heff[0]
-                    self.method(self.equ, vardict, soln, heff, self.relative_error_bound)
+                    self.method(self.equ, vardict, soln, heff, self.relative_error_bound, self.eqnum)
                 if heff[0] == 0:
                     heff[0] = (tf - self.t) * 0.5
                 self.t = vardict['t']
@@ -923,23 +942,25 @@ class OdeSystem:
                     soln.append([vardict['t']])
                 if eta:
                     temp_time = 0.4 * time_remaining[1] + (((tf - self.t) / heff[0]) *
-                                                           0.6 * (tm.perf_counter() - time_remaining[0]))
+                                                           0.6 * (time.perf_counter() - time_remaining[0]))
                     if temp_time != 0 and numpy.abs(time_remaining[1]/temp_time - 1) > 0.2:
                         time_remaining[1] = temp_time
+                    pLeft = round(1 - abs(tf - self.t) / abs(tf - self.t0), ndigits=3)
+                    prevLen = len(etaString)
+                    etaString = "{}% ----- ETA: {} -- Current Time and Step Size: {:.2e} and {:.2e}".format(
+                                "{:.2%}".format(pLeft).zfill(7), 
+                                convertSuffix(time_remaining[1]),
+                                self.t, heff[0])
+                    if prevLen > len(etaString):
+                        print("\r" + " " * prevLen, end='\r')
+                    print(etaString, end='\r')
                     sys.stdout.flush()
-                    print('\r', end='')
-                    print(
-                        "{:.3f}% ----- approx. ETA: {} -- Current Time and Step Size: {:.4e} and {:.4e}".format(
-                            round(100 - abs(tf - self.t) * 100 / abs(tf - self.t0), ndigits=3),
-                            "{} minutes and {} seconds".format(
-                                int(time_remaining[1] / 60.),
-                                int(time_remaining[1] - int(
-                                    time_remaining[1] / 60) * 60)), self.t, heff[0]), end='')
                 steps += 1
             except KeyboardInterrupt:
                 break
         if eta:
             sys.stdout.flush()
+            print('\r' + ' ' * (shutil.get_terminal_size()[0] - 2), end='')
             print("\r100%")
         else:
             print("100%")
