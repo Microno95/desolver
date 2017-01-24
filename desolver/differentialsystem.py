@@ -22,17 +22,28 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import re
 import numpy
 import numpy.linalg
 import sys
-import time as tm
+import time
+import shutil
 
 safe_dict = {}
 available_methods = {}
 methods_inv_order = {}
 
+# This regex string will match any unacceptable arguments attempting to be passed to eval
+precautions_regex = r"(\.*\_*(builtins|class|(?<!(c|C))os|shutil|sys|time|dict|tuple|list|module|super|name|subclasses|base|lambda)\_*)|(y_(\d*[^\s\+\-\/%(**)\d]\d*)+)" 
 
-# noinspection PyUnusedLocal
+
+error_coeff_arrayrk45 = [[-0.0042937748015873],
+                         [ 0.                ],
+                         [ 0.0186685860938579],
+                         [-0.0341550268308081],
+                         [-0.0193219866071429],
+                         [ 0.0391022021456804]]
+
 def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
     """
     Uses the bisection method to find the zeros of the function defined in cstring.
@@ -40,8 +51,8 @@ def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
     """
     import copy as cpy
     if iterlimit is None:
-        iterlimit = 64
-    r = 0
+        iterlimit = 64 # Iteration limit for bisection method
+    r = 0 # Track iteration count
     temp_vardict = cpy.deepcopy(vardict)
     temp_vardict.update({'t': vardict['t'] + m * h[0]})
     while numpy.amax(numpy.abs(numpy.subtract(high, low))) > 1e-14 and r < iterlimit:
@@ -58,6 +69,16 @@ def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
 
 
 def extrap(x, xdata, ydata):
+    """
+    Richardson Extrapolation.
+    
+    Calculates the extrapolated values of a function evaluated at xdata
+    with the values ydata.
+    
+    Required Arguments:
+    x : The value(s) to extrapolate to (can be a numpy array)
+    xdata, ydata : Values at which a function is evaluated, the result of that evaluation
+    """
     coeff = []
     xlen = len(xdata)
     coeff.append([0, ydata[0]])
@@ -78,6 +99,17 @@ def extrap(x, xdata, ydata):
             break
     return coeff
 
+def convertSuffix(value=3661, suffixes=[' d', ' h', ' m', ' s'], ratios=[24, 60, 60], delimiter=':'):
+    """
+    Converts a base value into a human readable format with the given suffixes and ratios.    
+    """
+    tValue = value
+    outputValues = []
+    for i in ratios[::-1]:
+        outputValues.append(int(tValue % i))
+        tValue = (tValue - tValue % i) // i
+    outputValues.append(int(tValue))
+    return delimiter.join(["{:2d}{}".format(*i) for i in zip(outputValues[::-1], suffixes)])
 
 def seval(string, **kwargs):
     """
@@ -98,7 +130,7 @@ def explicitrk4(ode, vardict, soln, h, relerr):
     Soln is the list containing the computed values for the odes.
     h is the step-size in computing the next value of the variable(s)
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 4]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -143,7 +175,6 @@ def explicitgills(ode, vardict, soln, h, relerr):
     Soln is the list containing the computed values for the odes.
     h is the step-size in computing the next value of the variable(s)
     """
-    eqnum = len(ode)
     dim = [eqnum, 4]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -183,7 +214,7 @@ def explicitgills(ode, vardict, soln, h, relerr):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
-def explicitrk45ck(ode, vardict, soln, h, relerr, tol=0.5):
+def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
     """
     Implementation of the Explicit Runge-Kutta-Fehlberg method.
     Ode is a list of strings with the expressions defining the odes.
@@ -191,7 +222,6 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, tol=0.5):
     Soln is the list containing the computed values for the odes.
     h is the step-size in computing the next value of the variable(s)
     """
-    eqnum = len(ode)
     dim = [eqnum, 6]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -242,31 +272,22 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, tol=0.5):
                            125.0 * aux[vari][3] / 594 + 512.0 * aux[vari][5] / 1771)
         coeff[vari].append(soln[vari][-1] + 2825.0 * aux[vari][0] / 27648 + 18575.0 * aux[vari][2] / 48384 +
                            13525.0 * aux[vari][3] / 55296 + 277.0 * aux[vari][4] / 14336 + aux[vari][5] / 4.0)
-    error_coeff_array = [[37.0 / 378 - 2825.0 / 27648], [0], [250.0 / 621 - 18575.0 / 48384],
-                         [125.0 / 594 - 13525.0 / 55296], [-277.0 / 14336],
-                         [512.0 / 1771 - 1.0 / 4.0]]
-    error_coeff_array = [numpy.resize(i, dim) for i in error_coeff_array]
-    est = [numpy.abs(numpy.sum(aux[vari] * error_coeff_array)) for vari in range(eqnum)]
-    delta = numpy.abs(numpy.ravel([coeff[vari][0] + coeff[vari][1] for vari in range(eqnum)]))
-    delta = numpy.sum(delta) / len(delta)
-    est = numpy.sum(est) / len(est)
+    error_coeff_array = [numpy.resize(i, dim) for i in error_coeff_arrayrk45]
+    err_estimate = numpy.abs(numpy.ravel([numpy.sum(aux[vari] * error_coeff_array, axis=0) for vari in range(eqnum)])).max()
     vardict.update({'t': t_initial + h[0]})
-    if est != 0:
+    if err_estimate != 0:
         h[1] = h[0]
-        if est > delta * relerr:
-            corr = h[0] * tol * (delta * relerr / est) ** (1.0 / 5.0)
-        else:
-            corr = h[0] * tol * (delta * relerr / est) ** (1.0 / 4.0)
+        corr = h[0] * tol * (relerr * h[0] / err_estimate) ** (1.0 / 4.0)
         if abs(corr + t_initial) < abs(h[2]):
             if corr != 0:
                 h[0] = corr
         else:
             h[0] = abs(h[2] - t_initial)
-    if est > delta * relerr:
+    if err_estimate > relerr * h[0] / (tol ** 3):
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): soln[vari][-1]})
         vardict.update({'t': t_initial})
-        explicitrk45ck(ode, vardict, soln, h, relerr)
+        explicitrk45ck(ode, vardict, soln, h, relerr, eqnum)
     else:
         for vari in range(eqnum):
             vardict.update({'y_{}'.format(vari): coeff[vari][1]})
@@ -279,7 +300,7 @@ def explicitmidpoint(ode, vardict, soln, h, relerr):
     """
     Implementation of the Explicit Midpoint method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 2]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -309,7 +330,7 @@ def implicitmidpoint(ode, vardict, soln, h, relerr):
     """
     Implementation of the Implicit Midpoint method.
     """
-    eqnum = len(ode)
+    
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -328,7 +349,7 @@ def heuns(ode, vardict, soln, h, relerr):
     """
     Implementation of Heun's method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 2]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -357,7 +378,7 @@ def backeuler(ode, vardict, soln, h, relerr):
     """
     Implementation of the Implicit/Backward Euler method.
     """
-    eqnum = len(ode)
+    
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -376,7 +397,7 @@ def foreuler(ode, vardict, soln, h, relerr):
     """
     Implementation of the Explicit/Forward Euler method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 1]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -401,7 +422,7 @@ def eulertrap(ode, vardict, soln, h, relerr):
     """
     Implementation of the Euler-Trapezoidal method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 3]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -428,11 +449,11 @@ def eulertrap(ode, vardict, soln, h, relerr):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
-def adaptiveheuneuler(ode, vardict, soln, h, relerr, tol=0.9):
+def adaptiveheuneuler(ode, vardict, soln, h, relerr, eqnum, tol=0.9):
     """
     Implementation of the Adaptive Heun-Euler method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 2]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -440,7 +461,9 @@ def adaptiveheuneuler(ode, vardict, soln, h, relerr, tol=0.9):
         aux = numpy.resize([0. + 0j], dim)
     else:
         aux = numpy.resize([0.], dim)
+    
     dim = soln[0][0].shape
+    
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
@@ -450,19 +473,17 @@ def adaptiveheuneuler(ode, vardict, soln, h, relerr, tol=0.9):
     vardict.update({'t': vardict['t'] + h[0]})
     for vari in range(eqnum):
         aux[vari][1] = numpy.resize(seval(ode[vari], **vardict), dim)
-    err = [numpy.subtract(aux[vari][0] * h[0], (aux[vari][0] + aux[vari][1]) * 0.5 * h[0]) for vari in range(eqnum)]
-    err = numpy.abs([numpy.abs(i) for i in err])
-    err = numpy.amax(err)
+    err = [(aux[vari][0] - aux[vari][1]) * h[0] for vari in range(eqnum)]
+    err = numpy.abs(err).max()
     err *= ((h[2] - vardict['t'] + h[0]) / h[0])
-    if numpy.any([err >= relerr]):
+    if err >= relerr:
         vardict.update({'t': vardict['t'] - h[0]})
         if err != 0:
-            h[0] *= tol * (relerr / err) ** (1.0 / 2.0)
-        adaptiveheuneuler(ode, vardict, soln, h, relerr)
+            h[0] *= tol * (relerr / err)
+        adaptiveheuneuler(ode, vardict, soln, h, relerr, eqnum)
     else:
-        if numpy.all([err ** 2.0 < relerr]) and err != 0:
-            h[0] *= (relerr / err) ** (1.0 / 3.0)
-            h[0] /= tol
+        if err < relerr and err != 0:
+            h[0] *= (relerr / err) ** (1.0 / 2.0)
         for vari in range(eqnum):
             vardict.update({"y_{}".format(vari): soln[vari][-1] + (aux[vari][0] + aux[vari][1]) * 0.5 * h[0]})
             pt = soln[vari]
@@ -474,7 +495,7 @@ def sympforeuler(ode, vardict, soln, h, relerr):
     """
     Implementation of the Symplectic Euler method.
     """
-    eqnum = len(ode)
+    
     dim = [eqnum, 1]
     dim.extend(soln[0][0].shape)
     dim = tuple(dim)
@@ -514,18 +535,19 @@ def init_namespace():
     else:
         pass
     if len(available_methods) == 0 or len(methods_inv_order) == 0:
-        available_methods.update({"Explicit Runge-Kutta 4": explicitrk4, "Explicit Midpoint": explicitmidpoint,
+        available_methods.update({"Explicit Runge-Kutta 4": explicitrk4, "RK4": explicitrk4, "RKF45": explicitrk45ck, 
+                                  "Explicit Midpoint": explicitmidpoint,
                                   "Symplectic Forward Euler": sympforeuler, "Adaptive Heun-Euler": adaptiveheuneuler,
                                   "Heun's": heuns, "Backward Euler": backeuler, "Euler-Trapezoidal": eulertrap,
                                   "Predictor-Corrector Euler": eulertrap, "Implicit Midpoint": implicitmidpoint,
                                   "Forward Euler": foreuler, "Adaptive Runge-Kutta-Cash-Karp": explicitrk45ck,
                                   "Explicit Gill's": explicitgills})
-        methods_inv_order.update({"Explicit Runge-Kutta 4": 1.0/5.0, "Explicit Midpoint": 1.0/2.0,
-                                  "Symplectic Forward Euler": 1.0, "Adaptive Heun-Euler": 1.0/3.0,
-                                  "Heun's": 1.0/2.0, "Backward Euler": 1.0, "Euler-Trapezoidal": 1.0/3.0,
-                                  "Predictor-Corrector Euler": 1.0/3.0, "Implicit Midpoint": 1.0,
-                                  "Forward Euler": 1.0, "Adaptive Runge-Kutta-Cash-Karp": 1.0/5.0,
-                                  "Explicit Gill's": 1.0/5.0})
+        methods_inv_order.update({explicitrk4: 1.0/5.0, explicitmidpoint: 1.0/2.0,
+                                  sympforeuler: 1.0, adaptiveheuneuler: 1.0,
+                                  heuns: 1.0/2.0, backeuler: 1.0, eulertrap: 1.0/3.0,
+                                  eulertrap: 1.0/3.0, implicitmidpoint: 1.0,
+                                  foreuler: 1.0, explicitrk45ck: 1.0/5.0,
+                                  explicitgills: 1.0/5.0})
     else:
         pass
 
@@ -581,7 +603,7 @@ class OdeSystem:
                 warning("Equation {} has no variables".format(k))
         init_namespace()
         self.relative_error_bound = relerr
-        self.equ = list(equ)
+        self.equ = [compile(re.sub(precautions_regex, "LUBADUBDUB", i), '<string>', 'eval') for i in equ]
         self.y = [numpy.resize(i, n) for i in y_i]
         self.dim = tuple([1] + list(n))
         self.t = float(t[0])
@@ -593,7 +615,7 @@ class OdeSystem:
         for k in self.consts:
             self.consts.update({k: numpy.resize(self.consts[k], n)})
         self.traj = savetraj
-        self.method = "Explicit Runge-Kutta 4"
+        self.method = explicitrk4
         if (stpsz < 0 < t[0] - t[1]) or (stpsz > 0 > t[0] - t[1]):
             self.dt = stpsz
         else:
@@ -601,7 +623,7 @@ class OdeSystem:
         self.eta = eta
         self.eqnum = len(equ)
 
-    def chgendtime(self, t):
+    def set_end_time(self, t):
         """Changes the final time for the integration of the ODE system
 
         Required arguments:
@@ -610,7 +632,7 @@ class OdeSystem:
         if not (abs(self.t0) < abs(self.t) < abs(self.t1)):
             self.t = self.t0
 
-    def chgbegtime(self, t):
+    def set_start_time(self, t):
         """Changes the initial time for the integration of the ODE system.
 
         Required arguments:
@@ -619,14 +641,14 @@ class OdeSystem:
         if not (abs(self.t0) < abs(self.t) < abs(self.t1)):
             self.t = self.t0
 
-    def chgcurtime(self, t):
+    def set_current_time(self, t):
         """Changes the current time for the integration of the ODE system.
 
         Required arguments:
         t: Denotes the current time"""
         self.t = float(t)
 
-    def chgtime(self, t=()):
+    def set_time(self, t=()):
         """Alternate interface for changing current, beginning and end times.
 
         Keyword arguments:
@@ -654,7 +676,7 @@ class OdeSystem:
         else:
             warning("You have passed an array that is empty, this doesn't make sense.")
 
-    def setstepsize(self, h):
+    def set_step_size(self, h):
         """Sets the step size that will be used for the integration.
 
         Required arguments:
@@ -664,7 +686,7 @@ class OdeSystem:
             setrelerr() with the keyword argument auto_calc_dt set to True for an approximately good step size."""
         self.dt = h
 
-    def setrelerr(self, relative_err, auto_calc_dt=0):
+    def set_relative_error(self, relative_err, auto_calc_dt=0):
         """Sets the value for target relative global error, especially useful for adaptive methods.
 
         Required arguments:
@@ -687,23 +709,31 @@ class OdeSystem:
                       ' appropriate value and the relative error to 1e-15 or greater.\n\n')
 
     @staticmethod
-    def availmethods():
+    def available_methods():
         """Prints and then returns a dict of methods of integration that are available."""
         print(available_methods.keys())
         return available_methods
 
-    def setmethod(self, method):
+    def set_method(self, method):
         """Sets the method of integration.
 
         Required arguments:
         method: String that denotes the key to one of the available methods in the dict() returned by availmethods()."""
         if method in available_methods.keys():
-            self.method = method
+            self.method = available_methods[method]
         else:
             print("The method you selected does not exist in the list of available methods, "
                   "call availmethods() to see what these are")
+                  
+    def get_method(self):
+        """
+        Returns the method used to integrate the system.
+        """
+        for method, func in available_methods.items():
+            if self.method is func:
+                return method
 
-    def addequ(self, eq, ic):
+    def add_equation(self, eq, ic):
         """Adds an equation to an already defined system.
 
         Required arguments:
@@ -717,14 +747,16 @@ class OdeSystem:
         if eq and ic:
             for equation, icond in zip(eq, ic):
                 self.equ.append(equation)
+                self.equ[-1] = re.sub(precautions_regex, "LUBADUBDUB", self.equ[-1])
+                self.equ[-1] = compile(self.equ[-1], '<string>', 'eval')
                 self.y.append(numpy.resize(icond, self.dim))
             solntime = self.soln[-1]
             self.soln = [[numpy.resize([i], self.dim)] for i in self.y]
             self.soln.append(solntime)
-            self.eqnum += len(eq)
+            self.eqnum = len(self.equ)
             self.t = self.t0
 
-    def delequ(self, indices):
+    def remove_equation(self, indices):
         """Removes (an) equation(s) at (a) given ind(ex)(ices) along with its corresponding initial values.
 
         Required arguments:
@@ -739,7 +771,7 @@ class OdeSystem:
             self.equ.pop(i)
         self.eqnum -= len(indices)
 
-    def showequ(self):
+    def show_equations(self):
         """Prints the equations that have been entered for the system.
 
         Returns the equations themselves as a list of strings."""
@@ -747,18 +779,18 @@ class OdeSystem:
             print("dy_{} = ".format(i) + self.equ[i])
         return self.equ
 
-    def numequ(self):
+    def number_of_equations(self):
         """Prints then returns the number of equations in the system"""
         print(self.eqnum)
         return self.eqnum
 
-    def initcond(self):
+    def initial_conditions(self):
         """Prints the initial conditions of the system"""
         for i in range(self.eqnum):
             print("y_{}({}) = {}".format(i, self.t0, self.y[i]))
         return self.y
 
-    def finalcond(self, p=1):
+    def final_conditions(self, p=1):
         """Prints the final state of the system.
 
         Identical to initial conditions if the system has not been integrated"""
@@ -767,7 +799,7 @@ class OdeSystem:
                 print("y_{}({}) = {}".format(i, self.t1, self.soln[i][-1]))
         return self.soln
 
-    def showsys(self):
+    def show_system(self):
         """Prints the equations, initial conditions, final states, time limits and defined constants in the system."""
         for i in range(self.eqnum):
             print("Equation {}\ny_{}({}) = {}\ndy_{} = {}\ny_{}({}) = {}\n".format(i, i, self.t0, self.y[i], i,
@@ -779,14 +811,14 @@ class OdeSystem:
         print("The time limits for this system are:\n "
               "t0 = {}, t1 = {}, t_current = {}, step_size = {}".format(self.t0, self.t1, self.t, self.dt))
 
-    def addconsts(self, **additional_constants):
+    def add_constants(self, **additional_constants):
         """Takes an arbitrary list of keyword arguments to add to the list of available constants.
 
         Variable-length arguments:
         additional_constants: A dict containing constants and their corresponding values."""
         self.consts.update({k: numpy.resize(additional_constants[k], self.dim) for k in additional_constants})
 
-    def remconsts(self, **constants_removal):
+    def remove_constants(self, **constants_removal):
         """Takes an arbitrary list of keyword arguments to remove from the list of available constants.
 
         Variable-length arguments:
@@ -796,12 +828,12 @@ class OdeSystem:
             if i in self.consts.keys():
                 del self.consts[i]
 
-    def chgdim(self, m=None):
+    def set_dimensions(self, m=None):
         """Changes the dimensions of the system.
 
         Keyword arguments:
         m: Takes a tuple that describes the dimensions of the system. For example, to integrate 3d vectors one would
-        pass (3,3)."""
+        pass (3,1)."""
         if m is not None:
             if isinstance(m, float):
                 raise ValueError('The dimension of a system cannot be a float')
@@ -814,15 +846,16 @@ class OdeSystem:
             self.soln = [[numpy.resize(i, m)] for i in self.soln[:-1]]
             self.soln.append(solntime)
 
-    def recordtraj(self, b=None):
+    def record_trajectory(self, b=None):
         """Sets whether or not the trajectory of the system will be recorded.
 
         Keyword arguments:
         b: A boolean value that denotes if the trajectory should be recorded.
-           1 - implies record; 0 - implies don't record. If b is None, then this will invert the sate from recording
-           trajectories to not recording trajectories and vice versa."""
+           1 - implies record; 0 - implies don't record. 
+           If b is None, then this will return the current state of
+           whether or not the trajectory is to be recorded"""
         if b is None:
-            self.traj = (not self.traj)
+            return self.traj
         else:
             self.traj = b
 
@@ -858,15 +891,6 @@ class OdeSystem:
            Otherwise the system will integrate to the specified final time.
            NOTE: t can be negative in order to integrate backwards in time, but use this with caution as this
                  functionality is slightly unstable."""
-        method = self.method
-        if method is None:
-            method = available_methods["Explicit Runge-Kutta 4"]
-        else:
-            try:
-                method = available_methods[method]
-            except KeyError:
-                print("Method not available, defaulting to RK4 Method")
-                method = available_methods["Explicit Runge-Kutta 4"]
         eta = self.eta
         heff = [self.dt, self.dt]
         if t:
@@ -883,27 +907,27 @@ class OdeSystem:
         soln = self.soln
         vardict = {'t': self.t}
         vardict.update(self.consts)
+        etaString = ''
         while heff[0] != 0 and abs(self.t) < abs(tf * (1 - 4e-16)):
             try:
                 if heff[0] != heff[1]:
                     heff[1] = heff[0]
                 if eta:
-                    time_remaining[0] = tm.perf_counter()
+                    time_remaining[0] = time.perf_counter()
                 if abs(heff[0] + self.t) > abs(tf):
                     heff[0] = (tf - self.t)
                 elif heff[1] == 0 and heff[0] == 0:
                     break
                 try:
-                    method(self.equ, vardict, soln, heff, self.relative_error_bound)
+                    self.method(self.equ, vardict, soln, heff, self.relative_error_bound, self.eqnum)
                 except RecursionError:
                     print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. "
                           "If this fails, either use a different relative error requirement or "
-                          "increase maximum recursion depth. Can also occur if the initial value of any "
-                          "variable is set to 0. In this case use a very small epsilon (like 5e-16) to prevent this "
-                          "from happening.")
+                          "increase maximum recursion depth. Can also occur if the initial value of all "
+                          "variables are set to 0.")
                     heff[1] = heff[0]
                     heff[0] = 0.5 * heff[0]
-                    method(self.equ, vardict, soln, heff, self.relative_error_bound)
+                    self.method(self.equ, vardict, soln, heff, self.relative_error_bound, self.eqnum)
                 if heff[0] == 0:
                     heff[0] = (tf - self.t) * 0.5
                 self.t = vardict['t']
@@ -914,23 +938,25 @@ class OdeSystem:
                     soln.append([vardict['t']])
                 if eta:
                     temp_time = 0.4 * time_remaining[1] + (((tf - self.t) / heff[0]) *
-                                                           0.6 * (tm.perf_counter() - time_remaining[0]))
+                                                           0.6 * (time.perf_counter() - time_remaining[0]))
                     if temp_time != 0 and numpy.abs(time_remaining[1]/temp_time - 1) > 0.2:
                         time_remaining[1] = temp_time
+                    pLeft = round(1 - abs(tf - self.t) / abs(tf - self.t0), ndigits=3)
+                    prevLen = len(etaString)
+                    etaString = "{}% ----- ETA: {} -- Current Time and Step Size: {:.2e} and {:.2e}".format(
+                                "{:.2%}".format(pLeft).zfill(7), 
+                                convertSuffix(time_remaining[1]),
+                                self.t, heff[0])
+                    if prevLen > len(etaString):
+                        print("\r" + " " * prevLen, end='\r')
+                    print(etaString, end='\r')
                     sys.stdout.flush()
-                    print('\r', end='')
-                    print(
-                        "{:.3f}% ----- approx. ETA: {} -- Current Time and Step Size: {:.4e} and {:.4e}".format(
-                            round(100 - abs(tf - self.t) * 100 / abs(tf - self.t0), ndigits=3),
-                            "{} minutes and {} seconds".format(
-                                int(time_remaining[1] / 60.),
-                                int(time_remaining[1] - int(
-                                    time_remaining[1] / 60) * 60)), self.t, heff[0]), end='')
                 steps += 1
             except KeyboardInterrupt:
                 break
         if eta:
             sys.stdout.flush()
+            print('\r' + ' ' * (shutil.get_terminal_size()[0] - 2), end='')
             print("\r100%")
         else:
             print("100%")
