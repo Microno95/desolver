@@ -122,7 +122,7 @@ def seval(string, **kwargs):
     return eval(string, safeglobals, safe_dict)
 
 
-def explicitrk4(ode, vardict, soln, h, relerr):
+def explicitrk4(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Explicit Runge-Kutta 4 method.
     Ode is a list of strings with the expressions defining the odes.
@@ -167,7 +167,7 @@ def explicitrk4(ode, vardict, soln, h, relerr):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
-def explicitgills(ode, vardict, soln, h, relerr):
+def explicitgills(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Explicit Runge-Kutta 4 method.
     Ode is a list of strings with the expressions defining the odes.
@@ -296,7 +296,7 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
             soln[vari] = numpy.concatenate((pt, kt))
 
 
-def explicitmidpoint(ode, vardict, soln, h, relerr):
+def explicitmidpoint(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Explicit Midpoint method.
     """
@@ -326,7 +326,7 @@ def explicitmidpoint(ode, vardict, soln, h, relerr):
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
 
 
-def implicitmidpoint(ode, vardict, soln, h, relerr):
+def implicitmidpoint(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Implicit Midpoint method.
     """
@@ -345,7 +345,7 @@ def implicitmidpoint(ode, vardict, soln, h, relerr):
     vardict.update({'t': vardict['t'] + h[0]})
 
 
-def heuns(ode, vardict, soln, h, relerr):
+def heuns(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of Heun's method.
     """
@@ -374,7 +374,7 @@ def heuns(ode, vardict, soln, h, relerr):
         soln[vari] = numpy.concatenate((pt, kt))
 
 
-def backeuler(ode, vardict, soln, h, relerr):
+def backeuler(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Implicit/Backward Euler method.
     """
@@ -393,7 +393,7 @@ def backeuler(ode, vardict, soln, h, relerr):
     vardict.update({'t': vardict['t'] + h[0]})
 
 
-def foreuler(ode, vardict, soln, h, relerr):
+def foreuler(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Explicit/Forward Euler method.
     """
@@ -418,7 +418,7 @@ def foreuler(ode, vardict, soln, h, relerr):
     vardict.update({'t': vardict['t'] + h[0]})
 
 
-def eulertrap(ode, vardict, soln, h, relerr):
+def eulertrap(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Euler-Trapezoidal method.
     """
@@ -491,7 +491,7 @@ def adaptiveheuneuler(ode, vardict, soln, h, relerr, eqnum, tol=0.9):
             soln[vari] = numpy.concatenate((pt, kt))
 
 
-def sympforeuler(ode, vardict, soln, h, relerr):
+def sympforeuler(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Symplectic Euler method.
     """

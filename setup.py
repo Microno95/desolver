@@ -26,7 +26,7 @@ SOFTWARE.
 from distutils.core import setup
 
 setup(name='DESolver',
-      version='1.1.41',
+      version='1.2.0',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
