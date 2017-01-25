@@ -26,6 +26,7 @@ SOFTWARE.
 from .differentialsystem import *
 
 __all__ = ["OdeSystem", 
+           "raise_KeyboardInterrupt",
            "bisectroot", 
            "extrap",
            "seval", 
