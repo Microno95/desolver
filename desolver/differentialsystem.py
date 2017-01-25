@@ -32,6 +32,7 @@ import shutil
 safe_dict = {}
 available_methods = {}
 methods_inv_order = {}
+raise_KeyboardInterrupt = False
 
 # This regex string will match any unacceptable arguments attempting to be passed to eval
 precautions_regex = r"(\.*\_*(builtins|class|(?<!(c|C))os|shutil|sys|time|dict|tuple|list|module|super|name|subclasses|base|lambda)\_*)|(y_(\d*[^\s\+\-\/%(**)\d]\d*)+)" 
@@ -953,7 +954,8 @@ class OdeSystem:
                     sys.stdout.flush()
                 steps += 1
             except KeyboardInterrupt:
-                break
+                if raise_KeyboardInterrupt: raise
+                else break
         if eta:
             sys.stdout.flush()
             print('\r' + ' ' * (shutil.get_terminal_size()[0] - 2), end='')

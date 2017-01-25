@@ -3,5 +3,5 @@ LICENSE.txt
 README
 setup.cfg
 setup.py
-desolver/__init__.py
-desolver/differentialsystem.py
+desolver\__init__.py
+desolver\differentialsystem.py

@@ -25,8 +25,24 @@ SOFTWARE.
 
 from .differentialsystem import *
 
-__all__ = ["OdeSystem", "bisectroot", "seval", "explicitrk4",
-           "explicitmidpoint", "implicitmidpoint", "heuns", "backeuler",
-           "foreuler", "eulertrap", "adaptiveheuneuler", "explicitrk45ck",
-           "sympforeuler", "init_namespace", "VariableMissing", "extrap",
-           "LengthError", "warning", "explicitgills"]
+__all__ = ["OdeSystem", 
+           "bisectroot", 
+           "extrap",
+           "seval", 
+           "explicitrk4",
+           "explicitrk45ck",
+           "explicitgills",
+           "explicitmidpoint", 
+           "implicitmidpoint", 
+           "heuns", 
+           "backeuler",
+           "foreuler", 
+           "eulertrap", 
+           "adaptiveheuneuler", 
+           "sympforeuler", 
+           "init_namespace", 
+           "VariableMissing", 
+           "LengthError", 
+           "warning"]
+
+init_namespace()
