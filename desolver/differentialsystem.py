@@ -29,22 +29,56 @@ import sys
 import time
 import shutil
 
-safe_dict = {}
-available_methods = {}
-methods_inv_order = {}
-raise_KeyboardInterrupt = False
+global safe_dict, available_methods, precautions_regex, methods_inv_order, namespaceInitialised, raise_KeyboardInterrupt
+namespaceInitialised = False
 
 # This regex string will match any unacceptable arguments attempting to be passed to eval
 precautions_regex = r"(\.*\_*(builtins|class|(?<!(c|C))os|shutil|sys|time|dict|tuple|list|module|super|name|subclasses|base|lambda)\_*)|(y_(\d*[^\s\+\-\/%(**)\d]\d*)+)" 
 
 
-error_coeff_arrayrk45 = [[-0.0042937748015873],
+error_coeff_arrayrk45ck = [[-0.0042937748015873],
                          [ 0.                ],
                          [ 0.0186685860938579],
                          [-0.0341550268308081],
                          [-0.0193219866071429],
                          [ 0.0391022021456804]]
 
+# Based on arXiv:1501.04345v2 - BAB's9o7H
+BABPrimes9o7H_coefficients = [[0.04649290043965892,
+                               0.154901012702888,
+                               0.31970548287359174,
+                               -0.19292000881571322,
+                               0.17182061279957458,
+                               0.17182061279957458,
+                               -0.19292000881571322,
+                               0.31970548287359174,
+                               0.154901012702888,
+                               0.04649290043965892],
+                              [0.1289555065927298,
+                               0.10907642985488271,
+                               -0.013886035680471514,
+                               0.18375497456418036,
+                               0.18419824933735726,
+                               0.18375497456418036,
+                               -0.013886035680471514,
+                               0.10907642985488271,
+                               0.1289555065927298,
+                               0.0000000000000000]]
+
+# Based on arXiv:1501.04345v2 - ABAs5o6H
+ABAs5o6HA_coefficients = [[0.15585935917621682,
+                          -0.007025499091957318,
+                          0.35116613991574047,
+                          0.35116613991574047,
+                          -0.007025499091957318,
+                          0.15585935917621682],
+                         [-0.6859195549562167,
+                          0.9966295909529364,
+                          0.3785799280065607,
+                          0.9966295909529364,
+                          -0.6859195549562167,
+                          0.0]]
+                         
 def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
     """
     Uses the bisection method to find the zeros of the function defined in cstring.
@@ -273,7 +307,7 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
                            125.0 * aux[vari][3] / 594 + 512.0 * aux[vari][5] / 1771)
         coeff[vari].append(soln[vari][-1] + 2825.0 * aux[vari][0] / 27648 + 18575.0 * aux[vari][2] / 48384 +
                            13525.0 * aux[vari][3] / 55296 + 277.0 * aux[vari][4] / 14336 + aux[vari][5] / 4.0)
-    error_coeff_array = [numpy.resize(i, dim) for i in error_coeff_arrayrk45]
+    error_coeff_array = [numpy.resize(i, dim) for i in error_coeff_arrayrk45ck]
     err_estimate = numpy.abs(numpy.ravel([numpy.sum(aux[vari] * error_coeff_array, axis=0) for vari in range(eqnum)])).max()
     vardict.update({'t': t_initial + h[0]})
     if err_estimate != 0:
@@ -417,6 +451,35 @@ def foreuler(ode, vardict, soln, h, relerr, eqnum):
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + h[0]})
+    
+
+def impforeuler(ode, vardict, soln, h, relerr, eqnum):
+    """
+    Implementation of an Improved Forward Euler method.
+    """
+    
+    dim = [eqnum, 2]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
+    for vari in range(eqnum):
+        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
+    for vari in range(eqnum):
+        aux[vari][0] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    for vari in range(eqnum):
+        vardict.update({"y_{}".format(vari): aux[vari][0] + soln[vari][-1]})
+    for vari in range(eqnum):
+        aux[vari][1] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
+    for vari in range(eqnum):
+        vardict.update({"y_{}".format(vari): vardict["y_{}".format(vari)] + 0.5 * (aux[vari][0] + aux[vari][1])})
+        pt = soln[vari]
+        kt = numpy.array([vardict['y_{}'.format(vari)]])
+        soln[vari] = numpy.concatenate((pt, kt))
+    vardict.update({'t': vardict['t'] + h[0]})
 
 
 def eulertrap(ode, vardict, soln, h, relerr, eqnum):
@@ -519,36 +582,119 @@ def sympforeuler(ode, vardict, soln, h, relerr, eqnum):
     vardict.update({'t': vardict['t'] + h[0]})
 
 
-def init_namespace():
-    if len(safe_dict) == 0:
-        import numpy
+def sympBABs9o7H(ode, vardict, soln, h, relerr, eqnum):
+    """
+    Implementation of the Symplectic BAB's9o7H method based on arXiv:1501.04345v2
+    """
+    
+    dim = [eqnum, 1]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
+    for vari in range(eqnum):
+        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
+    for stage in range(0, len(BABPrimes9o7H_coefficients[0])):
+        for vari in range(1, eqnum, 2):
+            aux[vari][0] = numpy.resize((vardict["y_{}".format(vari)] + 
+                           BABPrimes9o7H_coefficients[0][stage] * seval(ode[vari], **vardict) * h[0] / 2), dim)
+        for vari in range(1, eqnum, 2):
+            vardict.update({"y_{}".format(vari): aux[vari][0]})
+        for vari in range(0, eqnum, 2):
+            aux[vari][0] = numpy.resize((vardict["y_{}".format(vari)] + 
+                           BABPrimes9o7H_coefficients[1][stage] * seval(ode[vari], **vardict) * h[0]), dim)
+        for vari in range(0, eqnum, 2):
+            vardict.update({"y_{}".format(vari): aux[vari][0]})
+        for vari in range(1, eqnum, 2):
+            aux[vari][0] = numpy.resize((vardict["y_{}".format(vari)] + 
+                           BABPrimes9o7H_coefficients[0][stage] * seval(ode[vari], **vardict) * h[0] / 2), dim)
+        for vari in range(1, eqnum, 2):
+            vardict.update({"y_{}".format(vari): aux[vari][0]})
+    for vari in range(eqnum):
+        pt = soln[vari]
+        kt = numpy.array([aux[vari][0]])
+        soln[vari] = numpy.concatenate((pt, kt))
+    vardict.update({'t': vardict['t'] + h[0]})
+
+    
+def sympABAs5o6HA(ode, vardict, soln, h, relerr, eqnum):
+    """
+    Implementation of the Symplectic ABAs5o6HA method based on arXiv:1501.04345v2
+    """
+    
+    dim = [eqnum, 1]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
+    for vari in range(eqnum):
+        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
+    for stage in range(0, len(ABAs5o6HA_coefficients[0])):
+        for vari in range(0, eqnum, 2):
+            aux[vari][0] = numpy.resize((vardict["y_{}".format(vari)] + 
+                           ABAs5o6HA_coefficients[1][stage] * seval(ode[vari], **vardict) * h[0] / 2), dim)
+        for vari in range(0, eqnum, 2):
+            vardict.update({"y_{}".format(vari): aux[vari][0]})
+        for vari in range(1, eqnum, 2):
+            aux[vari][0] = numpy.resize((vardict["y_{}".format(vari)] + 
+                           ABAs5o6HA_coefficients[0][stage] * seval(ode[vari], **vardict) * h[0]), dim)
+        for vari in range(1, eqnum, 2):
+            vardict.update({"y_{}".format(vari): aux[vari][0]})
+        for vari in range(0, eqnum, 2):
+            aux[vari][0] = numpy.resize((vardict["y_{}".format(vari)] + 
+                           ABAs5o6HA_coefficients[1][stage] * seval(ode[vari], **vardict) * h[0] / 2), dim)
+        for vari in range(0, eqnum, 2):
+            vardict.update({"y_{}".format(vari): aux[vari][0]})
+    for vari in range(eqnum):
+        pt = soln[vari]
+        kt = numpy.array([aux[vari][0]])
+        soln[vari] = numpy.concatenate((pt, kt))
+    vardict.update({'t': vardict['t'] + h[0]})
+    
+
+def init_module(raiseKBINT=False):
+    global safe_dict, available_methods, precautions_regex, methods_inv_order, namespaceInitialised, raise_KeyboardInterrupt
+    if not namespaceInitialised:
+        safe_dict = dict()
+        available_methods = dict()
+        methods_inv_order = dict()
+        raise_KeyboardInterrupt = raiseKBINT
+        precautions_regex = re.compile(precautions_regex)
         safe_list_default = ['arccos', 'arcsin', 'arctan', 'arctan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp',
                              'abs', 'fabs', 'floor', 'fmod', 'frexp', 'hypot', 'ldexp', 'log', 'log10', 'modf', 'pi',
                              'power', 'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh', 'dot', 'vdot', 'outer', 'matmul',
                              'tensordot', 'inner', 'trace', 'cross']
-        safe_list_linalg = ['norm', 'eig', 'eigh', 'eigvals', 'eigvalsh', 'norm', 'cond', 'det', 'matrix_rank',
+        safe_list_linalg = ['norm', 'eig', 'eigh', 'eigvals', 'eigvalsh', 'cond', 'det', 'matrix_rank',
                             'slogdet', 'inv', 'pinv', 'tensorinv', 'matrix_power']
-
         for k in safe_list_default:
-            safe_dict.update({'{}'.format(k): getattr(locals().get("numpy"), k)})
+            safe_dict.update({'{}'.format(k): getattr(globals().get("numpy"), k)})
         for k in safe_list_linalg:
-            safe_dict.update({'{}'.format(k): getattr(getattr(locals().get("numpy"), "linalg"), k)})
-    else:
-        pass
-    if len(available_methods) == 0 or len(methods_inv_order) == 0:
-        available_methods.update({"Explicit Runge-Kutta 4": explicitrk4, "RK4": explicitrk4, "RKF45": explicitrk45ck, 
+            safe_dict.update({'{}'.format(k): getattr(getattr(globals().get("numpy"), "linalg"), k)})
+        available_methods.update({"Explicit Runge-Kutta 4": explicitrk4, "RK4": explicitrk4, "RKF45CK": explicitrk45ck, 
                                   "Explicit Midpoint": explicitmidpoint,
                                   "Symplectic Forward Euler": sympforeuler, "Adaptive Heun-Euler": adaptiveheuneuler,
                                   "Heun's": heuns, "Backward Euler": backeuler, "Euler-Trapezoidal": eulertrap,
                                   "Predictor-Corrector Euler": eulertrap, "Implicit Midpoint": implicitmidpoint,
-                                  "Forward Euler": foreuler, "Adaptive Runge-Kutta-Cash-Karp": explicitrk45ck,
-                                  "Explicit Gill's": explicitgills})
+                                  "Forward Euler": foreuler, "Improved Forward Euler": impforeuler, 
+                                  "Adaptive Runge-Kutta-Cash-Karp": explicitrk45ck,
+                                  "Explicit Gill's": explicitgills, "Symplectic BABs9o7H": sympBABs9o7H,
+                                  "Symplectic ABAs5o6HA": sympABAs5o6HA})
         methods_inv_order.update({explicitrk4: 1.0/5.0, explicitmidpoint: 1.0/2.0,
                                   sympforeuler: 1.0, adaptiveheuneuler: 1.0,
                                   heuns: 1.0/2.0, backeuler: 1.0, eulertrap: 1.0/3.0,
                                   eulertrap: 1.0/3.0, implicitmidpoint: 1.0,
-                                  foreuler: 1.0, explicitrk45ck: 1.0/5.0,
-                                  explicitgills: 1.0/5.0})
+                                  foreuler: 1.0, impforeuler: 1.0/2.0, explicitrk45ck: 1.0/5.0,
+                                  explicitgills: 1.0/5.0, sympBABs9o7H: 1.0/7.0, 
+                                  sympABAs5o6HA: 1.0/6.0})
+        namespaceInitialised = True
+    elif raiseKBINT:
+        raise_KeyboardInterrupt = True
     else:
         pass
 
@@ -602,9 +748,9 @@ class OdeSystem:
         for k, i in enumerate(equ):
             if 't' not in i and 'y_' not in i:
                 warning("Equation {} has no variables".format(k))
-        init_namespace()
         self.relative_error_bound = relerr
-        self.equ = [compile(re.sub(precautions_regex, "LUBADUBDUB", i), '<string>', 'eval') for i in equ]
+        self.equRepr = [i for i in equ]
+        self.equ = [compile(precautions_regex.sub("LUBADUBDUB", i), '<string>', 'eval') for i in equ]
         self.y = [numpy.resize(i, n) for i in y_i]
         self.dim = tuple([1] + list(n))
         self.t = float(t[0])
@@ -747,8 +893,8 @@ class OdeSystem:
             necessary dimensions. This may cause unexpected results and it is better to specify all the coefficients."""
         if eq and ic:
             for equation, icond in zip(eq, ic):
-                self.equ.append(equation)
-                self.equ[-1] = re.sub(precautions_regex, "LUBADUBDUB", self.equ[-1])
+                self.equRepr.append(equation)
+                self.equ.append(precautions_regex.sub("LUBADUBDUB", self.equRepr[-1]))
                 self.equ[-1] = compile(self.equ[-1], '<string>', 'eval')
                 self.y.append(numpy.resize(icond, self.dim))
             solntime = self.soln[-1]
@@ -777,8 +923,8 @@ class OdeSystem:
 
         Returns the equations themselves as a list of strings."""
         for i in range(self.eqnum):
-            print("dy_{} = ".format(i) + self.equ[i])
-        return self.equ
+            print("dy_{} = ".format(i) + self.equRepr[i])
+        return self.equRepr
 
     def number_of_equations(self):
         """Prints then returns the number of equations in the system"""
@@ -804,7 +950,7 @@ class OdeSystem:
         """Prints the equations, initial conditions, final states, time limits and defined constants in the system."""
         for i in range(self.eqnum):
             print("Equation {}\ny_{}({}) = {}\ndy_{} = {}\ny_{}({}) = {}\n".format(i, i, self.t0, self.y[i], i,
-                                                                                   self.equ[i], i, self.t,
+                                                                                   self.equRepr[i], i, self.t,
                                                                                    self.soln[i][-1]))
         if self.consts:
             print("The constants that have been defined for this system are: ")
@@ -893,14 +1039,18 @@ class OdeSystem:
            NOTE: t can be negative in order to integrate backwards in time, but use this with caution as this
                  functionality is slightly unstable."""
         eta = self.eta
-        heff = [self.dt, self.dt]
         if t:
             tf = t
         else:
             tf = self.t1
         steps = 0
-        if tf - self.t < 0:
-            heff = [-1.0 * abs(i) for i in heff]
+        heff = [self.dt, self.dt]
+        if numpy.sign(tf - self.t) != numpy.sign(self.dt):
+            if numpy.sign(self.dt) != 0:
+                heff = [-1.0 * i for i in heff]
+            else:
+                heff = [tf - self.dt for i in heff]
+            self.dt = heff[0]
         while abs(heff[0]) > abs(tf - self.t):
             heff = [i * 0.5 for i in heff]
         heff.append(tf)
@@ -955,7 +1105,8 @@ class OdeSystem:
                 steps += 1
             except KeyboardInterrupt:
                 if raise_KeyboardInterrupt: raise
-                else break
+                else: 
+                    break
         if eta:
             sys.stdout.flush()
             print('\r' + ' ' * (shutil.get_terminal_size()[0] - 2), end='')
