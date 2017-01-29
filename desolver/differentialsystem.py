@@ -475,7 +475,7 @@ def impforeuler(ode, vardict, soln, h, relerr, eqnum):
     for vari in range(eqnum):
         aux[vari][1] = numpy.resize(seval(ode[vari], **vardict) * h[0], dim)
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): vardict["y_{}".format(vari)] + 0.5 * (aux[vari][0] + aux[vari][1])})
+        vardict.update({"y_{}".format(vari): soln[vari][-1] + 0.5 * (aux[vari][0] + aux[vari][1])})
         pt = soln[vari]
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
