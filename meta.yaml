@@ -1,0 +1,27 @@
+package:
+  name: desolver
+  version: 1.4.0
+
+source:
+  git_url: https://github.com/Microno95/DESolver
+  git_tag: master
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - numpy
+
+  run:
+    - python
+    - numpy
+
+test:
+  imports:
+    - desolver
+
+about:
+  home: https://github.com/Microno95/DESolver
+  license: MIT
+  license_file: LICENSE
+  summary: "Numerical integrator for Ordinary Differential Equations. Implements multiple symplectic and non-symplectic methods."
