@@ -1085,7 +1085,7 @@ class OdeSystem:
                 if self.traj:
                     soln[-1].append(vardict['t'])
                 else:
-                    soln = [[i[-1]] for i in soln[:-1]]
+                    soln = [np.array([i[-1]]) for i in soln[:-1]]
                     soln.append([vardict['t']])
                 if eta:
                     temp_time = 0.4 * time_remaining[1] + (((tf - self.t) / heff[0]) *
