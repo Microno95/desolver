@@ -33,7 +33,7 @@ global safe_dict, available_methods, precautions_regex, methods_inv_order, names
 namespaceInitialised = False
 
 # This regex string will match any unacceptable arguments attempting to be passed to eval
-precautions_regex = r"(\.*\_*(builtins|class|(?<!(c|C))os|shutil|sys|time|dict|tuple|list|module|super|name|subclasses|base|lambda)\_*)|(y_(\d*[^\s\+\-\/%(**)\d]\d*)+)" 
+precautions_regex = r"(\.*\_*(builtins|class|(?<!(c|C))os|shutil|sys|time|dict|tuple|list|module|super|name|subclasses|base|lambda)\_*)" 
 
 
 error_coeff_arrayrk45ck = [[-0.0042937748015873],
