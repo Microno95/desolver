@@ -571,8 +571,16 @@ def sympforeuler(ode, vardict, soln, h, relerr, eqnum):
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
-        aux[vari][0] = numpy.resize((seval(ode[vari], **vardict) * h[0] + soln[vari][-1]), dim)
         if vari % 2 == 0:
+            aux[vari][0] = numpy.resize((seval(ode[vari], **vardict) * h[0] * 0.5 + soln[vari][-1]), dim)
+            vardict.update({"y_{}".format(vari): aux[vari][0]})
+    for vari in range(eqnum):
+        if vari % 2 == 1:
+            aux[vari][0] = numpy.resize((seval(ode[vari], **vardict) * h[0] + soln[vari][-1]), dim)
+            vardict.update({"y_{}".format(vari): aux[vari][0]})
+    for vari in range(eqnum):
+        if vari % 2 == 0:
+            aux[vari][0] = numpy.resize((seval(ode[vari], **vardict) * h[0] * 0.5 + soln[vari][-1]), dim)
             vardict.update({"y_{}".format(vari): aux[vari][0]})
     for vari in range(eqnum):
         vardict.update({"y_{}".format(vari): aux[vari][0]})
@@ -666,7 +674,7 @@ def init_module(raiseKBINT=False):
         methods_inv_order = dict()
         raise_KeyboardInterrupt = raiseKBINT
         precautions_regex = re.compile(precautions_regex)
-        safe_list_default = ['arccos', 'arcsin', 'arctan', 'arctan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp',
+        safe_list_default = ['array', 'arccos', 'arcsin', 'arctan', 'arctan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp',
                              'abs', 'fabs', 'floor', 'fmod', 'frexp', 'hypot', 'ldexp', 'log', 'log10', 'modf', 'pi',
                              'power', 'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh', 'dot', 'vdot', 'outer', 'matmul',
                              'tensordot', 'inner', 'trace', 'cross']
