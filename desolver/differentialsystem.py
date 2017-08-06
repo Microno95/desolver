@@ -459,7 +459,7 @@ class OdeSystem:
                     print(etaString, end='\r')
                     sys.stdout.flush()
                 steps += 1
-                callback(self)
+                if callback is not None: callback(self)
             except KeyboardInterrupt:
                 if raise_KeyboardInterrupt: raise
             except:
