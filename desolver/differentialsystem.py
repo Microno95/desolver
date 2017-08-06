@@ -31,20 +31,23 @@ import shutil
 import types
 
 import desolver.integrationschemes as ischemes
+import desolver.exceptiontypes as etypes
 
-global safe_dict, available_methods, methods_inv_order, raise_KeyboardInterrupt
 namespaceInitialised = False
+available_methods = {}
+methods_inv_order = {}
+safe_dict = {}
+raise_KeyboardInterrupt = False
 
 # This regex string will match any unacceptable arguments attempting to be passed to eval
 precautions_regex = r"(\.*\_*(builtins|class|(?<!(c|C))os|shutil|sys|time|dict|tuple|list|module|super|name|subclasses|base|lambda)\_*)"
 
 def init_module(raiseKBINT=False):
-    global safe_dict, available_methods, precautions_regex, methods_inv_order, namespaceInitialised, raise_KeyboardInterrupt
+    global namespaceInitialised
     if not namespaceInitialised:
-        safe_dict = dict()
-        available_methods = dict()
-        methods_inv_order = dict()
+        global raise_KeyboardInterrupt
         raise_KeyboardInterrupt = raiseKBINT
+        global precautions_regex
         precautions_regex = re.compile(precautions_regex)
         safe_list_default = ['array', 'arccos', 'arcsin', 'arctan', 'arctan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp',
                              'abs', 'fabs', 'floor', 'fmod', 'frexp', 'hypot', 'ldexp', 'log', 'log10', 'modf', 'pi',
@@ -59,11 +62,13 @@ def init_module(raiseKBINT=False):
 
         ischemes.safe_dict = safe_dict
 
-        available_methods_in_integrationschemes = [(ischemes.__dict__.get(a)) for a in dir(ischemes)
-                                                   if isinstance(ischemes.__dict__.get(a), types.FunctionType)]
-        available_methods = dict([(func.__name__, func) for func in available_methods_in_integrationschemes if hasattr(func, "__alt_names__")] +
-                                 [(alt_name, func) for func in available_methods_in_integrationschemes for alt_name in func.__alt_names__ if hasattr(func, "__alt_names__")])
-        methods_inv_order.update({func: func.__order__ for name, func in available_methods.items()})
+        methods_ischemes = [(ischemes.__dict__.get(a)) for a in dir(ischemes)
+                             if isinstance(ischemes.__dict__.get(a), types.FunctionType)]
+        available_methods.update(dict([(func.__name__, func) for func in methods_ischemes if hasattr(func, "__alt_names__")] +
+                                 [(alt_name, func) for func in methods_ischemes for alt_name in func.__alt_names__ if hasattr(func, "__alt_names__")]))
+
+        methods_inv_order.update({func: 1.0/func.__order__ for name, func in available_methods.items()})
+
         namespaceInitialised = True
     elif raiseKBINT:
         raise_KeyboardInterrupt = True
@@ -72,7 +77,7 @@ def init_module(raiseKBINT=False):
 
 class OdeSystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
-    def __init__(self, n=(1,), equ=(), y_i=(), t=(0, 0), savetraj=0, stpsz=1.0, eta=0, relerr=4e-16, **consts):
+    def __init__(self, n=(1,), equ=(), y_i=(), t=(0, 0), savetraj=0, stpsz=1.0, eta=0, relerr=4e-16, constants=dict()):
         """Initialises the system to the parameters passed or to default values.
 
         Keyword arguments:
@@ -97,14 +102,14 @@ class OdeSystem:
         Variable-length arguments:
         consts: Arbitrary set of keyword arguments that define the constants to be used in the system."""
         if len(equ) > len(y_i):
-            raise LengthError("There are more equations than initial conditions!")
+            raise etypes.LengthError("There are more equations than initial conditions!")
         elif len(equ) < len(y_i):
-            warning("There are more initial conditions than equations!")
+            ischemes.deutil.warning("There are more initial conditions than equations!")
         elif len(t) != 2:
-            raise LengthError("Two time bounds were required, only {} were given!".format(len(t)))
+            raise etypes.LengthError("Two time bounds were required, only {} were given!".format(len(t)))
         for k, i in enumerate(equ):
             if 't' not in i and 'y_' not in i:
-                warning("Equation {} has no variables".format(k))
+                ischemes.deutil.warning("Equation {} has no variables".format(k))
         self.relative_error_bound = relerr
         self.equRepr = [i for i in equ]
         self.equ = [compile(precautions_regex.sub("LUBADUBDUB", i), '<string>', 'eval') for i in equ]
@@ -115,11 +120,11 @@ class OdeSystem:
         self.t1 = float(t[1])
         self.soln = [[numpy.resize(i, n)] for i in self.y]
         self.soln.append([t[0]])
-        self.consts = consts
+        self.consts = constants
         for k in self.consts:
             self.consts.update({k: numpy.resize(self.consts[k], n)})
         self.traj = savetraj
-        self.method = explicitrk4
+        self.method = ischemes.explicitrk4
         if (stpsz < 0 < t[0] - t[1]) or (stpsz > 0 > t[0] - t[1]):
             self.dt = stpsz
         else:
@@ -161,7 +166,7 @@ class OdeSystem:
             -- A length of 3 denotes changes to all three times in order of current, beginning and end.
             -- A length larger than 3 will behave the same as above and ignore values beyond the 3rd index."""
         if len(t) == 1:
-            warning("You have passed a tuple that only contains one element, "
+            ischemes.deutil.warning("You have passed a tuple that only contains one element, "
                     "this will be taken as the current time.")
             self.t = t[0]
         elif len(t) == 2:
@@ -172,13 +177,13 @@ class OdeSystem:
             self.t0 = t[1]
             self.t1 = t[2]
         elif len(t) > 3:
-            warning("You have passed an array longer than 3 elements, "
+            ischemes.deutil.warning("You have passed an array longer than 3 elements, "
                     "the first three will be taken as the principle values.")
             self.t = t[0]
             self.t0 = t[1]
             self.t1 = t[2]
         else:
-            warning("You have passed an array that is empty, this doesn't make sense.")
+            ischemes.deutil.warning("You have passed an array that is empty, this doesn't make sense.")
 
     def set_step_size(self, h):
         """Sets the step size that will be used for the integration.
@@ -268,7 +273,7 @@ class OdeSystem:
                  there are more equations to be removed or if there is an index specified that exceeds the
                  number of equations that exist."""
         if len(indices) > self.eqnum:
-            raise LengthError("You've specified the removal of more equations than there exists!")
+            raise etypes.LengthError("You've specified the removal of more equations than there exists!")
         for i in indices:
             self.y.pop(i)
             self.soln.pop(i)
@@ -377,7 +382,7 @@ class OdeSystem:
                     self.soln[i] = list(numpy.delete(k, numpy.s_[ind + 1:], axis=0))
                 self.t = t
             else:
-                warning('Trajectory has not been recorded for prior integration, cannot revert to t = {}\nPlease '
+                ischemes.deutil.warning('Trajectory has not been recorded for prior integration, cannot revert to t = {}\nPlease '
                         'call reset() and record trajectory by calling recordtraj() before integrating'.format(t))
         else:
             for i in range(self.eqnum + 1):
@@ -387,7 +392,7 @@ class OdeSystem:
                     self.soln[i] = [0]
             self.t = 0
 
-    def integrate(self, t=None):
+    def integrate(self, t=None, callback=None):
         """Integrates the system to a specified time.
 
         Keyword arguments:
@@ -460,6 +465,7 @@ class OdeSystem:
                     print(etaString, end='\r')
                     sys.stdout.flush()
                 steps += 1
+                callback(self)
             except KeyboardInterrupt:
                 if raise_KeyboardInterrupt: raise
                 else: 

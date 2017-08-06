@@ -72,7 +72,9 @@ ABAs5o6HA_coefficients = [[0.15585935917621682,
                           -0.6859195549562167,
                           0.0]]
 
-@deutil.named_function("Explicit Runge-Kutta 4", alt_names=("Runge-Kutta 4", "RK4"), order=4.0)
+@deutil.named_function("Explicit Runge-Kutta 4",
+                       alt_names=("Runge-Kutta 4", "RK4",),
+                       order=4.0)
 def explicitrk4(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Explicit Runge-Kutta 4 method.
@@ -117,7 +119,9 @@ def explicitrk4(ode, vardict, soln, h, relerr, eqnum):
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
 
-@deutil.named_function("Explicit Gill's", alt_names=("Gill's"), order=5.0)
+@deutil.named_function("Explicit Gill's",
+                       alt_names=("Gill's",),
+                       order=5.0)
 def explicitgills(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Explicit Runge-Kutta 4 method.
@@ -164,7 +168,9 @@ def explicitgills(ode, vardict, soln, h, relerr, eqnum):
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
 
-@deutil.named_function("Explicit RK45CK", alt_names=("RK45CK", "Runge-Kutta-Cash-Karp"), order=4.0)
+@deutil.named_function("Explicit RK45CK",
+                       alt_names=("RK45CK", "Runge-Kutta-Cash-Karp"),
+                       order=4.0)
 def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
     """
     Implementation of the Explicit Runge-Kutta-Fehlberg method.
@@ -247,7 +253,9 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
             kt = numpy.array([coeff[vari][1]])
             soln[vari] = numpy.concatenate((pt, kt))
 
-@deutil.named_function("Explicit Midpoint", alt_names=("Midpoint"), order=2.0)
+@deutil.named_function("Explicit Midpoint",
+                       alt_names=("Midpoint",),
+                       order=2.0)
 def explicitmidpoint(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Explicit Midpoint method.
@@ -277,7 +285,8 @@ def explicitmidpoint(ode, vardict, soln, h, relerr, eqnum):
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
 
-@deutil.named_function("Implicit Midpoint", order=1.0)
+@deutil.named_function("Implicit Midpoint",
+                       order=1.0)
 def implicitmidpoint(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Implicit Midpoint method.
@@ -296,7 +305,9 @@ def implicitmidpoint(ode, vardict, soln, h, relerr, eqnum):
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + h[0]})
 
-@deutil.named_function("Explicit Heun's", alt_names=("Heun's"), order=2.0)
+@deutil.named_function("Explicit Heun's",
+                       alt_names=("Heun's",),
+                       order=2.0)
 def heuns(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of Heun's method.
@@ -325,7 +336,9 @@ def heuns(ode, vardict, soln, h, relerr, eqnum):
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
 
-@deutil.named_function("Implicit Euler", alt_names=("Backward Euler"), order=1.0)
+@deutil.named_function("Implicit Euler",
+                       alt_names=("Backward Euler",),
+                       order=1.0)
 def backeuler(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Implicit/Backward Euler method.
@@ -344,7 +357,9 @@ def backeuler(ode, vardict, soln, h, relerr, eqnum):
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + h[0]})
 
-@deutil.named_function("Explicit Euler", alt_names=("Forward Euler", "Euler"), order=1.0)
+@deutil.named_function("Explicit Euler",
+                       alt_names=("Forward Euler", "Euler"),
+                       order=1.0)
 def foreuler(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Explicit/Forward Euler method.
@@ -369,7 +384,9 @@ def foreuler(ode, vardict, soln, h, relerr, eqnum):
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + h[0]})
 
-@deutil.named_function("Explicit Improved Forward Euler", alt_names=("Improved Forward Euler", "IFE"), order=2.0)
+@deutil.named_function("Explicit Improved Forward Euler",
+                       alt_names=("Improved Forward Euler", "IFE"),
+                       order=2.0)
 def impforeuler(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of an Improved Forward Euler method.
@@ -398,7 +415,9 @@ def impforeuler(ode, vardict, soln, h, relerr, eqnum):
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + h[0]})
 
-@deutil.named_function("Explicit Euler-Trapezoidal", alt_names=("Euler-Trapezoidal", "Euler-Trap"), order=3.0)
+@deutil.named_function("Explicit Euler-Trapezoidal",
+                       alt_names=("Euler-Trapezoidal", "Euler-Trap", "Predictor-Corrector Euler"),
+                       order=3.0)
 def eulertrap(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Euler-Trapezoidal method.
@@ -429,7 +448,9 @@ def eulertrap(ode, vardict, soln, h, relerr, eqnum):
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
 
-@deutil.named_function("Explicit Adaptive Heun-Euler", alt_names=("Adaptive Heun-Euler", "AHE"), order=1.0)
+@deutil.named_function("Explicit Adaptive Heun-Euler",
+                       alt_names=("Adaptive Heun-Euler", "AHE"),
+                       order=1.0)
 def adaptiveheuneuler(ode, vardict, soln, h, relerr, eqnum, tol=0.9):
     """
     Implementation of the Adaptive Heun-Euler method.
@@ -471,7 +492,9 @@ def adaptiveheuneuler(ode, vardict, soln, h, relerr, eqnum, tol=0.9):
             kt = numpy.array([vardict['y_{}'.format(vari)]])
             soln[vari] = numpy.concatenate((pt, kt))
 
-@deutil.named_function("Explicit Symplectic Forward Euler", alt_names=("Symplectic Euler"), order=2.0)
+@deutil.named_function("Explicit Symplectic Forward Euler",
+                       alt_names=("Symplectic Euler",),
+                       order=2.0)
 def sympforeuler(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Symplectic Euler method.
@@ -506,7 +529,9 @@ def sympforeuler(ode, vardict, soln, h, relerr, eqnum):
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + h[0]})
 
-@deutil.named_function("Explicit BABS9O7H", alt_names=("BABS9O7H", "BABs9o7H"), order=7.0)
+@deutil.named_function("Explicit BABS9O7H",
+                       alt_names=("BABS9O7H", "BABs9o7H"),
+                       order=7.0)
 def sympBABs9o7H(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Symplectic BAB's9o7H method based on arXiv:1501.04345v2
@@ -547,7 +572,9 @@ def sympBABs9o7H(ode, vardict, soln, h, relerr, eqnum):
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + h[0]})
 
-@deutil.named_function("Explicit ABAS5O6HA", alt_names=("ABAS5O6HA", "ABAs5o6HA"), order=6.0)
+@deutil.named_function("Explicit ABAS5O6HA",
+                       alt_names=("ABAS5O6HA", "ABAs5o6HA"),
+                       order=6.0)
 def sympABAs5o6HA(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Symplectic ABAs5o6HA method based on arXiv:1501.04345v2
