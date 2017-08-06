@@ -22,7 +22,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-def bisectroot(equn, n, h, m, vardict, low, high, cstring, iterlimit=None):
+import numpy
+
+def bisectroot(equn, n, h, m, vardict, low, high, cstring, safe_dict, iterlimit=None):
     """
     Uses the bisection method to find the zeros of the function defined in cstring.
     Designed to be used as a method to find the value of the next y_#.

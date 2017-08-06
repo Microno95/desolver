@@ -349,8 +349,8 @@ def backeuler(ode, vardict, soln, h, relerr, eqnum):
     for vari in range(eqnum):
         deutil.bisectroot(ode[vari], vari, h, 1.0, vardict, - soln[vari][-1] - h[0] * deutil.safe_eval(ode[vari], safe_dict, **vardict),
                    soln[vari][-1] + h[0] * deutil.safe_eval(ode[vari], safe_dict, **vardict),
-                   cstring="temp_vardict['y_{}'.format(n)] - h[0] * deutil.safe_eval(equn, **temp_vardict) "
-                           "- vardict['y_{}'.format(n)]")
+                   cstring="temp_vardict['y_{}'.format(n)] - h[0] * safe_eval(equn, safe_dict, **temp_vardict) "
+                           "- vardict['y_{}'.format(n)]", safe_dict=safe_dict)
     for vari in range(eqnum):
         pt = soln[vari]
         kt = numpy.array([vardict['y_{}'.format(vari)]])

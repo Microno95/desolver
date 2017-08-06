@@ -77,7 +77,7 @@ def init_module(raiseKBINT=False):
 
 class OdeSystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
-    def __init__(self, n=(1,), equ=(), y_i=(), t=(0, 0), savetraj=0, stpsz=1.0, eta=0, relerr=4e-16, constants=dict()):
+    def __init__(self, n=(1,), equ=tuple(tuple()), t=(0, 0), savetraj=0, stpsz=1.0, eta=0, relerr=4e-16, constants=dict()):
         """Initialises the system to the parameters passed or to default values.
 
         Keyword arguments:
@@ -101,25 +101,23 @@ class OdeSystem:
 
         Variable-length arguments:
         consts: Arbitrary set of keyword arguments that define the constants to be used in the system."""
-        if len(equ) > len(y_i):
-            raise etypes.LengthError("There are more equations than initial conditions!")
-        elif len(equ) < len(y_i):
-            ischemes.deutil.warning("There are more initial conditions than equations!")
-        elif len(t) != 2:
+        if len(t) != 2:
             raise etypes.LengthError("Two time bounds were required, only {} were given!".format(len(t)))
         for k, i in enumerate(equ):
-            if 't' not in i and 'y_' not in i:
+            if 't' not in i[0] and 'y_' not in i[0]:
                 ischemes.deutil.warning("Equation {} has no variables".format(k))
         self.relative_error_bound = relerr
-        self.equRepr = [i for i in equ]
-        self.equ = [compile(precautions_regex.sub("LUBADUBDUB", i), '<string>', 'eval') for i in equ]
-        self.y = [numpy.resize(i, n) for i in y_i]
+        self.equRepr = [i[0] for i in equ]
+        self.eta = eta
+        self.eqnum = len(equ)
+        self.equ = [compile(precautions_regex.sub("LUBADUBDUB", i[0]), '<string>', 'eval') for i in equ]
+        self.y = [numpy.resize(equ[i][1] if (len(equ[i]) == 2) else 0.0, n) for i in range(self.eqnum)]
         self.dim = tuple([1] + list(n))
         self.t = float(t[0])
+        self.sample_times = [self.t]
         self.t0 = float(t[0])
         self.t1 = float(t[1])
-        self.soln = [[numpy.resize(i, n)] for i in self.y]
-        self.soln.append([t[0]])
+        self.soln = [[numpy.resize(value, n)] for value in self.y]
         self.consts = constants
         for k in self.consts:
             self.consts.update({k: numpy.resize(self.consts[k], n)})
@@ -129,8 +127,6 @@ class OdeSystem:
             self.dt = stpsz
         else:
             self.dt = -1 * stpsz
-        self.eta = eta
-        self.eqnum = len(equ)
 
     def set_end_time(self, t):
         """Changes the final time for the integration of the ODE system
@@ -417,38 +413,36 @@ class OdeSystem:
             heff = [i * 0.5 for i in heff]
         heff.append(tf)
         time_remaining = [0, 0]
-        soln = self.soln
         vardict = {'t': self.t}
         vardict.update(self.consts)
         etaString = ''
-        while heff[0] != 0 and abs(self.t) < abs(tf * (1 - 4e-16)):
+        while heff[0] != 0 and heff[1] != 0 and abs(self.t) < abs(tf * (1 - 4e-16)):
             try:
-                if heff[0] != heff[1]:
-                    heff[1] = heff[0]
+                heff[1] = heff[0]
                 if eta:
                     time_remaining[0] = time.perf_counter()
                 if abs(heff[0] + self.t) > abs(tf):
                     heff[0] = (tf - self.t)
-                elif heff[1] == 0 and heff[0] == 0:
-                    break
                 try:
-                    self.method(self.equ, vardict, soln, heff, self.relative_error_bound, self.eqnum)
+                    self.method(self.equ, vardict, self.soln, heff, self.relative_error_bound, self.eqnum)
                 except RecursionError:
                     print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. "
                           "If this fails, either use a different relative error requirement or "
                           "increase maximum recursion depth. Can also occur if the initial value of all "
-                          "variables are set to 0.")
+                          "variables is set to 0.")
                     heff[1] = heff[0]
                     heff[0] = 0.5 * heff[0]
-                    self.method(self.equ, vardict, soln, heff, self.relative_error_bound, self.eqnum)
+                    self.method(self.equ, vardict, self.soln, heff, self.relative_error_bound, self.eqnum)
+                except:
+                    raise
                 if heff[0] == 0:
                     heff[0] = (tf - self.t) * 0.5
                 self.t = vardict['t']
                 if self.traj:
-                    soln[-1].append(vardict['t'])
+                    self.sample_times.append(vardict['t'])
                 else:
-                    soln = [numpy.array([i[-1]]) for i in soln[:-1]]
-                    soln.append([vardict['t']])
+                    self.soln = [numpy.array([i[-1]]) for i in self.soln]
+                    self.sample_times = [vardict['t']]
                 if eta:
                     temp_time = 0.4 * time_remaining[1] + (((tf - self.t) / heff[0]) *
                                                            0.6 * (time.perf_counter() - time_remaining[0]))
@@ -458,7 +452,7 @@ class OdeSystem:
                     prevLen = len(etaString)
                     etaString = "{}% ----- ETA: {} -- Current Time and Step Size: {:.2e} and {:.2e}".format(
                                 "{:.2%}".format(pLeft).zfill(7), 
-                                convertSuffix(time_remaining[1]),
+                                ischemes.deutil.convert_suffix(time_remaining[1]),
                                 self.t, heff[0])
                     if prevLen > len(etaString):
                         print("\r" + " " * prevLen, end='\r')
@@ -468,14 +462,13 @@ class OdeSystem:
                 callback(self)
             except KeyboardInterrupt:
                 if raise_KeyboardInterrupt: raise
-                else: 
-                    break
+            except:
+                raise
         if eta:
             sys.stdout.flush()
             print('\r' + ' ' * (shutil.get_terminal_size()[0] - 2), end='')
             print("\r100%")
         else:
             print("100%")
-        self.soln = soln
-        self.t = soln[-1][-1]
+        self.t = self.soln[-1][-1]
         self.dt = heff[0]
