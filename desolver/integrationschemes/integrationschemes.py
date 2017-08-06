@@ -27,7 +27,20 @@ import numpy.linalg
 
 import desolver.utilities as deutil
 
-safe_dict = None
+safe_dict = {}
+
+def gen_safe_dict():
+    global safe_dict
+    safe_list_default = ['array', 'arccos', 'arcsin', 'arctan', 'arctan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp',
+                         'abs', 'fabs', 'floor', 'fmod', 'frexp', 'hypot', 'ldexp', 'log', 'log10', 'modf', 'pi',
+                         'power', 'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh', 'dot', 'vdot', 'outer', 'matmul',
+                         'tensordot', 'inner', 'trace', 'cross']
+    safe_list_linalg = ['norm', 'eig', 'eigh', 'eigvals', 'eigvalsh', 'cond', 'det', 'matrix_rank',
+                        'slogdet', 'inv', 'pinv', 'tensorinv', 'matrix_power']
+    for k in safe_list_default:
+        safe_dict.update({'{}'.format(k): getattr(globals().get("numpy"), k)})
+    for k in safe_list_linalg:
+        safe_dict.update({'{}'.format(k): getattr(getattr(globals().get("numpy"), "linalg"), k)})
 
 error_coeff_arrayrk45ck = [[-0.0042937748015873],
                          [ 0.                ],

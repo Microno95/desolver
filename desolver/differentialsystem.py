@@ -36,7 +36,6 @@ import desolver.exceptiontypes as etypes
 namespaceInitialised = False
 available_methods = {}
 methods_inv_order = {}
-safe_dict = {}
 raise_KeyboardInterrupt = False
 
 # This regex string will match any unacceptable arguments attempting to be passed to eval
@@ -49,23 +48,10 @@ def init_module(raiseKBINT=False):
         raise_KeyboardInterrupt = raiseKBINT
         global precautions_regex
         precautions_regex = re.compile(precautions_regex)
-        safe_list_default = ['array', 'arccos', 'arcsin', 'arctan', 'arctan2', 'ceil', 'cos', 'cosh', 'degrees', 'e', 'exp',
-                             'abs', 'fabs', 'floor', 'fmod', 'frexp', 'hypot', 'ldexp', 'log', 'log10', 'modf', 'pi',
-                             'power', 'radians', 'sin', 'sinh', 'sqrt', 'tan', 'tanh', 'dot', 'vdot', 'outer', 'matmul',
-                             'tensordot', 'inner', 'trace', 'cross']
-        safe_list_linalg = ['norm', 'eig', 'eigh', 'eigvals', 'eigvalsh', 'cond', 'det', 'matrix_rank',
-                            'slogdet', 'inv', 'pinv', 'tensorinv', 'matrix_power']
-        for k in safe_list_default:
-            safe_dict.update({'{}'.format(k): getattr(globals().get("numpy"), k)})
-        for k in safe_list_linalg:
-            safe_dict.update({'{}'.format(k): getattr(getattr(globals().get("numpy"), "linalg"), k)})
-
-        ischemes.safe_dict = safe_dict
-
         methods_ischemes = [(ischemes.__dict__.get(a)) for a in dir(ischemes)
                              if isinstance(ischemes.__dict__.get(a), types.FunctionType)]
         available_methods.update(dict([(func.__name__, func) for func in methods_ischemes if hasattr(func, "__alt_names__")] +
-                                 [(alt_name, func) for func in methods_ischemes for alt_name in func.__alt_names__ if hasattr(func, "__alt_names__")]))
+                                        [(alt_name, func) for func in methods_ischemes if hasattr(func, "__alt_names__") for alt_name in func.__alt_names__]))
 
         methods_inv_order.update({func: 1.0/func.__order__ for name, func in available_methods.items()})
 
@@ -470,5 +456,5 @@ class OdeSystem:
             print("\r100%")
         else:
             print("100%")
-        self.t = self.soln[-1][-1]
+        self.t = self.sample_times[-1]
         self.dt = heff[0]
