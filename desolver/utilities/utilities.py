@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import numpy
+import time
 
 def bisectroot(equn, n, h, m, vardict, low, high, cstring, safe_dict, iterlimit=None):
     """
@@ -110,3 +111,28 @@ def named_function(name, alt_names=tuple(), order=1.0):
         f.__order__ = order
         return f
     return wrap
+
+
+class StateTimer():
+    def __init__(self):
+        self.start = time.perf_counter()
+        self.stopped = 0
+        self.stopped = False
+
+    def stop_timer(self):
+        self.stop = time.perf_counter()
+
+    def get_elapsed_time(self):
+        if not self.stopped:
+            return time.perf_counter() - self.start
+        else:
+            return self.stop - self.start
+
+    def continue_timer(self):
+        if self.stopped:
+            self.stopped = False
+
+    def restart_timer(self):
+        if self.stopped:
+            self.stopped = False
+        self.start = time.perf_counter()

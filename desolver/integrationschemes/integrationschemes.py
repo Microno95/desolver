@@ -85,6 +85,13 @@ ABAs5o6HA_coefficients = [[0.15585935917621682,
                           -0.6859195549562167,
                           0.0]]
 
+# Based on RK45 Cash-Karp
+RK45CK_coefficients = [numpy.array([1631.0 / 55296, 175.0 / 512, 575.0/ 13824, 44275.0 / 110592, 253.0 / 4096, 0.0]),
+                       numpy.array([37.0 / 378, 0.0, 250.0 / 621, 125.0 / 594, 0.0, 512.0 / 1771]),
+                       numpy.array([2825.0 / 27648, 0.0, 18575.0 / 48384, 13525.0 / 55296, 277.0 / 14336, 1.0 / 4.0])]
+
+
+
 @deutil.named_function("Explicit Runge-Kutta 4",
                        alt_names=("Runge-Kutta 4", "RK4",),
                        order=4.0)
@@ -106,28 +113,30 @@ def explicitrk4(ode, vardict, soln, h, relerr, eqnum):
         aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
     for vari in range(eqnum):
-        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
+        vardict['y_{}'.format(vari)] = soln[vari][-1]
+
+    aux[:, 0] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+
     for vari in range(eqnum):
-        aux[vari][0] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
-    for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][0] * 0.5})
+        vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][0] * 0.5
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
+
+    aux[:, 1] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+
     for vari in range(eqnum):
-        aux[vari][1] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
+        vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][1] * 0.5
+
+    aux[:, 2] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][1] * 0.5})
-    for vari in range(eqnum):
-        aux[vari][2] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
-    for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][2]})
+        vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][2]
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
+
+
+    aux[:, 3] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+
     for vari in range(eqnum):
-        aux[vari][3] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
-    for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][3]})
-    for vari in range(eqnum):
-        vardict.update({'y_{}'.format(vari): (soln[vari][-1] +
-                                              (aux[vari][0] + aux[vari][1] * 2 + aux[vari][2] * 2 + aux[vari][3]) / 6)})
+        vardict['y_{}'.format(vari)] = soln[vari][-1] + (aux[vari][0] + aux[vari][1] * 2 + aux[vari][2] * 2 + aux[vari][3]) / 6
         pt = soln[vari]
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
@@ -152,31 +161,35 @@ def explicitgills(ode, vardict, soln, h, relerr, eqnum):
         aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
     for vari in range(eqnum):
-        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
+        vardict['y_{}'.format(vari)] = soln[vari][-1]
+
+    aux[:, 0] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+
     for vari in range(eqnum):
-        aux[vari][0] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
-    for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][0] * 0.5})
+        vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][0] * 0.5
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
+
+    aux[:, 1] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+
     for vari in range(eqnum):
-        aux[vari][1] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
+        vardict['y_{}'.format(vari)] = (soln[vari][-1] + aux[vari][0] * 0.4142135623730950 +
+                                        aux[vari][1] * 0.2928932188134524)
+
+    aux[:, 2] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][0] * 0.4142135623730950 +
-                                             aux[vari][1] * 0.2928932188134524})
-    for vari in range(eqnum):
-        aux[vari][2] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
-    for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][2]})
+        vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][2]
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
+
+    aux[:, 3] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] for vari in range(eqnum)],
+                             (eqnum, *dim))
+
     for vari in range(eqnum):
-        aux[vari][3] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
+        vardict['y_{}'.format(vari)] = (soln[vari][-1] - aux[vari][1] * 0.7071067811865475 +
+                                        aux[vari][2] * 1.7071067811865475)
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] - aux[vari][1] * 0.7071067811865475 +
-                                             aux[vari][2] * 1.7071067811865475})
-    for vari in range(eqnum):
-        vardict.update({'y_{}'.format(vari): (soln[vari][-1] +
-                                              (aux[vari][0] + aux[vari][1] * 0.585786437626905 +
-                                               aux[vari][2] * 3.4142135623730950 + aux[vari][3]) / 6)})
+        vardict['y_{}'.format(vari)] = (soln[vari][-1] +
+                                        (aux[vari][0] + aux[vari][1] * 0.585786437626905 +
+                                         aux[vari][2] * 3.4142135623730950 + aux[vari][3]) / 6)
         pt = soln[vari]
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
@@ -202,46 +215,42 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
         aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
     for vari in range(eqnum):
-        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
+        vardict['y_{}'.format(vari)] = soln[vari][-1]
     for vari in range(eqnum):
         aux[vari][0] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + aux[vari][0] / 5})
+        vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][0] / 5
     vardict.update({'t': t_initial + h[0] / 5})
     for vari in range(eqnum):
         aux[vari][1] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + 3.0 * aux[vari][0] / 40 + 9.0 * aux[vari][1] / 40})
+        vardict['y_{}'.format(vari)] = soln[vari][-1] + 3.0 * aux[vari][0] / 40 + 9.0 * aux[vari][1] / 40
     vardict.update({'t': t_initial + 3 * h[0] / 10})
     for vari in range(eqnum):
         aux[vari][2] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + (3.0 * aux[vari][0] - 9.0 * aux[vari][1] +
-                                                               12.0 * aux[vari][2]) / 10})
+        vardict['y_{}'.format(vari)] = (soln[vari][-1] + (3.0 * aux[vari][0] - 9.0 * aux[vari][1] +
+                                                          12.0 * aux[vari][2]) / 10)
     vardict.update({'t': t_initial + 3 * h[0] / 5})
     for vari in range(eqnum):
         aux[vari][3] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): (soln[vari][-1] - 11.0 * aux[vari][0] / 54 - 5.0 * aux[vari][1] / 2 -
-                                              70.0 * aux[vari][2] / 27 + 35.0 * aux[vari][3] / 27)})
+        vardict['y_{}'.format(vari)] = (soln[vari][-1] - 11.0 * aux[vari][0] / 54 - 5.0 * aux[vari][1] / 2 -
+                                        70.0 * aux[vari][2] / 27 + 35.0 * aux[vari][3] / 27)
     vardict.update({'t': t_initial + h[0]})
     for vari in range(eqnum):
         aux[vari][4] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): (soln[vari][-1] +
-                                              1631.0 * aux[vari][0] / 55296 + 175.0 * aux[vari][1] / 512 +
-                                              575.0 * aux[vari][2] / 13824 + 44275.0 * aux[vari][3] / 110592 +
-                                              253.0 * aux[vari][4] / 4096)})
+        vardict['y_{}'.format(vari)] = (soln[vari][-1] + numpy.sum(RK45CK_coefficients[0][[slice(None)] + [None]*(aux[vari].ndim - 1)] * aux[vari], axis=0))
     vardict.update({'t': t_initial + 7.0 * h[0] / 8})
+    
     for vari in range(eqnum):
         aux[vari][5] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0], dim)
     coeff = []
     for vari in range(eqnum):
         coeff.append([])
-        coeff[vari].append(soln[vari][-1] + 37.0 * aux[vari][0] / 378 + 250.0 * aux[vari][2] / 621 +
-                           125.0 * aux[vari][3] / 594 + 512.0 * aux[vari][5] / 1771)
-        coeff[vari].append(soln[vari][-1] + 2825.0 * aux[vari][0] / 27648 + 18575.0 * aux[vari][2] / 48384 +
-                           13525.0 * aux[vari][3] / 55296 + 277.0 * aux[vari][4] / 14336 + aux[vari][5] / 4.0)
+        coeff[vari].append(soln[vari][-1] + numpy.sum(RK45CK_coefficients[1][[slice(None)] + [None]*(aux[vari].ndim - 1)] * aux[vari], axis=0))
+        coeff[vari].append(soln[vari][-1] + numpy.sum(RK45CK_coefficients[2][[slice(None)] + [None]*(aux[vari].ndim - 1)] * aux[vari], axis=0))
     error_coeff_array = [numpy.resize(i, dim) for i in error_coeff_arrayrk45ck]
     err_estimate = numpy.abs(
         numpy.ravel([numpy.sum(aux[vari] * error_coeff_array, axis=0) for vari in range(eqnum)])).max()
@@ -261,7 +270,7 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
         explicitrk45ck(ode, vardict, soln, h, relerr, eqnum)
     else:
         for vari in range(eqnum):
-            vardict.update({'y_{}'.format(vari): coeff[vari][1]})
+            vardict.update({'y_{}'.format(vari): coeff[vari][0]})
             pt = soln[vari]
             kt = numpy.array([coeff[vari][1]])
             soln[vari] = numpy.concatenate((pt, kt))
@@ -282,20 +291,27 @@ def explicitmidpoint(ode, vardict, soln, h, relerr, eqnum):
     else:
         aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
+
     for vari in range(eqnum):
-        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
+        vardict["y_{}".format(vari)] = soln[vari][-1]
+
+    aux[:, 0] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] + soln[vari][-1]
+                              for vari in range(eqnum)], (eqnum, *dim))
+
     for vari in range(eqnum):
-        aux[vari][0] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] + soln[vari][-1]], dim)
-    for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): aux[vari][0]})
+        vardict["y_{}".format(vari)] = aux[vari, 0]
+
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
+
+    aux[:, 0] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] + soln[vari][-1]
+                              for vari in range(eqnum)], (eqnum, *dim))
+
     for vari in range(eqnum):
-        aux[vari][0] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict)], dim)
-    for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): numpy.array(soln[vari][-1] + h[0] * aux[vari][0])})
+        vardict["y_{}".format(vari)] = numpy.array(soln[vari][-1] + h[0] * aux[vari][0])
         pt = soln[vari]
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
+
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
 
 @deutil.named_function("Implicit Midpoint",
@@ -334,17 +350,20 @@ def heuns(ode, vardict, soln, h, relerr, eqnum):
     else:
         aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
-    for vari in range(eqnum):
-        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
-    for vari in range(eqnum):
-        aux[vari][0] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict), dim)
-    for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): aux[vari][0] * h[0] + soln[vari][-1]})
+
+    for vari in range(eqnum): vardict['y_{}'.format(vari)] = soln[vari][-1]
+
+    aux[:, 0] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict)
+                              for vari in range(eqnum)], (eqnum, *dim))
+
+    for vari in range(eqnum): vardict['y_{}'.format(vari)] = aux[vari][0] * h[0] + soln[vari][-1]
+
     vardict.update({'t': vardict['t'] + h[0]})
+
+    aux[:, 1] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict)
+                              for vari in range(eqnum)], (eqnum, *dim))
     for vari in range(eqnum):
-        aux[vari][1] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict), dim)
-    for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): soln[vari][-1] + h[0] * (aux[vari][0] + aux[vari][1]) * 0.5})
+        vardict["y_{}".format(vari)] = soln[vari][-1] + h[0] * (aux[vari][0] + aux[vari][1]) * 0.5
         pt = soln[vari]
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
@@ -357,8 +376,8 @@ def backeuler(ode, vardict, soln, h, relerr, eqnum):
     Implementation of the Implicit/Backward Euler method.
     """
 
-    for vari in range(eqnum):
-        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
+    for vari in range(eqnum): vardict['y_{}'.format(vari)] = soln[vari][-1]
+
     for vari in range(eqnum):
         deutil.bisectroot(ode[vari], vari, h, 1.0, vardict, - soln[vari][-1] - h[0] * deutil.safe_eval(ode[vari], safe_dict, **vardict),
                    soln[vari][-1] + h[0] * deutil.safe_eval(ode[vari], safe_dict, **vardict),
@@ -386,15 +405,18 @@ def foreuler(ode, vardict, soln, h, relerr, eqnum):
     else:
         aux = numpy.resize([0.], dim)
     dim = soln[0][0].shape
+
+    for vari in range(eqnum): vardict['y_{}'.format(vari)] = soln[vari][-1]
+
+    aux[:, 0] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] + soln[vari][-1]
+                              for vari in range(eqnum)], (eqnum, *dim))
+
     for vari in range(eqnum):
-        vardict.update({'y_{}'.format(vari): soln[vari][-1]})
-    for vari in range(eqnum):
-        aux[vari][0] = numpy.resize(deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] + soln[vari][-1], dim)
-    for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): aux[vari][0]})
+        vardict['y_{}'.format(vari)] = aux[vari, -1]
         pt = soln[vari]
-        kt = numpy.array([vardict['y_{}'.format(vari)]])
+        kt = numpy.array([aux[vari, -1]])
         soln[vari] = numpy.concatenate((pt, kt))
+
     vardict.update({'t': vardict['t'] + h[0]})
 
 @deutil.named_function("Explicit Improved Forward Euler",
@@ -524,19 +546,24 @@ def sympforeuler(ode, vardict, soln, h, relerr, eqnum):
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
     for vari in range(eqnum):
-        if vari % 2 == 0:
+        if vari % 2 == 1:
             aux[vari][0] = numpy.resize((deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] * 0.5 + soln[vari][-1]), dim)
+    for vari in range(eqnum):
+        if vari % 2 == 1:
+            vardict.update({"y_{}".format(vari): aux[vari][0]})
+    for vari in range(eqnum):
+        if vari % 2 == 0:
+            aux[vari][0] = numpy.resize((deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] + soln[vari][-1]), dim)
+    for vari in range(eqnum):
+        if vari % 2 == 0:
             vardict.update({"y_{}".format(vari): aux[vari][0]})
     for vari in range(eqnum):
         if vari % 2 == 1:
-            aux[vari][0] = numpy.resize((deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] + soln[vari][-1]), dim)
-            vardict.update({"y_{}".format(vari): aux[vari][0]})
-    for vari in range(eqnum):
-        if vari % 2 == 0:
             aux[vari][0] = numpy.resize((deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] * 0.5 + soln[vari][-1]), dim)
+    for vari in range(eqnum):
+        if vari % 2 == 1:
             vardict.update({"y_{}".format(vari): aux[vari][0]})
     for vari in range(eqnum):
-        vardict.update({"y_{}".format(vari): aux[vari][0]})
         pt = soln[vari]
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
@@ -624,5 +651,37 @@ def sympABAs5o6HA(ode, vardict, soln, h, relerr, eqnum):
     for vari in range(eqnum):
         pt = soln[vari]
         kt = numpy.array([aux[vari][0]])
+        soln[vari] = numpy.concatenate((pt, kt))
+    vardict.update({'t': vardict['t'] + h[0]})
+
+
+
+@deutil.named_function("Alt Euler",
+                       alt_names=("AltE"),
+                       order=1.0)
+def alt_foreuler(ode, vardict, soln, h, relerr, eqnum):
+    """
+    Implementation of the Explicit/Forward Euler method.
+    """
+
+    dim = [eqnum, 1]
+    dim.extend(soln[0][0].shape)
+    dim = tuple(dim)
+    if numpy.iscomplexobj(soln[0]):
+        aux = numpy.resize([0. + 0j], dim)
+    else:
+        aux = numpy.resize([0.], dim)
+    dim = soln[0][0].shape
+
+    for vari in range(eqnum):
+        vardict['y_{}'.format(vari)] = soln[vari][-1]
+
+    aux[:, 0] = numpy.resize([deutil.safe_eval(ode[vari], safe_dict, **vardict) * h[0] + soln[vari][-1]
+                              for vari in range(eqnum)], (eqnum, *dim))
+
+    for vari in range(eqnum):
+        vardict['y_{}'.format(vari)] = aux[vari, -1]
+        pt = soln[vari]
+        kt = numpy.array([aux[vari, -1]])
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + h[0]})
