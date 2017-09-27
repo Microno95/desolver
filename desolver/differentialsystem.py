@@ -95,12 +95,12 @@ class OdeSystem:
             if 't' not in i[0] and 'y_' not in i[0]:
                 ischemes.deutil.warning("Equation {} has no variables".format(k))
         self.relative_error_bound = relerr
-        self.equRepr = [precautions_regex.sub("LUBADUBDUB", i[0]) for i in equ]
+        self.equRepr = [parse_expr(precautions_regex.sub("LUBADUBDUB", i[0])) if isinstance(i[0], str) else i[0] if isinstance(i[0], smp.Expr) else parse_expr("t") for i in equ]
         self.eta = eta
         self.eqnum = len(equ)
         self.symbols = set(smp.symbols(" ".join(["y_{}".format(i) for i in range(self.eqnum)]) + " t " + " ".join([k for k in constants])))
         print(self.symbols)
-        self.equ = [smp.lambdify(self.symbols, parse_expr(i), "numpy", dummify=False) for i in self.equRepr]
+        self.equ = [smp.lambdify(self.symbols, i, "numpy", dummify=False) for i in self.equRepr]
         self.y = [numpy.resize(equ[i][1] if (len(equ[i]) == 2) else 0.0, n) for i in range(self.eqnum)]
         self.dim = tuple([1] + list(n))
         self.t = float(t[0])
@@ -233,7 +233,7 @@ class OdeSystem:
 
         Returns the equations themselves as a list of strings."""
         for i in range(self.eqnum):
-            print("dy_{} = ".format(i) + self.equRepr[i])
+            print("dy_{} =".format(i), self.equRepr[i])
         return self.equRepr
 
     def number_of_equations(self):
@@ -260,7 +260,7 @@ class OdeSystem:
         """Prints the equations, initial conditions, final states, time limits and defined constants in the system."""
         for i in range(self.eqnum):
             print("Equation {}\ny_{}({}) = {}\ndy_{} = {}\ny_{}({}) = {}\n".format(i, i, self.t0, self.y[i], i,
-                                                                                   self.equRepr[i], i, self.t,
+                                                                                   str(self.equRepr[i]), i, self.t,
                                                                                    self.soln[i][-1]))
         if self.consts:
             print("The constants that have been defined for this system are: ")
