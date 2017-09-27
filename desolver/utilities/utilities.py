@@ -25,28 +25,60 @@ SOFTWARE.
 import numpy
 import time
 
-def bisectroot(equn, n, h, m, vardict, low, high, cstring, safe_dict, iterlimit=None):
-    """
-    Uses the bisection method to find the zeros of the function defined in cstring.
-    Designed to be used as a method to find the value of the next y_#.
-    """
-    import copy as cpy
-    if iterlimit is None:
-        iterlimit = 64  # Iteration limit for bisection method
-    r = 0  # Track iteration count
-    temp_vardict = cpy.deepcopy(vardict)
-    temp_vardict.update({'t': vardict['t'] + m * h[0]})
-    while numpy.amax(numpy.abs(numpy.subtract(high, low))) > 1e-14 and r < iterlimit:
-        temp_vardict.update({'y_{}'.format(n): (low + high) * 0.5})
-        if r > iterlimit:
-            break
-        c = eval(cstring)
-        if (numpy.sum(c) >= 0 and numpy.sum(low) >= 0) or (numpy.sum(c) < 0 and numpy.sum(low) < 0):
-            low = c
+from math import floor
+
+def bisection_method(eqn_lambda, arg_name=None, low=-1.0, high=1.0, eqn_args=None, eqn_kwargs=None, iterlimit=64, tol=1e-9):
+    eqn_args = eqn_args if eqn_args is not None else tuple()
+    eqn_kwargs = eqn_kwargs if eqn_kwargs is not None else dict()
+    if isinstance(arg_name, str):
+        def wrapped_eqn(x):
+            return eqn_lambda(*eqn_args, **{arg_name: x}, **eqn_kwargs)
+    else:
+        def wrapped_eqn(x):
+            return eqn_lambda(x, *eqn_args, **eqn_kwargs)
+    current_x = (high + low) * 0.5
+    current_high = high
+    current_low = low
+    evaluated_high = wrapped_eqn(current_high)
+    evaluated_low = wrapped_eqn(current_low)
+    for _ in range(iterlimit):
+        evaluated_value = wrapped_eqn(current_x)
+        if (numpy.sign(numpy.sum(evaluated_value)) == numpy.sign(numpy.sum(evaluated_low))):
+            current_low = current_x
+            evaluated_low = evaluated_value
         else:
-            high = c
-        r += 1
-    vardict.update({'y_{}'.format(n): vardict['y_{}'.format(n)] + (low + high) * 0.5 / m})
+            current_high = current_x
+            evaluated_high = evaluated_value
+        current_x = (current_high + current_low) * 0.5
+        if (current_high < tol + current_low).all():
+            break
+    return current_x
+
+def sa_minimisation(eqn_lambda, arg_name=None, start=0.0, eqn_args=None, eqn_kwargs=None, init_temperature=1.0, iterlimit=12800, tol=1e-4):
+    eqn_args = eqn_args if eqn_args is not None else tuple()
+    eqn_kwargs = eqn_kwargs if eqn_kwargs is not None else dict()
+    arg_name = [arg_name] if isinstance(arg_name, str) else list(arg_name) if not isinstance(arg_name, list) and arg_name is not None else arg_name
+    if arg_name is not None and isinstance(arg_name[0], str):
+        def wrapped_eqn(x):
+            return eqn_lambda(*eqn_args, **{arg_name[i]: x[i] for i in range(len(arg_name))}, **eqn_kwargs)
+    else:
+        def wrapped_eqn(x):
+            return eqn_lambda(*x, *eqn_args, **eqn_kwargs)
+    current_value = start
+    proposed_value = start
+    evaluated_value = wrapped_eqn(current_value)
+    temperature = init_temperature
+    for k in range(iterlimit):
+        if temperature < tol:
+            break
+        proposed_value = current_value + numpy.random.randn(*numpy.shape(current_value))
+        evaluated_proposed_value = wrapped_eqn(proposed_value)
+        delta_E = evaluated_proposed_value - evaluated_value
+        if (delta_E <= 0) or numpy.exp(-delta_E / temperature) >= numpy.random.uniform():
+            current_value = proposed_value
+            evaluated_value = evaluated_proposed_value
+        temperature = temperature * 0.95 ** floor(k / 1000)
+    return current_value
 
 def extrap(x, xdata, ydata):
     """

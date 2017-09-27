@@ -65,7 +65,7 @@ def init_module(raiseKBINT=False):
 
 class OdeSystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
-    def __init__(self, n=(1,), equ=tuple(tuple()), t=(0, 0), savetraj=0, stpsz=1.0, eta=0, relerr=4e-16, constants=dict()):
+    def __init__(self, n=(1,), equ=tuple(tuple()), t=(0, 0), savetraj=0, stpsz=1.0, eta=0, relerr=4e-16, constants=None):
         """Initialises the system to the parameters passed or to default values.
 
         Keyword arguments:
@@ -98,8 +98,8 @@ class OdeSystem:
         self.equRepr = [parse_expr(precautions_regex.sub("LUBADUBDUB", i[0])) if isinstance(i[0], str) else i[0] if isinstance(i[0], smp.Expr) else parse_expr("t") for i in equ]
         self.eta = eta
         self.eqnum = len(equ)
-        self.symbols = set(smp.symbols(" ".join(["y_{}".format(i) for i in range(self.eqnum)]) + " t " + " ".join([k for k in constants])))
-        print(self.symbols)
+        self.consts = constants if constants is not None else dict()
+        self.symbols = set(smp.symbols(" ".join(["y_{}".format(i) for i in range(self.eqnum)]) + " t " + " ".join([k for k in self.consts])))
         self.equ = [smp.lambdify(self.symbols, i, "numpy", dummify=False) for i in self.equRepr]
         self.y = [numpy.resize(equ[i][1] if (len(equ[i]) == 2) else 0.0, n) for i in range(self.eqnum)]
         self.dim = tuple([1] + list(n))
@@ -108,7 +108,6 @@ class OdeSystem:
         self.t0 = float(t[0])
         self.t1 = float(t[1])
         self.soln = [[numpy.resize(value, n)] for value in self.y]
-        self.consts = constants
         for k in self.consts:
             self.consts.update({k: numpy.resize(self.consts[k], n)})
         self.traj = savetraj
@@ -124,8 +123,7 @@ class OdeSystem:
         Required arguments:
         t: Denotes the final time."""
         self.t1 = float(t)
-        if not (abs(self.t0) < abs(self.t) < abs(self.t1)):
-            self.t = self.t0
+        check_time_bounds()
 
     def set_start_time(self, t):
         """Changes the initial time for the integration of the ODE system.
@@ -133,6 +131,9 @@ class OdeSystem:
         Required arguments:
         t: Denotes the initial time."""
         self.t0 = float(t)
+        check_time_bounds()
+
+    def check_time_bounds(self):
         if not (abs(self.t0) < abs(self.t) < abs(self.t1)):
             self.t = self.t0
 
@@ -274,6 +275,8 @@ class OdeSystem:
         Variable-length arguments:
         additional_constants: A dict containing constants and their corresponding values."""
         self.consts.update({k: numpy.resize(additional_constants[k], self.dim) for k in additional_constants})
+        self.symbols = set(smp.symbols(" ".join(["y_{}".format(i) for i in range(self.eqnum)]) + " t " + " ".join([k for k in self.consts])))
+        self.equ = [smp.lambdify(self.symbols, i, "numpy", dummify=False) for i in self.equRepr]
 
     def remove_constants(self, **constants_removal):
         """Takes an arbitrary list of keyword arguments to remove from the list of available constants.
@@ -284,6 +287,9 @@ class OdeSystem:
         for i in constants_removal:
             if i in self.consts.keys():
                 del self.consts[i]
+
+        self.symbols = set(smp.symbols(" ".join(["y_{}".format(i) for i in range(self.eqnum)]) + " t " + " ".join([k for k in self.consts])))
+        self.equ = [smp.lambdify(self.symbols, i, "numpy", dummify=False) for i in self.equRepr]
 
     def set_dimensions(self, m=None):
         """Changes the dimensions of the system.
@@ -315,6 +321,22 @@ class OdeSystem:
             return self.traj
         else:
             self.traj = b
+
+    def get_trajectory(self, var_names=tuple()):
+        if isinstance(var_names, tuple):
+            if len(var_names) == 0:
+                return self.soln
+            elif len(var_names) > 0:
+                return [self.soln[int(i.split("_")[-1]) if isinstance(i, str) else i] for i in var_names]
+        elif isinstance(var_names, str):
+            return [self.soln[int(var_names.split("_")[-1])]]
+        elif isinstance(var_names, int):
+            return [self.soln[var_names]]
+        else:
+            raise TypeError("var_names should either be a tuple of variable names or a single variable name as a string!")
+
+    def get_sample_times(self):
+        return self.sample_times
 
     def reset(self, t=None):
         """Resets the system to a previous time.
