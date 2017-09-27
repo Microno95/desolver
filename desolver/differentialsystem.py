@@ -29,6 +29,8 @@ import sys
 import time
 import shutil
 import types
+import sympy as smp
+from sympy.parsing.sympy_parser import parse_expr
 
 import desolver.integrationschemes as ischemes
 import desolver.exceptiontypes as etypes
@@ -69,11 +71,11 @@ class OdeSystem:
         Keyword arguments:
         n: Specifies the dimensions of the system in the form of a tuple.
            Can be arbitrary as long as the values are integral.
-        equ: Specifies the list of differential equations. Use in the form of strings where t and y_{} are the variables.
+        equ: Specifies the list of differential equations and their initial conditions.
+             Use in the form of strings where t and y_{} are the variables.
              The curly braces are to be replaced by values that range from 0 to k where
              k = total_number_of_equations - 1.
              NOTE: y_0 will be the first equation, y_1 the second, and so on.
-        y_i: Specifies the initial conditions of each equation in the order of equations that are passed.
         t: A tuple of the form (initial time, final time) aka the integration limits.
         savetraj: Set to True or False to specify whether or not the trajectory of the
                   integration should be recorded.
@@ -93,10 +95,12 @@ class OdeSystem:
             if 't' not in i[0] and 'y_' not in i[0]:
                 ischemes.deutil.warning("Equation {} has no variables".format(k))
         self.relative_error_bound = relerr
-        self.equRepr = [i[0] for i in equ]
+        self.equRepr = [precautions_regex.sub("LUBADUBDUB", i[0]) for i in equ]
         self.eta = eta
         self.eqnum = len(equ)
-        self.equ = [compile(precautions_regex.sub("LUBADUBDUB", i[0]), '<string>', 'eval') for i in equ]
+        self.symbols = set(smp.symbols(" ".join(["y_{}".format(i) for i in range(self.eqnum)]) + " t " + " ".join([k for k in constants])))
+        print(self.symbols)
+        self.equ = [smp.lambdify(self.symbols, parse_expr(i), "numpy", dummify=False) for i in self.equRepr]
         self.y = [numpy.resize(equ[i][1] if (len(equ[i]) == 2) else 0.0, n) for i in range(self.eqnum)]
         self.dim = tuple([1] + list(n))
         self.t = float(t[0])
@@ -215,7 +219,7 @@ class OdeSystem:
         else:
             print("The method you selected does not exist in the list of available methods, "
                   "call availmethods() to see what these are")
-                  
+
     def get_method(self):
         """
         Returns the method used to integrate the system.
@@ -223,44 +227,6 @@ class OdeSystem:
         for method, func in available_methods.items():
             if self.method is func:
                 return method
-
-    def add_equation(self, eq, ic):
-        """Adds an equation to an already defined system.
-
-        Required arguments:
-        eq: A list of strings that use y_{} and t as the integration variables where the curly braces should be
-            replaced with the index of the equation being referenced starting from 0 as the first equation.
-            NOTE: Referencing an equation that does not exist, ie. y_10 for a system with 10 equations will cause
-                  the integrator to fail.
-        ic: A list of values for each eq in order of the equations entered. If the dimension of the system is set
-            to be larger than scalars then an initial condition with fewer specified values will be extended to the
-            necessary dimensions. This may cause unexpected results and it is better to specify all the coefficients."""
-        if eq and ic:
-            for equation, icond in zip(eq, ic):
-                self.equRepr.append(equation)
-                self.equ.append(precautions_regex.sub("LUBADUBDUB", self.equRepr[-1]))
-                self.equ[-1] = compile(self.equ[-1], '<string>', 'eval')
-                self.y.append(numpy.resize(icond, self.dim))
-            solntime = self.soln[-1]
-            self.soln = [[numpy.resize([i], self.dim)] for i in self.y]
-            self.soln.append(solntime)
-            self.eqnum = len(self.equ)
-            self.t = self.t0
-
-    def remove_equation(self, indices):
-        """Removes (an) equation(s) at (a) given ind(ex)(ices) along with its corresponding initial values.
-
-        Required arguments:
-        indices: A list of integers that denote the equations to remove from the system. Will throw an error if
-                 there are more equations to be removed or if there is an index specified that exceeds the
-                 number of equations that exist."""
-        if len(indices) > self.eqnum:
-            raise etypes.LengthError("You've specified the removal of more equations than there exists!")
-        for i in indices:
-            self.y.pop(i)
-            self.soln.pop(i)
-            self.equ.pop(i)
-        self.eqnum -= len(indices)
 
     def show_equations(self):
         """Prints the equations that have been entered for the system.
@@ -342,7 +308,7 @@ class OdeSystem:
 
         Keyword arguments:
         b: A boolean value that denotes if the trajectory should be recorded.
-           1 - implies record; 0 - implies don't record. 
+           1 - implies record; 0 - implies don't record.
            If b is None, then this will return the current state of
            whether or not the trajectory is to be recorded"""
         if b is None:
@@ -437,7 +403,7 @@ class OdeSystem:
                     pLeft = round(1 - abs(tf - self.t) / abs(tf - self.t0), ndigits=3)
                     prevLen = len(etaString)
                     etaString = "{}% ----- ETA: {} -- Current Time and Step Size: {:.2e} and {:.2e}".format(
-                                "{:.2%}".format(pLeft).zfill(7), 
+                                "{:.2%}".format(pLeft).zfill(7),
                                 ischemes.deutil.convert_suffix(time_remaining[1]),
                                 self.t, heff[0])
                     if prevLen > len(etaString):
