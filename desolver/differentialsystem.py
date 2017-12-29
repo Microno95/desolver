@@ -69,33 +69,48 @@ class OdeSystem:
         """Initialises the system to the parameters passed or to default values.
 
         Keyword arguments:
-        n: Specifies the dimensions of the system in the form of a tuple.
-           Can be arbitrary as long as the values are integral.
-        equ: Specifies the list of differential equations and their initial conditions.
-             Use in the form of strings where t and y_{} are the variables.
-             The curly braces are to be replaced by values that range from 0 to k where
-             k = total_number_of_equations - 1.
-             NOTE: y_0 will be the first equation, y_1 the second, and so on.
-        t: A tuple of the form (initial time, final time) aka the integration limits.
-        savetraj: Set to True or False to specify whether or not the trajectory of the
-                  integration should be recorded.
-        stpsz: Sets the step-size for the integration, choose a value that is slightly less than the highest frequency
-               changes in value of the solutions to the equations.
-        eta: Set to True or False to specify whether or not the integration process should return an eta,
-             current progress and simple information regarding step-size and current time.
-             NOTE: This may slow the integration process down as the process of outputting
-                   these values create overhead.
-        relerr: Denotes the target relative global error. Useful for adaptive methods.
+            n: Specifies the dimensions of the system in the form of a tuple.
+               Can be arbitrary as long as the values are integral. Uses numpy convention so
+               a scalar is (1,), a vector is (1,3), a 2x2 matrix is (1,2,2),
+               an (M,T) tensor is (1,n_1,...,n_M,k_1,...,k_T) as expected.
+            equ: Specifies the list of differential equations and their initial conditions.
+                 Use in the form of strings where t and y_{} are the variables.
+                 The curly braces are to be replaced by values that range from 0 to k where
+                 k = total_number_of_equations - 1.
+                 ie. y_0 will be the first equation, y_1 the second, and so on.
+            t: A tuple of the form (initial time, final time) aka the integration limits.
+            savetraj: Set to True or False to specify whether or not the trajectory of the
+                      integration should be recorded.
+            stpsz: Sets the step-size for the integration, choose a value that is slightly less than the highest frequency
+                   changes in value of the solutions to the equations.
+            eta: Set to True or False to specify whether or not the integration process should return an eta,
+                 current progress and simple information regarding step-size and current time.
+                 NOTE: This may slow the integration process down as the process of outputting
+                       these values create overhead.
+            relerr: Denotes the target relative global error. Useful for adaptive methods.
 
         Variable-length arguments:
-        consts: Arbitrary set of keyword arguments that define the constants to be used in the system."""
+            consts: Arbitrary set of keyword arguments that define the constants to be used in the system."""
+
         if len(t) != 2:
             raise etypes.LengthError("Two time bounds were required, only {} were given!".format(len(t)))
         for k, i in enumerate(equ):
             if 't' not in i[0] and 'y_' not in i[0]:
                 ischemes.deutil.warning("Equation {} has no variables".format(k))
         self.relative_error_bound = relerr
-        self.equRepr = [parse_expr(precautions_regex.sub("LUBADUBDUB", i[0])) if isinstance(i[0], str) else i[0] if isinstance(i[0], smp.Expr) else parse_expr("t") for i in equ]
+        self.equRepr = []
+        for i in equ:
+            try:
+                if isinstance(i[0],str):
+                    temp = parse_expr(precautions_regex.sub("LUBADUBDUB", i[0]))
+                elif isinstance(i[0], smp.Expr):
+                    temp = i[0]
+                else:
+                    temp = parse_expr("t")
+            except:
+                print(i[0])
+                raise
+            self.equRepr.append(temp)
         self.eta = eta
         self.eqnum = len(equ)
         self.consts = constants if constants is not None else dict()
@@ -125,6 +140,10 @@ class OdeSystem:
         self.t1 = float(t)
         check_time_bounds()
 
+    def get_end_time(self):
+        """Returns the final time of the ODE system."""
+        return self.t1
+
     def set_start_time(self, t):
         """Changes the initial time for the integration of the ODE system.
 
@@ -132,6 +151,10 @@ class OdeSystem:
         t: Denotes the initial time."""
         self.t0 = float(t)
         check_time_bounds()
+
+    def get_start_time(self):
+        """Returns the initial time of the ODE system."""
+        return self.t0
 
     def check_time_bounds(self):
         if not (abs(self.t0) < abs(self.t) < abs(self.t1)):
@@ -143,6 +166,10 @@ class OdeSystem:
         Required arguments:
         t: Denotes the current time"""
         self.t = float(t)
+
+    def get_current_time(self):
+        """Returns the current time of the ODE system"""
+        return self.t
 
     def set_time(self, t=()):
         """Alternate interface for changing current, beginning and end times.
@@ -182,32 +209,21 @@ class OdeSystem:
             setrelerr() with the keyword argument auto_calc_dt set to True for an approximately good step size."""
         self.dt = h
 
-    def set_relative_error(self, relative_err, auto_calc_dt=0):
-        """Sets the value for target relative global error, especially useful for adaptive methods.
+    def get_step_size(self):
+        """Returns the step size that will be attempted for the next integration step"""
+        return self.dt
 
-        Required arguments:
-        relative_err: Generally a float less than or equal to 1, do NOT set to 0 as that is an impossible goal
-                      and will cause an infinite loop in adaptive methods.
-
-        Keyword arguments:
-        auto_calc_dt: if set to true, will use knowledge of the order of the method chosen in order to estimate
-                      a good step size.
-                      NOTE: This will not necessarily be the optimal step size, but will suffice in most cases."""
-        self.relative_error_bound = relative_err
-        if auto_calc_dt:
-            alt_h = float(self.t1 - self.t) * (self.relative_error_bound ** methods_inv_order[self.method])
-            if alt_h != 0:
-                self.dt = alt_h
-                print('Time step, dt, set to: {:.4e}'.format(self.dt))
-            if relative_err <= 5e-16:
-                print('This choice of relative error has been observed to cause issues with adaptive algorithms' +
-                      ' and may lead to instability.\nIt is advised that you manually set the time-step to an' +
-                      ' appropriate value and the relative error to 1e-15 or greater.\n\n')
+    def get_relative_error(self):
+        """Returns the target relative error used by the timestep autocalculator and the adaptive integration methods.
+        Has no effect when the integration method is non-adaptive. These are all the symplectic integrators and the fixed order schemes.
+        """
+        return self.relative_error_bound
 
     @staticmethod
-    def available_methods():
+    def available_methods(suppress_print=False):
         """Prints and then returns a dict of methods of integration that are available."""
-        print(available_methods.keys())
+        if not suppress_print:
+            print(available_methods.keys())
         return available_methods
 
     def set_method(self, method):
