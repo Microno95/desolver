@@ -1,11 +1,11 @@
 import types
 import desolver as de
 import matplotlib.pyplot as plt
-import timeit
-import numpy
 import argparse
 plt.ion()
 de.init_module(True)
+
+fig = ax = None
 
 parser = argparse.ArgumentParser(description="Numerically integrate the trajectory of a nonlinear 1D oscillator using a variety of integration methods and parameters.")
 parser.add_argument("-dt", "--stepsize", type=float, default=0.0625/8, help="Set the step size of the integration")
