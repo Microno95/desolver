@@ -27,33 +27,6 @@ import time
 
 from math import floor
 
-def bisection_method(eqn_lambda, arg_name=None, low=-1.0, high=1.0, eqn_args=None, eqn_kwargs=None, iterlimit=64, tol=1e-9):
-    eqn_args = eqn_args if eqn_args is not None else tuple()
-    eqn_kwargs = eqn_kwargs if eqn_kwargs is not None else dict()
-    if isinstance(arg_name, str):
-        def wrapped_eqn(x):
-            return eqn_lambda(*eqn_args, **{arg_name: x}, **eqn_kwargs)
-    else:
-        def wrapped_eqn(x):
-            return eqn_lambda(x, *eqn_args, **eqn_kwargs)
-    current_x = (high + low) * 0.5
-    current_high = high
-    current_low = low
-    evaluated_high = wrapped_eqn(current_high)
-    evaluated_low = wrapped_eqn(current_low)
-    for _ in range(iterlimit):
-        evaluated_value = wrapped_eqn(current_x)
-        if (numpy.sign(numpy.sum(evaluated_value)) == numpy.sign(numpy.sum(evaluated_low))):
-            current_low = current_x
-            evaluated_low = evaluated_value
-        else:
-            current_high = current_x
-            evaluated_high = evaluated_value
-        current_x = (current_high + current_low) * 0.5
-        if (current_high < tol + current_low).all():
-            break
-    return current_x
-
 def sa_minimisation(eqn_lambda, arg_name=None, start=0.0, eqn_args=None, eqn_kwargs=None, init_temperature=1.0, iterlimit=12800, tol=1e-4):
     eqn_args = eqn_args if eqn_args is not None else tuple()
     eqn_kwargs = eqn_kwargs if eqn_kwargs is not None else dict()
@@ -122,16 +95,6 @@ def convert_suffix(value=3661, suffixes=(' d', ' h', ' m', ' s'), ratios=(24, 60
         tValue = (tValue - tValue % i) // i
     outputValues.append(int(tValue))
     return delimiter.join(["{:2d}{}".format(*i) for i in zip(outputValues[::-1], suffixes)])
-
-def safe_eval(string, safe_dict, **kwargs):
-    """
-    Safe eval() functions.
-    Evaluates string within a namespace that excludes builtins and is limited to
-    those defined in **kwargs if **kwargs is supplied.
-    """
-    safeglobals = {"__builtins__": None}
-    safeglobals.update(kwargs)
-    return eval(string, safeglobals, safe_dict)
 
 def warning(message):
     print(message)

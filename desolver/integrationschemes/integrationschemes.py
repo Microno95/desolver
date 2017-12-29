@@ -153,9 +153,7 @@ def explicitgills(ode, vardict, soln, h, relerr, eqnum):
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][0] * 0.5
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
-
     aux[:, 1] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
-
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = (soln[vari][-1] + aux[vari][0] * 0.4142135623730950 +
                                         aux[vari][1] * 0.2928932188134524)
