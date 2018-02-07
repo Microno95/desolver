@@ -26,7 +26,7 @@ SOFTWARE.
 from setuptools import setup
 
 setup(name='DESolver',
-      version='1.5.1',
+      version='1.5.2',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
@@ -34,7 +34,7 @@ setup(name='DESolver',
       license='MIT',
       keywords=['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode'],
       url='https://github.com/Microno95/desolver',
-      packages=['desolver'],
+      packages=['desolver', 'desolver.integrationschemes', 'desolver.exceptiontypes', 'desolver.utilities'],
       classifiers=[
           # How mature is this project? Common values are
           #   3 - Alpha
