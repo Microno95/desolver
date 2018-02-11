@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import re
 import numpy
 import numpy.linalg
@@ -43,7 +45,7 @@ raise_KeyboardInterrupt = False
 # This regex string will match any unacceptable arguments attempting to be passed to eval
 precautions_regex = r"(\.*\_*(builtins|class|(?<!(c|C))os|shutil|sys|time|dict|tuple|list|module|super|name|subclasses|base|lambda)\_*)"
 
-def init_module(raiseKBINT=False):
+def init_module(raiseKBINT=True):
     global namespaceInitialised
     if not namespaceInitialised:
         global raise_KeyboardInterrupt
@@ -101,12 +103,13 @@ class OdeSystem:
         self.equRepr = []
         for i in equ:
             try:
-                if isinstance(i[0],str):
-                    temp = parse_expr(precautions_regex.sub("LUBADUBDUB", i[0]))
-                elif isinstance(i[0], smp.Expr):
-                    temp = i[0]
-                else:
-                    temp = parse_expr("t")
+                try:
+                    temp = parse_expr(precautions_regex.sub("LUBADUBDUB", str(i[0])))
+                except:
+                    if isinstance(i[0], smp.Expr):
+                        temp = i[0]
+                    else:
+                        temp = parse_expr("t")
             except:
                 print(i[0])
                 raise
@@ -115,16 +118,16 @@ class OdeSystem:
         self.eqnum = len(equ)
         self.consts = constants if constants is not None else dict()
         self.symbols = set(smp.symbols(" ".join(["y_{}".format(i) for i in range(self.eqnum)]) + " t " + " ".join([k for k in self.consts])))
-        self.equ = [smp.lambdify(self.symbols, i, "numpy", dummify=False) for i in self.equRepr]
-        self.y = [numpy.resize(equ[i][1] if (len(equ[i]) == 2) else 0.0, n) for i in range(self.eqnum)]
+        self.equ = [smp.lambdify(self.symbols, i, numpy, dummify=False) for i in self.equRepr]
         self.dim = tuple([1] + list(n))
+        self.y = [numpy.resize(equ[i][1] if (len(equ[i]) == 2) else 0.0, self.dim) for i in range(self.eqnum)]
         self.t = float(t[0])
         self.sample_times = [self.t]
         self.t0 = float(t[0])
         self.t1 = float(t[1])
-        self.soln = [[numpy.resize(value, n)] for value in self.y]
+        self.soln = [[numpy.resize(value, self.dim)] for value in self.y]
         for k in self.consts:
-            self.consts.update({k: numpy.resize(self.consts[k], n)})
+            self.consts.update({k: numpy.resize(self.consts[k], self.dim)})
         self.traj = savetraj
         self.method = ischemes.explicitrk4
         if (stpsz < 0 < t[0] - t[1]) or (stpsz > 0 > t[0] - t[1]):
@@ -138,7 +141,7 @@ class OdeSystem:
         Required arguments:
         t: Denotes the final time."""
         self.t1 = float(t)
-        check_time_bounds()
+        self.check_time_bounds()
 
     def get_end_time(self):
         """Returns the final time of the ODE system."""
@@ -150,7 +153,7 @@ class OdeSystem:
         Required arguments:
         t: Denotes the initial time."""
         self.t0 = float(t)
-        check_time_bounds()
+        self.check_time_bounds()
 
     def get_start_time(self):
         """Returns the initial time of the ODE system."""
@@ -319,11 +322,20 @@ class OdeSystem:
             elif isinstance(m, int):
                 self.dim = (1, m,)
             else:
+                if any([not isinstance(m_elem, int) for m_elem in m]):
+                    raise ValueError("The dimensions of a system cannot contain a float")
                 self.dim = tuple([1] + list(m))
             self.y = [numpy.resize(i, m) for i in self.y]
             solntime = self.soln[-1]
             self.soln = [[numpy.resize(i, m)] for i in self.soln[:-1]]
             self.soln.append(solntime)
+
+    def get_dimensions(self):
+        """Returns the dimensions of the current system in the form of a tuple of ints.
+
+        Follows numpy convention so numpy dimensions and OdeSystem dimensions are interchangeable.
+        """
+        return self.dim
 
     def record_trajectory(self, b=None):
         """Sets whether or not the trajectory of the system will be recorded.
@@ -371,12 +383,10 @@ class OdeSystem:
                 ischemes.deutil.warning('Trajectory has not been recorded for prior integration, cannot revert to t = {}\nPlease '
                         'call reset() and record trajectory by calling recordtraj() before integrating'.format(t))
         else:
-            for i in range(self.eqnum + 1):
-                if i < self.eqnum:
-                    self.soln[i] = [self.y[i]]
-                else:
-                    self.soln[i] = [0]
-            self.t = 0
+            for i in range(self.eqnum):
+                self.soln[i] = [self.y[i]]
+            self.t = self.t0
+            self.sample_times = [self.t]
 
     def integrate(self, t=None, callback=None):
         """Integrates the system to a specified time.
@@ -415,7 +425,7 @@ class OdeSystem:
                     heff[0] = (tf - self.t)
                 try:
                     self.method(self.equ, vardict, self.soln, heff, self.relative_error_bound, self.eqnum)
-                except RecursionError:
+                except etypes.RecursionError:
                     print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. "
                           "If this fails, either use a different relative error requirement or "
                           "increase maximum recursion depth. Can also occur if the initial value of all "

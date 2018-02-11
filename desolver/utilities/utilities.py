@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import numpy
 import time
 
@@ -33,10 +35,10 @@ def sa_minimisation(eqn_lambda, arg_name=None, start=0.0, eqn_args=None, eqn_kwa
     arg_name = [arg_name] if isinstance(arg_name, str) else list(arg_name) if not isinstance(arg_name, list) and arg_name is not None else arg_name
     if arg_name is not None and isinstance(arg_name[0], str):
         def wrapped_eqn(x):
-            return eqn_lambda(*eqn_args, **{arg_name[i]: x[i] for i in range(len(arg_name))}, **eqn_kwargs)
+            return eqn_lambda(*eqn_args, **dict([(arg_name[i], x[i]) for i in range(len(arg_name))] + [(k, v) for k, v in eqn_kwargs.items()]))
     else:
         def wrapped_eqn(x):
-            return eqn_lambda(*x, *eqn_args, **eqn_kwargs)
+            return eqn_lambda(*tuple(x + eqn_args), **eqn_kwargs)
     current_value = start
     proposed_value = start
     evaluated_value = wrapped_eqn(current_value)
@@ -101,12 +103,14 @@ def warning(message):
 
 def named_function(name, alt_names=tuple(), order=1.0):
     def wrap(f):
-        f.__name__ = name
+        f.__name__ = str(name)
         f.__alt_names__ = alt_names
         f.__order__ = order
         return f
     return wrap
 
+def resize_to_correct_dims(x, eqnum, dim):
+    return numpy.resize(x, tuple([eqnum] + list(dim)))
 
 class StateTimer():
     def __init__(self):

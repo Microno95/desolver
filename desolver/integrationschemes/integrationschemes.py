@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import numpy
 import numpy.linalg
@@ -99,26 +100,26 @@ def explicitrk4(ode, vardict, soln, h, relerr, eqnum):
     dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1]
-
-    aux[:, 0] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+        
+    aux[:, 0] = numpy.array(deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim), dtype=soln[0][-1].dtype)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][0] * 0.5
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
 
-    aux[:, 1] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 1] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][1] * 0.5
 
-    aux[:, 2] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 2] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][2]
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
 
 
-    aux[:, 3] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 3] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1] + (aux[vari][0] + aux[vari][1] * 2 + aux[vari][2] * 2 + aux[vari][3]) / 6
@@ -148,23 +149,22 @@ def explicitgills(ode, vardict, soln, h, relerr, eqnum):
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1]
 
-    aux[:, 0] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][0] * 0.5
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
-    aux[:, 1] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 1] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = (soln[vari][-1] + aux[vari][0] * 0.4142135623730950 +
                                         aux[vari][1] * 0.2928932188134524)
 
-    aux[:, 2] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 2] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][2]
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
 
-    aux[:, 3] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)],
-                             (eqnum, *dim))
+    aux[:, 3] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = (soln[vari][-1] - aux[vari][1] * 0.7071067811865475 +
@@ -201,39 +201,39 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
         vardict['y_{}'.format(vari)] = soln[vari][-1]
 
 
-    aux[:, 0] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1] + aux[vari][0] / 5
     vardict.update({'t': t_initial + h[0] / 5})
 
-    aux[:, 1] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 1] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1] + 3.0 * aux[vari][0] / 40 + 9.0 * aux[vari][1] / 40
     vardict.update({'t': t_initial + 3 * h[0] / 10})
 
-    aux[:, 2] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 2] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = (soln[vari][-1] + (3.0 * aux[vari][0] - 9.0 * aux[vari][1] +
                                                           12.0 * aux[vari][2]) / 10)
     vardict.update({'t': t_initial + 3 * h[0] / 5})
 
-    aux[:, 3] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 3] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = (soln[vari][-1] - 11.0 * aux[vari][0] / 54 - 5.0 * aux[vari][1] / 2 -
                                         70.0 * aux[vari][2] / 27 + 35.0 * aux[vari][3] / 27)
     vardict.update({'t': t_initial + h[0]})
 
-    aux[:, 4] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 4] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = (soln[vari][-1] + numpy.sum(RK45CK_coefficients[0][[slice(None)] + [None]*(aux[vari].ndim - 1)] * aux[vari], axis=0))
     vardict.update({'t': t_initial + 7.0 * h[0] / 8})
 
-    aux[:, 5] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 5] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     coeff = []
     for vari in range(eqnum):
@@ -284,16 +284,14 @@ def explicitmidpoint(ode, vardict, soln, h, relerr, eqnum):
     for vari in range(eqnum):
         vardict["y_{}".format(vari)] = soln[vari][-1]
 
-    aux[:, 0] = numpy.resize([ode[vari](**vardict) * h[0] + soln[vari][-1]
-                              for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] + soln[vari][-1] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict["y_{}".format(vari)] = aux[vari, 0]
 
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
 
-    aux[:, 0] = numpy.resize([ode[vari](**vardict) * h[0] + soln[vari][-1]
-                              for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] + soln[vari][-1] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict["y_{}".format(vari)] = numpy.array(soln[vari][-1] + h[0] * aux[vari][0])
@@ -322,15 +320,13 @@ def heuns(ode, vardict, soln, h, relerr, eqnum):
 
     for vari in range(eqnum): vardict['y_{}'.format(vari)] = soln[vari][-1]
 
-    aux[:, 0] = numpy.resize([ode[vari](**vardict)
-                              for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum): vardict['y_{}'.format(vari)] = aux[vari][0] * h[0] + soln[vari][-1]
 
     vardict.update({'t': vardict['t'] + h[0]})
 
-    aux[:, 1] = numpy.resize([ode[vari](**vardict)
-                              for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 1] = deutil.resize_to_correct_dims([ode[vari](**vardict) for vari in range(eqnum)], eqnum, dim)
     for vari in range(eqnum):
         vardict["y_{}".format(vari)] = soln[vari][-1] + h[0] * (aux[vari][0] + aux[vari][1]) * 0.5
         pt = soln[vari]
@@ -356,8 +352,7 @@ def foreuler(ode, vardict, soln, h, relerr, eqnum):
 
     for vari in range(eqnum): vardict['y_{}'.format(vari)] = soln[vari][-1]
 
-    aux[:, 0] = numpy.resize([ode[vari](**vardict) * h[0] + soln[vari][-1]
-                              for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] + soln[vari][-1] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = aux[vari, -1]
@@ -386,12 +381,12 @@ def impforeuler(ode, vardict, soln, h, relerr, eqnum):
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
 
-    aux[:, 0] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict.update({"y_{}".format(vari): aux[vari][0] + soln[vari][-1]})
 
-    aux[:, 1] = numpy.resize([ode[vari](**vardict) * h[0] for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 1] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict.update({"y_{}".format(vari): soln[vari][-1] + 0.5 * (aux[vari][0] + aux[vari][1])})
@@ -418,15 +413,17 @@ def eulertrap(ode, vardict, soln, h, relerr, eqnum):
     dim = soln[0][0].shape
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
-    for vari in range(eqnum):
-        aux[vari][0] = numpy.resize(ode[vari](**vardict), dim)
-    for vari in range(eqnum):
-        aux[vari][1] = numpy.resize(ode[vari](**vardict) * h[0] + soln[vari][-1], dim)
+
+    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) for vari in range(eqnum)], eqnum, dim)
+
+    aux[:, 1] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] + soln[vari][-1] for vari in range(eqnum)], eqnum, dim)
+
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): aux[vari][1]})
     vardict.update({'t': vardict['t'] + h[0]})
-    for vari in range(eqnum):
-        aux[vari][2] = numpy.resize(ode[vari](**vardict), dim)
+
+    aux[:, 2] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] for vari in range(eqnum)], eqnum, dim)
+
     for vari in range(eqnum):
         vardict.update({"y_{}".format(vari): soln[vari][-1] + h[0] * (aux[vari][0] + aux[vari][2])})
         pt = soln[vari]
@@ -453,13 +450,15 @@ def adaptiveheuneuler(ode, vardict, soln, h, relerr, eqnum, tol=0.9):
 
     for vari in range(eqnum):
         vardict.update({'y_{}'.format(vari): soln[vari][-1]})
-    for vari in range(eqnum):
-        aux[vari][0] = numpy.resize(ode[vari](**vardict), dim)
+
+    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) for vari in range(eqnum)], eqnum, dim)
+
     for vari in range(eqnum):
         vardict.update({"y_{}".format(vari): aux[vari][0] * h[0] + soln[vari][-1]})
     vardict.update({'t': vardict['t'] + h[0]})
-    for vari in range(eqnum):
-        aux[vari][1] = numpy.resize(ode[vari](**vardict), dim)
+
+    aux[:, 1] = deutil.resize_to_correct_dims([ode[vari](**vardict) for vari in range(eqnum)], eqnum, dim)
+
     err = [(aux[vari][0] - aux[vari][1]) * h[0] for vari in range(eqnum)]
     err = numpy.abs(err).max()
     err *= ((h[2] - vardict['t'] + h[0]) / h[0])
@@ -626,8 +625,7 @@ def alt_foreuler(ode, vardict, soln, h, relerr, eqnum):
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = soln[vari][-1]
 
-    aux[:, 0] = numpy.resize([ode[vari](**vardict) * h[0] + soln[vari][-1]
-                              for vari in range(eqnum)], (eqnum, *dim))
+    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] + soln[vari][-1] for vari in range(eqnum)], eqnum, dim)
 
     for vari in range(eqnum):
         vardict['y_{}'.format(vari)] = aux[vari, -1]
