@@ -2,7 +2,7 @@
 """
 The MIT License (MIT)
 
-Copyright (c) 2016 Microno95, Ekin Ozturk
+Copyright (c) 2017 Microno95, Ekin Ozturk
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,15 +26,15 @@ SOFTWARE.
 from setuptools import setup
 
 setup(name='DESolver',
-      version='1.4.5',
+      version='1.5.2',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
-      install_requires=['numpy'],
+      install_requires=['numpy', 'sympy'],
       license='MIT',
       keywords=['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode'],
       url='https://github.com/Microno95/desolver',
-      packages=['desolver'],
+      packages=['desolver', 'desolver.integrationschemes', 'desolver.exceptiontypes', 'desolver.utilities'],
       classifiers=[
           # How mature is this project? Common values are
           #   3 - Alpha
@@ -59,6 +59,7 @@ setup(name='DESolver',
           'Programming Language :: Python :: 3',
           'Programming Language :: Python :: 3.3',
           'Programming Language :: Python :: 3.4',
-          'Programming Language :: Python :: 3.5'
+          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6'
       ],
       )

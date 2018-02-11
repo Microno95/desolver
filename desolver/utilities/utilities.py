@@ -25,28 +25,33 @@ SOFTWARE.
 import numpy
 import time
 
-def bisectroot(equn, n, h, m, vardict, low, high, cstring, safe_dict, iterlimit=None):
-    """
-    Uses the bisection method to find the zeros of the function defined in cstring.
-    Designed to be used as a method to find the value of the next y_#.
-    """
-    import copy as cpy
-    if iterlimit is None:
-        iterlimit = 64  # Iteration limit for bisection method
-    r = 0  # Track iteration count
-    temp_vardict = cpy.deepcopy(vardict)
-    temp_vardict.update({'t': vardict['t'] + m * h[0]})
-    while numpy.amax(numpy.abs(numpy.subtract(high, low))) > 1e-14 and r < iterlimit:
-        temp_vardict.update({'y_{}'.format(n): (low + high) * 0.5})
-        if r > iterlimit:
+from math import floor
+
+def sa_minimisation(eqn_lambda, arg_name=None, start=0.0, eqn_args=None, eqn_kwargs=None, init_temperature=1.0, iterlimit=12800, tol=1e-4):
+    eqn_args = eqn_args if eqn_args is not None else tuple()
+    eqn_kwargs = eqn_kwargs if eqn_kwargs is not None else dict()
+    arg_name = [arg_name] if isinstance(arg_name, str) else list(arg_name) if not isinstance(arg_name, list) and arg_name is not None else arg_name
+    if arg_name is not None and isinstance(arg_name[0], str):
+        def wrapped_eqn(x):
+            return eqn_lambda(*eqn_args, **{arg_name[i]: x[i] for i in range(len(arg_name))}, **eqn_kwargs)
+    else:
+        def wrapped_eqn(x):
+            return eqn_lambda(*x, *eqn_args, **eqn_kwargs)
+    current_value = start
+    proposed_value = start
+    evaluated_value = wrapped_eqn(current_value)
+    temperature = init_temperature
+    for k in range(iterlimit):
+        if temperature < tol:
             break
-        c = eval(cstring)
-        if (numpy.sum(c) >= 0 and numpy.sum(low) >= 0) or (numpy.sum(c) < 0 and numpy.sum(low) < 0):
-            low = c
-        else:
-            high = c
-        r += 1
-    vardict.update({'y_{}'.format(n): vardict['y_{}'.format(n)] + (low + high) * 0.5 / m})
+        proposed_value = current_value + numpy.random.randn(*numpy.shape(current_value))
+        evaluated_proposed_value = wrapped_eqn(proposed_value)
+        delta_E = evaluated_proposed_value - evaluated_value
+        if (delta_E <= 0) or numpy.exp(-delta_E / temperature) >= numpy.random.uniform():
+            current_value = proposed_value
+            evaluated_value = evaluated_proposed_value
+        temperature = temperature * 0.95 ** floor(k / 1000)
+    return current_value
 
 def extrap(x, xdata, ydata):
     """
@@ -90,16 +95,6 @@ def convert_suffix(value=3661, suffixes=(' d', ' h', ' m', ' s'), ratios=(24, 60
         tValue = (tValue - tValue % i) // i
     outputValues.append(int(tValue))
     return delimiter.join(["{:2d}{}".format(*i) for i in zip(outputValues[::-1], suffixes)])
-
-def safe_eval(string, safe_dict, **kwargs):
-    """
-    Safe eval() functions.
-    Evaluates string within a namespace that excludes builtins and is limited to
-    those defined in **kwargs if **kwargs is supplied.
-    """
-    safeglobals = {"__builtins__": None}
-    safeglobals.update(kwargs)
-    return eval(string, safeglobals, safe_dict)
 
 def warning(message):
     print(message)
