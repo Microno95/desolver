@@ -29,7 +29,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from setuptools import setup
 
 setup(name='DESolver',
-      version='1.6.0',
+      version='2.0.0',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
