@@ -101,11 +101,12 @@ def convert_suffix(value=3661, suffixes=(' d', ' h', ' m', ' s'), ratios=(24, 60
 def warning(message):
     print(message)
 
-def named_function(name, alt_names=tuple(), order=1.0):
+def named_object(name, alt_names=tuple(), order=1.0, adaptive=False):
     def wrap(f):
         f.__name__ = str(name)
         f.__alt_names__ = alt_names
         f.__order__ = order
+        f.__adaptive__ = adaptive
         return f
     return wrap
 

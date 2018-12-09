@@ -27,13 +27,7 @@ import numpy
 import numpy.linalg
 
 import desolver.utilities as deutil
-
-error_coeff_arrayrk45ck = [[-0.0042937748015873],
-                         [ 0.                ],
-                         [ 0.0186685860938579],
-                         [-0.0341550268308081],
-                         [-0.0193219866071429],
-                         [ 0.0391022021456804]]
+from .integrator_template import integrator_template
 
 # Based on arXiv:1501.04345v2 - BAB's9o7H
 BABPrimes9o7H_coefficients = [[0.04649290043965892,
@@ -76,11 +70,18 @@ RK45CK_coefficients = [numpy.array([1631.0 / 55296, 175.0 / 512, 575.0/ 13824, 4
                        numpy.array([37.0 / 378, 0.0, 250.0 / 621, 125.0 / 594, 0.0, 512.0 / 1771]),
                        numpy.array([2825.0 / 27648, 0.0, 18575.0 / 48384, 13525.0 / 55296, 277.0 / 14336, 1.0 / 4.0])]
 
+error_coeff_arrayrk45ck = [[-0.0042937748015873],
+                         [ 0.                ],
+                         [ 0.0186685860938579],
+                         [-0.0341550268308081],
+                         [-0.0193219866071429],
+                         [ 0.0391022021456804]]
 
 
-@deutil.named_function("Explicit Runge-Kutta 4",
+
+@deutil.named_object("Explicit Runge-Kutta 4",
                        alt_names=("Runge-Kutta 4", "RK4",),
-                       order=4.0)
+                       order=4.0)              
 def explicitrk4(ode, vardict, soln, h, relerr, eqnum):
     """
     Implementation of the Explicit Runge-Kutta 4 method.
@@ -127,7 +128,7 @@ def explicitrk4(ode, vardict, soln, h, relerr, eqnum):
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
 
-@deutil.named_function("Explicit Gill's",
+@deutil.named_object("Explicit Gill's",
                        alt_names=("Gill's",),
                        order=5.0)
 def explicitgills(ode, vardict, soln, h, relerr, eqnum):
@@ -177,7 +178,7 @@ def explicitgills(ode, vardict, soln, h, relerr, eqnum):
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
 
-@deutil.named_function("Explicit RK45CK",
+@deutil.named_object("Explicit RK45CK",
                        alt_names=("RK45CK", "Runge-Kutta-Cash-Karp"),
                        order=4.0)
 def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
@@ -264,7 +265,7 @@ def explicitrk45ck(ode, vardict, soln, h, relerr, eqnum, tol=0.5):
             kt = numpy.array([coeff[vari][1]])
             soln[vari] = numpy.concatenate((pt, kt))
 
-@deutil.named_function("Explicit Midpoint",
+@deutil.named_object("Explicit Midpoint",
                        alt_names=("Midpoint",),
                        order=2.0)
 def explicitmidpoint(ode, vardict, soln, h, relerr, eqnum):
@@ -301,68 +302,81 @@ def explicitmidpoint(ode, vardict, soln, h, relerr, eqnum):
 
     vardict.update({'t': vardict['t'] + 0.5 * h[0]})
 
-@deutil.named_function("Explicit Heun's",
+@deutil.named_object("Explicit Heun's",
                        alt_names=("Heun's",),
                        order=2.0)
-def heuns(ode, vardict, soln, h, relerr, eqnum):
-    """
-    Implementation of Heun's method.
-    """
+class HeunsSolver(integrator_template):
+    def __init__(self, step_size, sys_dim, variables, vars_idx):
+        self.step_size = step_size
+        self.dim = sys_dim
+        self.variables = variables
+        self.variable_indices = vars_idx
+        print(vars_idx)
+        self.num_stages = 3
+        
+    def forward(self, ode_equations, vardict, soln):            
+        aux = self.get_aux_array(len(soln), soln[0][0])
+        
+        eqnum = len(soln)
+        
+        print(self.variable_indices.keys(), self.variables)
+        print({i: soln[self.variable_indices[i]][-1] for i in self.variables})
+        
+        vardict.update({i: soln[self.variable_indices[i]][-1] for i in self.variables})
 
-    dim = [eqnum, 2]
-    dim.extend(soln[0][0].shape)
-    dim = tuple(dim)
-    if numpy.iscomplexobj(soln[0]):
-        aux = numpy.resize([0. + 0j], dim)
-    else:
-        aux = numpy.resize([0.], dim)
-    dim = soln[0][0].shape
+        for vari in range(len(soln)):
+            aux[vari, 0] = numpy.resize(ode_equations[vari](**vardict) * self.step_size, self.dim)
+        
+        vardict.update({i: aux[self.variable_indices[i]][0] * self.step_size + vardict[i][-1] for i in self.variables})
+        vardict.update({'t': vardict['t'] + self.step_size})
+            
+        for vari in range(len(soln)):
+            aux[vari, 1] = numpy.resize(ode_equations[vari](**vardict) * self.step_size, self.dim)
+        
+        for vari in range(len(soln)):
+            aux[vari, 2] = soln[vari][-1] + self.step_size * (aux[vari][0] + aux[vari][1]) * 0.5
+        
+        soln, vardict = self.update_vardict(soln, vardict, aux)
+        
+        return soln, vardict, self.step_size
+        
+    __call__ = forward
 
-    for vari in range(eqnum): vardict['y_{}'.format(vari)] = soln[vari][-1]
-
-    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) for vari in range(eqnum)], eqnum, dim)
-
-    for vari in range(eqnum): vardict['y_{}'.format(vari)] = aux[vari][0] * h[0] + soln[vari][-1]
-
-    vardict.update({'t': vardict['t'] + h[0]})
-
-    aux[:, 1] = deutil.resize_to_correct_dims([ode[vari](**vardict) for vari in range(eqnum)], eqnum, dim)
-    for vari in range(eqnum):
-        vardict["y_{}".format(vari)] = soln[vari][-1] + h[0] * (aux[vari][0] + aux[vari][1]) * 0.5
-        pt = soln[vari]
-        kt = numpy.array([vardict['y_{}'.format(vari)]])
-        soln[vari] = numpy.concatenate((pt, kt))
-
-@deutil.named_function("Explicit Euler",
+@deutil.named_object("Explicit Euler",
                        alt_names=("Forward Euler", "Euler"),
                        order=1.0)
-def foreuler(ode, vardict, soln, h, relerr, eqnum):
-    """
-    Implementation of the Explicit/Forward Euler method.
-    """
+class EulerSolver(integrator_template):
+    def __init__(self, step_size, sys_dim, variables, vars_idx):
+        self.step_size = step_size
+        self.dim = sys_dim
+        self.variables = variables
+        self.variable_indices = vars_idx
+        print(vars_idx)
+        self.num_stages = 1
+        
+    def forward(self, ode_equations, vardict, soln):
+        aux = self.get_aux_array(len(soln), soln[0][0])
+        
+        eqnum = len(soln)
+        
+        print(self.variable_indices.keys(), self.variables)
+        print({i: soln[self.variable_indices[i]][-1] for i in self.variables})
+        
+        vardict.update({i: soln[self.variable_indices[i]][-1] for i in self.variables})
 
-    dim = [eqnum, 1]
-    dim.extend(soln[0][0].shape)
-    dim = tuple(dim)
-    if numpy.iscomplexobj(soln[0]):
-        aux = numpy.resize([0. + 0j], dim)
-    else:
-        aux = numpy.resize([0.], dim)
-    dim = soln[0][0].shape
+        for vari in range(len(soln)):
+            aux[vari, 0] = numpy.resize(ode_equations[vari](**vardict) * self.step_size + soln[vari][-1], self.dim)
+        
+        soln, vardict = self.update_vardict(soln, vardict, aux)
+        
+        vardict.update({'t': vardict['t'] + self.step_size})
+        
+        return soln, vardict, self.step_size
+        
+    __call__ = forward
+    
 
-    for vari in range(eqnum): vardict['y_{}'.format(vari)] = soln[vari][-1]
-
-    aux[:, 0] = deutil.resize_to_correct_dims([ode[vari](**vardict) * h[0] + soln[vari][-1] for vari in range(eqnum)], eqnum, dim)
-
-    for vari in range(eqnum):
-        vardict['y_{}'.format(vari)] = aux[vari, -1]
-        pt = soln[vari]
-        kt = numpy.array([aux[vari, -1]])
-        soln[vari] = numpy.concatenate((pt, kt))
-
-    vardict.update({'t': vardict['t'] + h[0]})
-
-@deutil.named_function("Explicit Improved Forward Euler",
+@deutil.named_object("Explicit Improved Forward Euler",
                        alt_names=("Improved Forward Euler", "IFE"),
                        order=2.0)
 def impforeuler(ode, vardict, soln, h, relerr, eqnum):
@@ -395,7 +409,7 @@ def impforeuler(ode, vardict, soln, h, relerr, eqnum):
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + h[0]})
 
-@deutil.named_function("Explicit Euler-Trapezoidal",
+@deutil.named_object("Explicit Euler-Trapezoidal",
                        alt_names=("Euler-Trapezoidal", "Euler-Trap", "Predictor-Corrector Euler"),
                        order=3.0)
 def eulertrap(ode, vardict, soln, h, relerr, eqnum):
@@ -430,7 +444,7 @@ def eulertrap(ode, vardict, soln, h, relerr, eqnum):
         kt = numpy.array([vardict['y_{}'.format(vari)]])
         soln[vari] = numpy.concatenate((pt, kt))
 
-@deutil.named_function("Explicit Adaptive Heun-Euler",
+@deutil.named_object("Explicit Adaptive Heun-Euler",
                        alt_names=("Adaptive Heun-Euler", "AHE"),
                        order=1.0)
 def adaptiveheuneuler(ode, vardict, soln, h, relerr, eqnum, tol=0.9):
@@ -476,7 +490,7 @@ def adaptiveheuneuler(ode, vardict, soln, h, relerr, eqnum, tol=0.9):
             kt = numpy.array([vardict['y_{}'.format(vari)]])
             soln[vari] = numpy.concatenate((pt, kt))
 
-@deutil.named_function("Explicit Symplectic Forward Euler",
+@deutil.named_object("Explicit Symplectic Forward Euler",
                        alt_names=("Symplectic Euler",),
                        order=2.0)
 def sympforeuler(ode, vardict, soln, h, relerr, eqnum):
@@ -518,7 +532,7 @@ def sympforeuler(ode, vardict, soln, h, relerr, eqnum):
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + h[0]})
 
-@deutil.named_function("Explicit BABS9O7H",
+@deutil.named_object("Explicit BABS9O7H",
                        alt_names=("BABS9O7H", "BABs9o7H"),
                        order=7.0)
 def sympBABs9o7H(ode, vardict, soln, h, relerr, eqnum):
@@ -561,7 +575,7 @@ def sympBABs9o7H(ode, vardict, soln, h, relerr, eqnum):
         soln[vari] = numpy.concatenate((pt, kt))
     vardict.update({'t': vardict['t'] + h[0]})
 
-@deutil.named_function("Explicit ABAS5O6HA",
+@deutil.named_object("Explicit ABAS5O6HA",
                        alt_names=("ABAS5O6HA", "ABAs5o6HA"),
                        order=6.0)
 def sympABAs5o6HA(ode, vardict, soln, h, relerr, eqnum):
@@ -605,7 +619,7 @@ def sympABAs5o6HA(ode, vardict, soln, h, relerr, eqnum):
 
 
 
-@deutil.named_function("Alt Euler",
+@deutil.named_object("Alt Euler",
                        alt_names=("AltE",),
                        order=1.0)
 def alt_foreuler(ode, vardict, soln, h, relerr, eqnum):

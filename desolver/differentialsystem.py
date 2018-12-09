@@ -34,6 +34,8 @@ import types
 import sympy as smp
 from sympy.parsing.sympy_parser import parse_expr
 
+from tqdm.auto import tqdm
+
 import desolver.integrationschemes as ischemes
 import desolver.exceptiontypes as etypes
 
@@ -43,7 +45,8 @@ methods_inv_order = {}
 raise_KeyboardInterrupt = False
 
 # This regex string will match any unacceptable arguments attempting to be passed to eval
-precautions_regex = r"(\.*\_*(builtins|class|(?<!(c|C))os|shutil|sys|time|dict|tuple|list|module|super|name|subclasses|base|lambda)\_*)"
+#precautions_regex = r"([^a-z]*[^A-z]*)((\.*\_*)(builtins|class|(?<!(c|C))os|shutil|sys|time|dict|tuple|list|module|super|name|subclasses|base|lambda)(\_*\.*))([^a-z]*[^A-z]*)"
+precautions_regex = "(?!)"
 
 def init_module(raiseKBINT=True):
     global namespaceInitialised
@@ -52,8 +55,16 @@ def init_module(raiseKBINT=True):
         raise_KeyboardInterrupt = raiseKBINT
         global precautions_regex
         precautions_regex = re.compile(precautions_regex)
-        methods_ischemes = [(ischemes.__dict__.get(a)) for a in dir(ischemes)
-                             if isinstance(ischemes.__dict__.get(a), types.FunctionType)]
+        methods_ischemes = []
+        for a in dir(ischemes):
+            try:
+                if issubclass(ischemes.__dict__.get(a), ischemes.integrator_template):
+                    methods_ischemes.append(ischemes.__dict__.get(a))
+            except:
+                if isinstance(ischemes.__dict__.get(a), types.FunctionType):
+                    methods_ischemes.append(ischemes.__dict__.get(a))
+        
+        print(methods_ischemes)
         available_methods.update(dict([(func.__name__, func) for func in methods_ischemes if hasattr(func, "__alt_names__")] +
                                         [(alt_name, func) for func in methods_ischemes if hasattr(func, "__alt_names__") for alt_name in func.__alt_names__]))
 
@@ -96,40 +107,65 @@ class OdeSystem:
 
         if len(t) != 2:
             raise etypes.LengthError("Two time bounds were required, only {} were given!".format(len(t)))
-        for k, i in enumerate(equ):
-            if 't' not in i[0] and 'y_' not in i[0]:
-                ischemes.deutil.warning("Equation {} has no variables".format(k))
         self.relative_error_bound = relerr
+        self.consts = constants if constants is not None else dict()
+        self.symbols = set(smp.symbols("t " + " ".join([k for k in self.consts])))
+        self.variables = set()
+        self.var2index = dict()
+        self.index2var = dict()
         self.equRepr = []
-        for i in equ:
+        for i in range(len(equ)):
             try:
                 try:
-                    temp = parse_expr(precautions_regex.sub("LUBADUBDUB", str(i[0])))
-                except:
-                    if isinstance(i[0], smp.Expr):
-                        temp = i[0]
+                    temp = parse_expr(precautions_regex.sub("LUBADUBDUB", str(equ[i][1])))
+                except (AttributeError, TypeError) as e:
+                    if isinstance(equ[i][0], smp.Expr):
+                        temp = equ[i][0]
                     else:
                         temp = parse_expr("t")
+                    raise e
+                except:
+                    raise ValueError("{} could not be converted to an appropriate sympy function!".format(equ[i][1]))
+            except ValueError as e:
+                raise e
             except:
-                print(i[0])
+                print(equ[i][1])
                 raise
             self.equRepr.append(temp)
+                
+            if len(equ[i]) == 2:
+                temp = smp.Symbol("y_{}".format(i))
+            elif len(equ[i]) == 3:
+                if isinstance(equ[i][0], str):
+                    temp = smp.Symbol(equ[i][0])
+                elif isinstance(smp.Symbol):
+                    temp = equ[i][0]
+                else:
+                    raise TypeError("Integration variable must be an instance of str or sympy.Symbol! - Received {} of type {}".format(equ[i][0], type(equ[i][0])))
+            else:
+                raise LengthError("Wrong number of arguments for equation {}! - {}".format(i, equ[i]))
+            self.variables.update({temp})
+            self.var2index.update({repr(temp): i})
+            self.index2var.update({i: (temp, repr(temp))})
+            
+        self.symbols.update(self.variables)
         self.eta = eta
         self.eqnum = len(equ)
-        self.consts = constants if constants is not None else dict()
-        self.symbols = set(smp.symbols(" ".join(["y_{}".format(i) for i in range(self.eqnum)]) + " t " + " ".join([k for k in self.consts])))
         self.equ = [smp.lambdify(self.symbols, i, numpy, dummify=False) for i in self.equRepr]
-        self.dim = tuple([1] + list(n))
-        self.y = [numpy.resize(equ[i][1] if (len(equ[i]) == 2) else 0.0, self.dim) for i in range(self.eqnum)]
+        self.dim = tuple(list(n))
+        self.y = [None for i in range(self.eqnum)]
+        for i in range(self.eqnum):
+            if len(equ[i]) == 1:
+                self.y[i] = numpy.resize(0.0, self.dim)
+            else:
+                self.y[i] = numpy.resize(equ[i][-1], self.dim)
         self.t = float(t[0])
         self.sample_times = [self.t]
         self.t0 = float(t[0])
         self.t1 = float(t[1])
         self.soln = [[numpy.resize(value, self.dim)] for value in self.y]
-        for k in self.consts:
-            self.consts.update({k: numpy.resize(self.consts[k], self.dim)})
         self.traj = savetraj
-        self.method = ischemes.explicitrk4
+        self.integrator = ischemes.explicitrk4
         if (stpsz < 0 < t[0] - t[1]) or (stpsz > 0 > t[0] - t[1]):
             self.dt = stpsz
         else:
@@ -211,10 +247,18 @@ class OdeSystem:
             list of available methods (view by calling availmethods()) followed by setmethod(), and finally call
             setrelerr() with the keyword argument auto_calc_dt set to True for an approximately good step size."""
         self.dt = h
+        self.initialise_integrator()
 
     def get_step_size(self):
         """Returns the step size that will be attempted for the next integration step"""
         return self.dt
+
+    def set_relative_error(self, relerr):
+        """Sets the target relative error used by the timestep autocalculator and the adaptive integration methods.
+        Has no effect when the integration method is non-adaptive. These are all the symplectic integrators and the fixed order schemes.
+        """
+        self.relative_error_bound = relerr
+        self.initialise_integrator()
 
     def get_relative_error(self):
         """Returns the target relative error used by the timestep autocalculator and the adaptive integration methods.
@@ -228,32 +272,38 @@ class OdeSystem:
         if not suppress_print:
             print(available_methods.keys())
         return available_methods
-
+    
+    def initialise_integrator(self):
+        if available_methods[self.method_name].__adaptive__:
+            self.integrator = available_methods[self.method_name](self.dt, self.dim, list(self.var2index.keys()), self.var2index, self.relative_error_bound)
+        else:
+            self.integrator = available_methods[self.method_name](self.dt, self.dim, list(self.var2index.keys()), self.var2index)
+    
     def set_method(self, method):
         """Sets the method of integration.
 
         Required arguments:
         method: String that denotes the key to one of the available methods in the dict() returned by availmethods()."""
         if method in available_methods.keys():
-            self.method = available_methods[method]
+            self.method_name = method
         else:
-            print("The method you selected does not exist in the list of available methods, "
-                  "call availmethods() to see what these are")
-
+            raise ValueError("The method you selected does not exist in the list of available methods, \
+                              call desolver.available_methods() to see what these are")
+        
+        self.initialise_integrator()
+        
     def get_method(self):
         """
         Returns the method used to integrate the system.
         """
-        for method, func in available_methods.items():
-            if self.method is func:
-                return method
+        return repr(self.integrator)
 
     def show_equations(self):
         """Prints the equations that have been entered for the system.
 
         Returns the equations themselves as a list of strings."""
         for i in range(self.eqnum):
-            print("dy_{} =".format(i), self.equRepr[i])
+            print("d{} =".format(self.index2var[i][1]), self.equRepr[i])
         return self.equRepr
 
     def number_of_equations(self):
@@ -264,7 +314,7 @@ class OdeSystem:
     def initial_conditions(self):
         """Prints the initial conditions of the system"""
         for i in range(self.eqnum):
-            print("y_{}({}) = {}".format(i, self.t0, self.y[i]))
+            print("{}({}) = {}".format(self.index2var[i][1], self.t0, self.y[i]))
         return self.y
 
     def final_conditions(self, p=1):
@@ -273,15 +323,16 @@ class OdeSystem:
         Identical to initial conditions if the system has not been integrated"""
         if p:
             for i in range(self.eqnum):
-                print("y_{}({}) = {}".format(i, self.t1, self.soln[i][-1]))
+                print("{}({}) = {}".format(self.index2var[i][1], self.t1, self.soln[i][-1]))
         return self.soln
 
     def show_system(self):
         """Prints the equations, initial conditions, final states, time limits and defined constants in the system."""
         for i in range(self.eqnum):
-            print("Equation {}\ny_{}({}) = {}\ndy_{} = {}\ny_{}({}) = {}\n".format(i, i, self.t0, self.y[i], i,
-                                                                                   str(self.equRepr[i]), i, self.t,
-                                                                                   self.soln[i][-1]))
+            print_str = "Equation {idx}\n{diff_var}({t0}) = {init_val}\nd{diff_var} = {equation}\n{diff_var}({t}) = {cur_val}\n"
+            print(print_str.format(idx=i, diff_var=self.index2var[i][1], init_val=self.y[i], t0=self.t0,
+                                   equation=str(self.equRepr[i]), t=self.t,
+                                   cur_val=self.soln[i][-1]))
         if self.consts:
             print("The constants that have been defined for this system are: ")
             print(self.consts)
@@ -294,8 +345,9 @@ class OdeSystem:
         Variable-length arguments:
         additional_constants: A dict containing constants and their corresponding values."""
         self.consts.update({k: numpy.resize(additional_constants[k], self.dim) for k in additional_constants})
-        self.symbols = set(smp.symbols(" ".join(["y_{}".format(i) for i in range(self.eqnum)]) + " t " + " ".join([k for k in self.consts])))
+        self.symbols.update(smp.symbols(" ".join([k for k in self.consts])))
         self.equ = [smp.lambdify(self.symbols, i, "numpy", dummify=False) for i in self.equRepr]
+        self.initialise_integrator()
 
     def remove_constants(self, **constants_removal):
         """Takes an arbitrary list of keyword arguments to remove from the list of available constants.
@@ -305,10 +357,11 @@ class OdeSystem:
                               The names must be denoted by strings."""
         for i in constants_removal:
             if i in self.consts.keys():
+                self.symbols.remove(self.consts[i])
                 del self.consts[i]
-
-        self.symbols = set(smp.symbols(" ".join(["y_{}".format(i) for i in range(self.eqnum)]) + " t " + " ".join([k for k in self.consts])))
+                
         self.equ = [smp.lambdify(self.symbols, i, "numpy", dummify=False) for i in self.equRepr]
+        self.initialise_integrator()
 
     def set_dimensions(self, m=None):
         """Changes the dimensions of the system.
@@ -329,6 +382,8 @@ class OdeSystem:
             solntime = self.soln[-1]
             self.soln = [[numpy.resize(i, m)] for i in self.soln[:-1]]
             self.soln.append(solntime)
+            
+        self.initialise_integrator()
 
     def get_dimensions(self):
         """Returns the dimensions of the current system in the form of a tuple of ints.
@@ -355,9 +410,19 @@ class OdeSystem:
             if len(var_names) == 0:
                 return self.soln
             elif len(var_names) > 0:
-                return [self.soln[int(i.split("_")[-1]) if isinstance(i, str) else i] for i in var_names]
+                ret_val = [None for i in var_names]
+                for idx,i in enumerate(var_names):
+                    if isinstance(i, str):
+                        ret_val[idx] = self.soln[self.var2index[i]]
+                    elif isinstance(i,smp.Symbol):
+                        ret_val[idx] = self.soln[self.var2index[repr(i)]]
+                    elif isinstance(i, int):
+                        ret_val[idx] = self.soln[i]
+                    else:
+                        raise TypeError("Type of {} is not appropriate and cannot be interpreted as an integration variable!")
+                return ret_val
         elif isinstance(var_names, str):
-            return [self.soln[int(var_names.split("_")[-1])]]
+            return [self.soln[self.var2index[i]]]
         elif isinstance(var_names, int):
             return [self.soln[var_names]]
         else:
@@ -396,35 +461,43 @@ class OdeSystem:
            Otherwise the system will integrate to the specified final time.
            NOTE: t can be negative in order to integrate backwards in time, but use this with caution as this
                  functionality is slightly unstable."""
-        eta = self.eta
+                 
         if t:
             tf = t
         else:
             tf = self.t1
+            
         steps = 0
         heff = [self.dt, self.dt]
+        
         if numpy.sign(tf - self.t) != numpy.sign(self.dt):
-            if numpy.sign(self.dt) != 0:
-                heff = [-1.0 * i for i in heff]
-            else:
-                heff = [tf - self.dt for i in heff]
+            heff = numpy.copysign(heff, tf - self.dt)
             self.dt = heff[0]
-        while abs(heff[0]) > abs(tf - self.t):
-            heff = [i * 0.5 for i in heff]
+            
+        if abs(heff[0]) > abs(tf - self.t):
+            heff = [abs(tf - self.t)*0.5 for i in heff]
+            
         heff.append(tf)
+        
         time_remaining = [0, 0]
         vardict = {'t': self.t}
         vardict.update(self.consts)
+        
         etaString = ''
+        
+        if self.eta:
+            tqdm_progress_bar = tqdm(total=(tf-self.t)/heff[0])
+        
         while heff[0] != 0 and heff[1] != 0 and abs(self.t) < abs(tf * (1 - 4e-16)):
+            print(vardict)
             try:
                 heff[1] = heff[0]
-                if eta:
-                    time_remaining[0] = time.perf_counter()
+                
                 if abs(heff[0] + self.t) > abs(tf):
                     heff[0] = (tf - self.t)
+                rerun_step = True
                 try:
-                    self.method(self.equ, vardict, self.soln, heff, self.relative_error_bound, self.eqnum)
+                    soln, vardict, heff[0] = self.integrator(self.equ, vardict, self.soln)
                 except etypes.RecursionError:
                     print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. "
                           "If this fails, either use a different relative error requirement or "
@@ -432,43 +505,31 @@ class OdeSystem:
                           "variables is set to 0.")
                     heff[1] = heff[0]
                     heff[0] = 0.5 * heff[0]
-                    self.method(self.equ, vardict, self.soln, heff, self.relative_error_bound, self.eqnum)
+                    self.integrator.step_size = heff[0]
+                    soln, vardict, heff[0] = self.integrator(self.equ, vardict, self.soln)
                 except:
                     raise
-                if heff[0] == 0:
-                    heff[0] = (tf - self.t) * 0.5
-                self.t = vardict['t']
+                    
+                self.t = self.t + heff[0]
+                
                 if self.traj:
                     self.sample_times.append(vardict['t'])
                 else:
                     self.soln = [numpy.array([i[-1]]) for i in self.soln]
                     self.sample_times = [vardict['t']]
-                if eta:
-                    temp_time = 0.4 * time_remaining[1] + (((tf - self.t) / heff[0]) *
-                                                           0.6 * (time.perf_counter() - time_remaining[0]))
-                    if temp_time != 0 and numpy.abs(time_remaining[1]/temp_time - 1) > 0.2:
-                        time_remaining[1] = temp_time
-                    pLeft = round(1 - abs(tf - self.t) / abs(tf - self.t0), ndigits=3)
-                    prevLen = len(etaString)
-                    etaString = "{}% ----- ETA: {} -- Current Time and Step Size: {:.2e} and {:.2e}".format(
-                                "{:.2%}".format(pLeft).zfill(7),
-                                ischemes.deutil.convert_suffix(time_remaining[1]),
-                                self.t, heff[0])
-                    if prevLen > len(etaString):
-                        print("\r" + " " * prevLen, end='\r')
-                    print(etaString, end='\r')
-                    sys.stdout.flush()
+                    
+                    
+                if self.eta:
+                    if heff[0] != heff[1]:
+                        tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t) / heff[0])
+                    tqdm_progress_bar.update()
+                    
                 steps += 1
                 if callback is not None: callback(self)
             except KeyboardInterrupt:
                 if raise_KeyboardInterrupt: raise
             except:
                 raise
-        if eta:
-            sys.stdout.flush()
-            print('\r' + ' ' * (shutil.get_terminal_size()[0] - 2), end='')
-            print("\r100%")
-        else:
-            print("100%")
+                
         self.t = self.sample_times[-1]
         self.dt = heff[0]
