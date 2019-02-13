@@ -29,64 +29,7 @@ import time
 
 from math import floor
 
-def sa_minimisation(eqn_lambda, arg_name=None, start=0.0, eqn_args=None, eqn_kwargs=None, init_temperature=1.0, iterlimit=12800, tol=1e-4):
-    eqn_args = eqn_args if eqn_args is not None else tuple()
-    eqn_kwargs = eqn_kwargs if eqn_kwargs is not None else dict()
-    arg_name = [arg_name] if isinstance(arg_name, str) else list(arg_name) if not isinstance(arg_name, list) and arg_name is not None else arg_name
-    if arg_name is not None and isinstance(arg_name[0], str):
-        def wrapped_eqn(x):
-            return eqn_lambda(*eqn_args, **dict([(arg_name[i], x[i]) for i in range(len(arg_name))] + [(k, v) for k, v in eqn_kwargs.items()]))
-    else:
-        def wrapped_eqn(x):
-            return eqn_lambda(*tuple(x + eqn_args), **eqn_kwargs)
-    current_value = start
-    proposed_value = start
-    evaluated_value = wrapped_eqn(current_value)
-    temperature = init_temperature
-    for k in range(iterlimit):
-        if temperature < tol:
-            break
-        proposed_value = current_value + numpy.random.randn(*numpy.shape(current_value))
-        evaluated_proposed_value = wrapped_eqn(proposed_value)
-        delta_E = evaluated_proposed_value - evaluated_value
-        if (delta_E <= 0) or numpy.exp(-delta_E / temperature) >= numpy.random.uniform():
-            current_value = proposed_value
-            evaluated_value = evaluated_proposed_value
-        temperature = temperature * 0.95 ** floor(k / 1000)
-    return current_value
-
-def extrap(x, xdata, ydata):
-    """
-    Richardson Extrapolation.
-
-    Calculates the extrapolated values of a function evaluated at xdata
-    with the values ydata.
-
-    Required Arguments:
-    x : The value(s) to extrapolate to (can be a numpy array)
-    xdata, ydata : Values at which a function is evaluated, the result of that evaluation
-    """
-    coeff = []
-    xlen = len(xdata)
-    coeff.append([0, ydata[0]])
-    for j in range(1, xlen):
-        try:
-            coeff.append([0, ydata[j]])
-            for k in range(2, j + 1):
-                if numpy.all([(i < 5e-14) for i in numpy.abs(coeff[-2][-1] - coeff[-1][-1])]):
-                    raise StopIteration
-                t1 = xdata[j] - xdata[j - k + 1]
-                s1 = (x - xdata[j - k + 1])
-                s2 = (x - xdata[j])
-                p1 = s1 * coeff[j][k - 1] - s2 * coeff[j - 1][k - 1]
-                p1 /= t1
-                coeff[j].append(p1)
-        except StopIteration:
-            coeff.pop()
-            break
-    return coeff
-
-def convert_suffix(value=3661, suffixes=(' d', ' h', ' m', ' s'), ratios=(24, 60, 60), delimiter=':'):
+def convert_suffix(value=3661, suffixes=('d', 'h', 'm', 's'), ratios=(24, 60, 60), delimiter=':'):
     """
     Converts a base value into a human readable format with the given suffixes and ratios.
     """
@@ -95,43 +38,84 @@ def convert_suffix(value=3661, suffixes=(' d', ' h', ' m', ' s'), ratios=(24, 60
     for i in ratios[::-1]:
         outputValues.append(int(tValue % i))
         tValue = (tValue - tValue % i) // i
-    outputValues.append(int(tValue))
-    return delimiter.join(["{:2d}{}".format(*i) for i in zip(outputValues[::-1], suffixes)])
+    outputValues.append(tValue)
+    return delimiter.join(["{:.2f}{}".format(*i) for i in zip(outputValues[::-1], suffixes)])
 
 def warning(message):
     print(message)
 
-def named_object(name, alt_names=tuple(), order=1.0, adaptive=False):
+def named_integrator(name, alt_names=tuple(), order=1.0):
     def wrap(f):
         f.__name__ = str(name)
         f.__alt_names__ = alt_names
         f.__order__ = order
-        f.__adaptive__ = adaptive
+        if hasattr(f, "final_state"):
+            f.__adaptive__ = numpy.shape(f.final_state)[0] == 2
+        else:
+            f.__adaptive__ = False
         return f
     return wrap
 
 def resize_to_correct_dims(x, eqnum, dim):
     return numpy.resize(x, tuple([eqnum] + list(dim)))
 
-class StateTimer():
-    def __init__(self):
-        self.start = time.perf_counter()
-        self.stopped = 0
-        self.stopped = False
+def contract_first_ndims(a, b, n=1):
+    # Contracts the first n-dims of two tensors.
+    # Useful interface to einsum when the inner dimensions may vary
+    # depending on the arguments to the function.
+    if len(a.shape) > len(b.shape):
+        a,b = b,a
+    if n > len(a.shape):
+        raise ValueError("Cannot contract along more dims than there exists!")
+    return numpy.einsum(a, [i for i in range(len(a.shape))], b, [i for i in range(n)] + [i + len(a.shape) - 1 for i in range(n, len(b.shape))], [i + len(a.shape) - 1 for i in range(n, len(b.shape))])
 
-    def stop_timer(self):
-        self.stop = time.perf_counter()
+class BlockTimer():
+    # Class to time a block of code.
+    #
+    # Designed to work using the with ... as ... : syntax.
+    # Example:
+    #       with block_timer(section_label="Test") as _timer:
+    #           print(";".join(["{: >#5}".format(i-5) for i in range(21)]))
+    #           print("Time elapsed since start: {}s".format(_timer.elapsed()))
+    #
+    def __init__(self, section_label=None, start_now=True, suppress_print=False):
+        self.start_now = start_now
+        self.start_time = None
+        self.end_time = None
+        self.label = section_label
+        self.suppress_print = suppress_print
 
-    def get_elapsed_time(self):
-        if not self.stopped:
-            return time.perf_counter() - self.start
+    def __enter__(self):
+        if self.start_now:
+            self.start_time = time.perf_counter()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if not self.suppress_print:
+            if self.start_time is None and not self.start_now:
+                print("Timer was never started, cannot give run-time of code.")
+                print("Set start_now=True to count from start of block to end")
+            elif self.start_now:
+                if self.label: print("Section:\n\t"+self.label)
+                self.end_time = time.perf_counter()
+                print("\tThis code block took {}".format(convert_suffix(self.end_time - self.start_time)))
+            else:
+                if self.label: print("Section:\n\t"+self.label)
+                print("\tBetween start() and end(), the time taken was {}".format(convert_suffix(self.end_time - self.start_time)))
+
+    def start(self):
+        self.start_time = time.perf_counter()
+        return self
+
+    def end(self):
+        self.end_time = time.perf_counter()
+        return self
+
+    def elapsed(self):
+        if self.end_time is None:
+            return time.perf_counter() - self.start_time
         else:
-            return self.stop - self.start
-
-    def continue_timer(self):
-        if self.stopped:
-            self.stopped = False
-
+            return self.end_time - self.start_time
     def restart_timer(self):
         if self.stopped:
             self.stopped = False
