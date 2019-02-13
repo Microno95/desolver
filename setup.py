@@ -43,7 +43,7 @@ setup(name='DESolver',
           #   3 - Alpha
           #   4 - Beta
           #   5 - Production/Stable
-          'Development Status :: 4 - Alpha',
+          'Development Status :: 4 - Beta',
 
           'Environment :: Console',
           # Indicate who your project is intended for
