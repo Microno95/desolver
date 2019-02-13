@@ -29,11 +29,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from setuptools import setup
 
 setup(name='DESolver',
-      version='2.0.0',
+      version='2.0.1',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
-      install_requires=['numpy', 'tqdm'],
+      install_requires=['numpy', 'tqdm', 'scipy'],
       license='MIT',
       keywords=['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode'],
       url='https://github.com/Microno95/desolver',

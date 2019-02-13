@@ -31,6 +31,7 @@ import sys
 import time
 import shutil
 import types
+from scipy.interpolate import CubicSpline
 
 from tqdm.auto import tqdm
 
@@ -154,6 +155,7 @@ class OdeSystem:
         else:
             self.dt = -1 * stpsz
         self.staggered_mask = None
+        self.dense_output = dense_output
         self.initialise_integrator()
 
     def set_velocity_vars(self, staggered_mask):
@@ -311,29 +313,11 @@ class OdeSystem:
                               call desolver.available_methods() to see what these are")
         self.initialise_integrator()
 
-    def get_method(self):
-        """
-        Returns the method used to integrate the system.
-        """
-        return self.method_name
-
     def show_equations(self):
         """Prints the equations that have been entered for the system.
         Returns the equations themselves as a list of strings."""
         print("dy = {}".format(str(self.equ_rhs)))
         return str(self.equ_rhs)
-
-    def initial_conditions(self):
-        """Prints the initial conditions of the system"""
-        print("y({}) = {}".format(self.t0, self.y))
-        return self.y
-
-    def final_conditions(self, p=1):
-        """Prints the final state of the system.
-
-        Identical to initial conditions if the system has not been integrated"""
-        print("y({}) = {}".format(self.t1, self.soln[-1]))
-        return self.soln
 
     def show_system(self):
         """Prints the equations, initial conditions, final states, time limits and defined constants in the system."""
@@ -352,8 +336,7 @@ class OdeSystem:
 
         Variable-length arguments:
         additional_constants: A dict containing constants and their corresponding values."""
-        self.consts.update({k: numpy.resize(additional_constants[k], self.dim) for k in additional_constants})
-        self.initialise_integrator()
+        self.consts.update(additional_constants)
 
     def remove_constants(self, **constants_removal):
         """Takes an arbitrary list of keyword arguments to remove from the list of available constants.
@@ -364,7 +347,6 @@ class OdeSystem:
         for i in constants_removal:
             if i in self.consts.keys():
                 del self.consts[i]
-        self.initialise_integrator()
 
     def set_dimensions(self, m=None):
         """Changes the dimensions of the system.
@@ -386,31 +368,16 @@ class OdeSystem:
 
         self.initialise_integrator()
 
-    def get_dimensions(self):
-        """Returns the dimensions of the current system in the form of a tuple of ints.
+    def set_dense_output(self, dense_output=True):
+        """Sets self.dense_output to dense_output which determines if a CubicSpline
+        fit is computed for the integration results.
 
-        Follows numpy convention so numpy dimensions and OdeSystem dimensions are interchangeable.
+        WARNING: If dense_output is changed from its original value,
+                 the system will be reset.
         """
-        return self.dim
-
-    def record_trajectory(self, b=None):
-        """Sets whether or not the trajectory of the system will be recorded.
-
-        Keyword arguments:
-        b: A boolean value that denotes if the trajectory should be recorded.
-           1 - implies record; 0 - implies don't record.
-           If b is None, then this will return the current state of
-           whether or not the trajectory is to be recorded"""
-        if b is None:
-            return self.traj
-        else:
-            self.traj = b
-
-    def get_trajectory(self):
-        return self.soln
-
-    def get_sample_times(self):
-        return self.sample_times
+        if dense_output != self.dense_output:
+            self.reset()
+        self.dense_output = dense_output
 
     def reset(self):
         """Resets the system to the initial time."""
@@ -466,7 +433,7 @@ class OdeSystem:
 
                 self.t = new_time
 
-                if self.traj:
+                if self.dense_output:
                     self.soln += [new_state]
                     self.sample_times.append(new_time)
                 else:
@@ -485,3 +452,5 @@ class OdeSystem:
                 raise
 
         self.t = self.sample_times[-1]
+        if self.dense_output:
+            self.spline_interp = CubicSpline(self.sample_times, self.soln, extrapolate=True)
