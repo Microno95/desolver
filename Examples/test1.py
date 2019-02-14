@@ -25,7 +25,7 @@ def kbinterrupt_cb(ode_sys):
 
 y_init = de.numpy.array([1., 0.])
 
-a = de.OdeSystem(rhs, y0=y_init, n=y_init.shape, eta=True, dense_output=True, t=(0, 2*de.numpy.pi), dt=0.01, rtol=1e-3, atol=1e-6)
+a = de.OdeSystem(rhs, y0=y_init, n=y_init.shape, eta=True, dense_output=True, t=(0, 2*de.numpy.pi), dt=0.01, rtol=1e-6, atol=1e-9)
 
 a.set_end_time(a.get_end_time())
 a.set_step_size(a.get_step_size())
@@ -48,6 +48,7 @@ with de.BlockTimer(section_label="Integrator Tests") as sttimer:
             except KeyboardInterrupt as e:
                 print("")
                 print(e)
+                print(a.integration_status())
                 print("")
             a.integrate()
 

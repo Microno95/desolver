@@ -166,10 +166,10 @@ class BABs9o7HSolver(SymplecticIntegrator):
         [ 1.                  ,  0.                  ,  0.04649290043965892 ]]
     )
 
-@deutil.named_integrator("Explicit ABAS5O6HA",
-                       alt_names=("ABAS5O6HA", "ABAs5o6HA"),
+@deutil.named_integrator("Explicit ABAS5O6H",
+                       alt_names=("ABAS5O6H", "ABAs5o6H"),
                        order=6.0)
-class ABAs5o6HASolver(SymplecticIntegrator):
+class ABAs5o6HSolver(SymplecticIntegrator):
     # Based on arXiv:1501.04345v2 - ABAs5o6H
     tableau = numpy.array(
       [[ 0.                  ,  0.                  ,  0.15585935917621682 ],

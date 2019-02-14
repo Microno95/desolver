@@ -1,75 +1,56 @@
 # DESolver
-The purpose of the integrator python script is to provide a straightforward interface for numerically integrating
-systems of linear and non-linear first-order Ordinary Differential Equations, and plotting the results.
-Several different integration methods have been implemented and several interfacing methods exist for using the script.
+This is a python package for solving Initial Value Problems using various numerical integrators.
+Many integration routines are included ranging from fixed step to symplectic to adaptive integrators.
 
-#To Install:
+# To Install:
 Just type
-
 	pip install DESolver
-or
 
-	conda install DESolver
-
-##Implemented Integration Methods
-1. Runge-Kutta 4
-2. Runga-Kutta 45 w\ Cash-Karp Coefficients
-3. Forward Euler
-4. Backward Euler
-5. Implicit Midpoint
-6. Explicit Midpoint
-7. Adaptive Heun-Euler
-8. Euler-Trapezoidal Method
-9. Heun's Method
-10. Symplectic Forward Euler
-11. Explicit Gill's
-
-
-		NOTE:   The Symplectic Foward Euler method takes the entered equations in pairs for integration. For example,
-						when integrating a system where the position is updated based on the intermediate future velocity
-						then the equations would look something like the following for a spring satisfying Hooke's Law.
-						Equation 1 = y_1/m
-						Equation 2 = -k*y_0
-						Where y_0 is the position, y_1 is the momentum, k is the spring stiffness, and m is the mass.
+## Implemented Integration Methods
+### Adaptive Methods
+#### Explicit Methods
+1. Runge-Kutta 45 with Cash-Karp Coefficients
+2. Adaptive Heun-Euler Method
+#### Implicit Methods
+**NOT YET IMPLEMENTED**
+### Fixed Step Methods
+#### Explicit Methods
+1. Midpoint Method
+2. Heun's Method
+3. Euler's Method
+4. Euler-Trapezoidal Method
+5. BABs9o7H Method -- Based on arXiv:1501.04345v2 - BAB's9o7H
+5. ABAs5o6HA Method -- Based on arXiv:1501.04345v2 - ABAs5o6H
+#### Implicit Methods
+**NOT YET IMPLEMENTED**
 
 
-##Usage Methods
-1. Directly Running the Script
+# Minimal Working Example
 
-	When you run the script without any command line/terminal arguments the script will automatically default to
-	the internal interface where you will be asked how you wish to enter the various parameters for integration.
+This example shows the integration of a harmonic oscillator using DESolver.
 
-	This input method is the best documented and the directions are stated clearly when run.
-	Basically the script will ask for various parameters, separated by commas (or semicolons in the case
-	of the plotting methods), check if the parameters have been correctly entered, and request clarification or
-	re-entering if necessary.
+``` python
+import desolver as de
 
-2. Parameters from a Text File
+@de.rhs_prettifier("""[vx, x]""")
+def rhs(t, state, **kwargs):
+    x,vx = state
 
-	When running the script, using the -t optional argument followed by the name and location of a text file with
-	the integration parameters will run the script directly using the arguments provided.
+    dx  = vx
+    dvx = -x
 
-	If you do set the script to make plots then it will request that you enter the pairs of variables to plot
-	followed by requesting the necessarily titles and other parameters for a matplotlib 2d, line or scatter plot.
+    return de.numpy.array([dx, dvx])
 
-3. Parameters from the Command Line/Terminal
-	
-	**WARNING: This interface is still experimental and requires improvement.**
+y_init = de.numpy.array([1., 0.])
 
-	When you run the script with the optional arguments:
-	- -eqn "...ode 1..." "...ode 2..." ... "...ode n..."
-	- -y_i y_0(0) y_1(0) ... y_n(0)
-	- -tp t_initial t_final step_size
-	- -o "output directory location"
-	- -m "method of integration"
-	
-	In that order, the script will run and give the relevant output to the directory you have specified.
+a = de.OdeSystem(rhs, y0=y_init, n=y_init.shape, eta=True, dense_output=True, t=(0, 2*de.numpy.pi), dt=0.01, rtol=1e-6, atol=1e-9)
 
+a.show_system()
 
-I hope that this script is useful to you. If you have any suggestions as to what I should implement next email me or
-fork the repository and implement it yourself.
+a.integrate()
 
-**DISCLAIMER:
-The commenting on the code is currently sub-par and requires some polishing as certain variables and
-functions are not described in sufficient detail. Please email me if you wish to understand the code
-better.**
+print(a)
+
+print("If the integration was successful and correct, a.y[0] and a.y[-1] should be near identical.")
+print(a.y[0], a.y[-1])
+```
