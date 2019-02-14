@@ -406,7 +406,7 @@ class OdeSystem:
                 deutil.warning(
                     "A KeyboardInterrupt was raised during integration,",
                     "the interpolating spline will only be valid between",
-                    "{} and {}.".format(self.t0, self.t)
+                    "{} and {}.".format(self.t0, self.t[-1])
                 )
             else:
                 raise etypes.FailedIntegrationError("Integration failed with message:"+self.integration_status())
