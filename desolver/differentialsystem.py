@@ -41,30 +41,23 @@ from . import exceptiontypes as etypes
 namespaceInitialised = False
 available_methods = {}
 methods_inv_order = {}
-raise_KeyboardInterrupt = False
 
-def init_module(raiseKBINT=True):
+def init_module():
     global namespaceInitialised
     if not namespaceInitialised:
-        global raise_KeyboardInterrupt
-        raise_KeyboardInterrupt = raiseKBINT
         methods_ischemes = []
-        # print(dir(ischemes))
         for a in dir(ischemes):
             try:
                 if issubclass(ischemes.__dict__.get(a), ischemes.IntegratorTemplate):
                     methods_ischemes.append(ischemes.__dict__.get(a))
             except TypeError:
                 pass
-        # print(methods_ischemes)
         available_methods.update(dict([(func.__name__, func) for func in methods_ischemes if hasattr(func, "__alt_names__")] +
                                       [(alt_name, func) for func in methods_ischemes if hasattr(func, "__alt_names__") for alt_name in func.__alt_names__]))
 
         methods_inv_order.update({func: 1.0/func.__order__ for name, func in available_methods.items()})
 
         namespaceInitialised = True
-    elif raiseKBINT:
-        raise_KeyboardInterrupt = True
     else:
         pass
 
@@ -88,7 +81,7 @@ def rhs_prettifier(equRepr):
 
 class OdeSystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
-    def __init__(self, equ_rhs, y0=None, n=(1,), t=(0, 1), savetraj=0, stpsz=1.0, eta=0, rtol=1e-6, atol=1e-6, constants=None):
+    def __init__(self, equ_rhs, y0=None, n=(1,), t=(0, 1), dense_output=False, dt=1.0, eta=0, rtol=1e-6, atol=1e-6, constants=None):
         """Initialises the system to the parameters passed or to default values.
 
         Required arguments:
@@ -116,15 +109,21 @@ class OdeSystem:
                A numpy array of shape n will be passed to the integration routines,
                thus equ_rhs should be able to take this as input.
             t: A tuple of the form (initial time, final time) aka the integration limits.
-            savetraj: Set to True or False to specify whether or not the trajectory of the
-                      integration should be recorded.
-            stpsz: Sets the step-size for the integration, choose a value that is slightly less than the highest frequency
+            dense_output: Set to True or False to specify whether or not a cubic spline fit should be computed
+                          for the integration.
+            dt: Sets the step-size for the integration, choose a value that is slightly less than the highest frequency
                    changes in value of the solutions to the equations.
             eta: Set to True or False to specify whether or not the integration process should return an eta,
                  current progress and simple information regarding step-size and current time.
                  NOTE: This may slow the integration process down as the process of outputting
                        these values create overhead.
-            relerr: Denotes the target relative global error. Useful for adaptive methods.
+            rtol: Denotes the target relative error. Useful for adaptive methods.
+            atol: Denotes the target absolute error. Useful for adaptive methods.
+
+            NOTE:
+                rtol and atol are used in the error computation as
+                    err_bound = atol + rtol * abs(y)
+                in the same way as it is used in the scipy routines.
 
         Variable-length arguments:
             consts: Arbitrary set of keyword arguments that define the constants to be used in the system."""
@@ -139,39 +138,82 @@ class OdeSystem:
         self.consts = constants if constants is not None else dict()
         self.eta = eta
         self.dim = tuple(list(n))
-        self.y = numpy.array(y0) if y0 is not None else numpy.zeros(self.dim)
-        if not numpy.all(self.y.shape == self.dim):
-            raise ValueError("initial y0 has the wrong shape, expected y0 with shape {} but got with shape {}".format(self.dim, self.y.shape))
-        self.t = float(t[0])
-        self.sample_times = [self.t]
+        self.y = numpy.array([numpy.array(y0) if y0 is not None else numpy.zeros(self.dim)])
+        if not numpy.all(self.y[0].shape == self.dim):
+            raise ValueError("initial y0 has the wrong shape, expected y0 with shape {} but got with shape {}".format(self.dim, self.y[0].shape))
+        self.t = numpy.array([float(t[0])])
         self.t0 = float(t[0])
         self.t1 = float(t[1])
-        self.soln = [numpy.resize(self.y, self.dim)]
-        self.traj = savetraj
         self.method_name = "RK45CK"
         self.integrator  = None
-        if (stpsz < 0 < t[0] - t[1]) or (stpsz > 0 > t[0] - t[1]):
-            self.dt = stpsz
+        if (dt < 0 < t[1] - t[0]) or (dt > 0 > t[1] - t[0]):
+            self.dt = -dt
         else:
-            self.dt = -1 * stpsz
+            self.dt = dt
+        self.dt0 = self.dt
         self.staggered_mask = None
         self.dense_output = dense_output
+        self.int_status = 0
+        self.success = False
+        self.sol = None
+        self.nfev = 0
         self.initialise_integrator()
 
-    def set_velocity_vars(self, staggered_mask):
-        """Sets the velocity variable mask for the symplectic integrators. Does nothing
-        if integrator is not symplectic.
-        """
+    def set_kick_vars(self, staggered_mask):
+        """Sets the variable mask for the symplectic integrators. This mask denotes
+        the elements of y that are to be updated as part of the Kick step.
 
+        The conventional structure of a symplectic integrator is Kick-Drift-Kick
+        or Drift-Kick-Drift where Drift is when the Positions are updated and
+        Kick is when the Velocities are updated.
+
+        The default assumption is that the latter half of the variables are
+        to be updated in the Kick step and the former half in the Drift step.
+
+        Does nothing if integrator is not symplectic.
+        """
         self.staggered_mask = staggered_mask
+
+    def set_time(self, t=[]):
+        """Alternate interface for changing current, beginning and end times.
+
+        Keyword arguments:
+        t:  -- A length of 1 denotes changes to end time.
+            -- A length of 2 denotes changes to beginning and end times in that order.
+            -- A length larger than 2 will behave the same as above and ignore values beyond the 2nd index."""
+        if len(t) == 1:
+            if t[0] <= self.t0:
+                raise ValueError("The end time of the integration cannot be less than "
+                                 "or equal to the initial time!")
+            self.t1 = t[0]
+            if self.t1 < self.t[-1]:
+                ischemes.deutil.warning("You have set the end time to less than the current time, "
+                                        "this has automatically reset the integration.")
+                self.reset()
+        elif len(t) == 2:
+            if t[1] <= t[0]:
+                raise ValueError("The end time of the integration cannot be less than "
+                                 "or equal to the initial time!")
+            self.t0 = t[0]
+            self.t1 = t[1]
+            ischemes.deutil.warning("You have set the start time to a different value,",
+                                    "this has automatically reset the integration.")
+            self.reset()
+        elif len(t) > 2:
+            ischemes.deutil.warning("You have passed an array longer than 2 elements, "
+                                    "the first 2 will be taken as the principle values.")
+            self.set_time(t=t[:2])
+        elif len(t) == 0:
+            raise ValueError("You have passed an array that is empty, this does not make sense.")
+        else:
+            raise ValueError("You have not passed an array, this does not make sense.")
 
     def set_end_time(self, t):
         """Changes the final time for the integration of the ODE system
 
         Required arguments:
         t: Denotes the final time."""
-        self.t1 = float(t)
-        self.check_time_bounds()
+        self.set_time([self.t0, t])
 
     def get_end_time(self):
         """Returns the final time of the ODE system."""
@@ -182,57 +224,21 @@ class OdeSystem:
 
         Required arguments:
         t: Denotes the initial time."""
-        self.t0 = float(t)
-        self.check_time_bounds()
+        self.set_time([t, self.t1])
 
     def get_start_time(self):
         """Returns the initial time of the ODE system."""
         return self.t0
 
     def check_time_bounds(self):
-        if not (abs(self.t0) < abs(self.t) < abs(self.t1)):
-            self.t = self.t0
-
-    def set_current_time(self, t):
-        """Changes the current time for the integration of the ODE system.
-
-        Required arguments:
-        t: Denotes the current time"""
-        self.t = float(t)
+        if not (abs(self.t0) < abs(self.t[-1]) < abs(self.t1)):
+            self.reset()
 
     def get_current_time(self):
         """Returns the current time of the ODE system"""
-        return self.t
+        return self.t[-1]
 
-    def set_time(self, t=()):
-        """Alternate interface for changing current, beginning and end times.
-
-        Keyword arguments:
-        t:  -- A length of 1 denotes changes to current time.
-            -- A length of 2 denotes changes to beginning and end times in that order.
-            -- A length of 3 denotes changes to all three times in order of current, beginning and end.
-            -- A length larger than 3 will behave the same as above and ignore values beyond the 3rd index."""
-        if len(t) == 1:
-            ischemes.deutil.warning("You have passed a tuple that only contains one element, "
-                    "this will be taken as the current time.")
-            self.t = t[0]
-        elif len(t) == 2:
-            self.t0 = t[0]
-            self.t1 = t[1]
-        elif len(t) == 3:
-            self.t = t[0]
-            self.t0 = t[1]
-            self.t1 = t[2]
-        elif len(t) > 3:
-            ischemes.deutil.warning("You have passed an array longer than 3 elements, "
-                    "the first three will be taken as the principle values.")
-            self.t = t[0]
-            self.t0 = t[1]
-            self.t1 = t[2]
-        else:
-            ischemes.deutil.warning("You have passed an array that is empty, this doesn't make sense.")
-
-    def set_step_size(self, h):
+    def set_step_size(self, dt):
         """Sets the step size that will be used for the integration.
 
         Required arguments:
@@ -240,19 +246,11 @@ class OdeSystem:
             a value slightly less than the highest frequency of oscillation. If unsure, use an adaptive method in the
             list of available methods (view by calling availmethods()) followed by setmethod(), and finally call
             setrelerr() with the keyword argument auto_calc_dt set to True for an approximately good step size."""
-        self.dt = h
-        self.initialise_integrator()
+        self.dt = dt
 
     def get_step_size(self):
         """Returns the step size that will be attempted for the next integration step"""
         return self.dt
-
-    def set_relative_error(self, relerr):
-        """Sets the target relative error used by the timestep autocalculator and the adaptive integration methods.
-        Has no effect when the integration method is non-adaptive. These are all the symplectic integrators and the fixed order schemes.
-        """
-        self.relative_error_bound = relerr
-        self.initialise_integrator()
 
     def set_rtol(self, new_rtol):
         """Sets the target relative error used by the timestep autocalculator and the adaptive integration methods.
@@ -260,17 +258,17 @@ class OdeSystem:
         """
         self.rtol = new_rtol
 
-    def set_atol(self, new_atol):
-        """Sets the target absolute error used by the timestep autocalculator and the adaptive integration methods.
-        Has no effect when the integration method is non-adaptive..
-        """
-        self.atol = new_atol
-
     def get_rtol(self):
         """Returns the target relative error used by the timestep autocalculator and the adaptive integration methods.
         Has no effect when the integration method is non-adaptive..
         """
         return self.rtol
+
+    def set_atol(self, new_atol):
+        """Sets the target absolute error used by the timestep autocalculator and the adaptive integration methods.
+        Has no effect when the integration method is non-adaptive..
+        """
+        self.atol = new_atol
 
     def get_atol(self):
         """Returns the target absolute error used by the timestep autocalculator and the adaptive integration methods.
@@ -322,14 +320,14 @@ class OdeSystem:
     def show_system(self):
         """Prints the equations, initial conditions, final states, time limits and defined constants in the system."""
         print_str = "y({t0}) = {init_val}\ndy = {equation}\ny({t}) = {cur_val}\n"
-        print(print_str.format(init_val=self.y, t0=self.t0,
-                               equation=str(self.equ_rhs), t=self.t,
-                               cur_val=self.soln[-1]))
+        print(print_str.format(init_val=self.y[0], t0=self.t0,
+                               equation=str(self.equ_rhs), t=self.t[-1],
+                               cur_val=self.y[-1]))
         if self.consts:
             print("The constants that have been defined for this system are: ")
             print(self.consts)
         print("The time limits for this system are:\n "
-              "t0 = {}, t1 = {}, t_current = {}, step_size = {}".format(self.t0, self.t1, self.t, self.dt))
+              "t0 = {}, t1 = {}, t_current = {}, step_size = {}".format(self.t0, self.t1, self.t[-1], self.dt))
 
     def add_constants(self, **additional_constants):
         """Takes an arbitrary list of keyword arguments to add to the list of available constants.
@@ -362,28 +360,62 @@ class OdeSystem:
             else:
                 if any([not isinstance(m_elem, int) for m_elem in m]):
                     raise ValueError("The dimensions of a system cannot contain a float")
-                self.dim = tuple([1] + list(m))
-            self.y = numpy.resize(self.y, self.dim)
+                self.dim = tuple(m)
+            self.y[0] = numpy.resize(self.y[0], self.dim)
             self.reset()
 
         self.initialise_integrator()
 
+    def integration_status(self):
+        if self.int_status == 0:
+            return "Integration has not been run."
+        elif self.int_status == 1:
+            return "Integration completed successfully."
+        elif self.int_status == -1:
+            return "Recursion limit was reached during integration, "+\
+                   "this can be caused by the adaptive integrator being unable "+\
+                   "to find a suitable step size to achieve the rtol/atol "+\
+                   "requirements."
+        elif self.int_status == -2:
+            return "A KeyboardInterrupt exception was raised during integration."
+        elif self.int_status == -3:
+            return "A generic exception was raised during integration."
+
     def set_dense_output(self, dense_output=True):
         """Sets self.dense_output to dense_output which determines if a CubicSpline
         fit is computed for the integration results.
-
-        WARNING: If dense_output is changed from its original value,
-                 the system will be reset.
         """
-        if dense_output != self.dense_output:
-            self.reset()
+        if self.sol is not None:
+            self.sol = None
         self.dense_output = dense_output
+
+    def compute_dense_output(self):
+        """Computes an interpolating CubicSpline over the solution of the
+           integration.
+
+           Will not work if an integration error has occurred or integration is
+           incomplete.
+        """
+        if self.int_status == 0:
+            raise etypes.ValueError("Cannot compute dense output for non-existent integration.")
+        elif self.int_status != 1:
+            if self.int_status == -2:
+                deutil.warning(
+                    "A KeyboardInterrupt was raised during integration,",
+                    "the interpolating spline will only be valid between",
+                    "{} and {}.".format(self.t0, self.t)
+                )
+            else:
+                raise etypes.FailedIntegrationError("Integration failed with message:"+self.integration_status())
+        self.sol = CubicSpline(self.t, self.y, extrapolate=True)
+        return self.sol
 
     def reset(self):
         """Resets the system to the initial time."""
-        self.t = self.t0
-        self.soln = [self.y]
-        self.sample_times = [self.t]
+        self.y = numpy.array([self.y[0]])
+        self.t = numpy.array([self.t[0]])
+        self.sol = None
+        self.dt = self.dt0
 
     def integrate(self, t=None, callback=None):
         """Integrates the system to a specified time.
@@ -402,55 +434,65 @@ class OdeSystem:
         steps = 0
         self.dt = self.dt
 
-        if numpy.sign(tf - self.t) != numpy.sign(self.dt):
+        if numpy.sign(tf - self.t[-1]) != numpy.sign(self.dt):
             self.dt = numpy.copysign(self.dt, tf - self.dt)
 
-        if abs(self.dt) > abs(tf - self.t):
-            self.dt = abs(tf - self.t)*0.5
+        if abs(self.dt) > abs(tf - self.t[-1]):
+            self.dt = abs(tf - self.t[-1])*0.5
 
         time_remaining = [0, 0]
 
         etaString = ''
 
         if self.eta:
-            tqdm_progress_bar = tqdm(total=(tf-self.t)/self.dt)
+            tqdm_progress_bar = tqdm(total=(tf-self.t[-1])/self.dt)
 
-        while self.dt != 0 and abs(self.t) < abs(tf * (1 - 4e-16)):
+        self.nfev = 0 if self.int_status == 1 else self.nfev
+        while self.dt != 0 and abs(self.t[-1]) < abs(tf * (1 - 4e-16)):
             try:
-                if abs(self.dt + self.t) > abs(tf):
-                    self.dt = (tf - self.t)
+                if abs(self.dt + self.t[-1]) > abs(tf):
+                    self.dt = (tf - self.t[-1])
                 try:
-                    self.dt, (new_time, new_state) = self.integrator(self.equ_rhs, self.t, self.soln[-1], self.consts, timestep=self.dt)
+                    self.dt, (new_time, new_state), nfev_ = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
                 except etypes.RecursionError:
-                    print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. "
-                          "If this fails, either use a different relative error requirement or "
-                          "increase maximum recursion depth. Can also occur if the initial value of all "
-                          "variables is set to 0.")
+                    print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. ",
+                          "If this fails, either use a different rtol/atol or ",
+                          "increase maximum recursion depth.")
                     self.dt = 0.5 * self.dt
-                    self.dt, (new_time, new_state) = self.integrator(self.equ_rhs, self.t, self.soln[-1], self.consts, timestep=self.dt)
+                    self.dt, (new_time, new_state), nfev_ = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
                 except:
+                    self.int_status = -1
                     raise
 
-                self.t = new_time
-
-                if self.dense_output:
-                    self.soln += [new_state]
-                    self.sample_times.append(new_time)
-                else:
-                    self.soln = [new_state]
-                    self.sample_times = [new_time]
-
+                self.y = numpy.append(self.y, [new_state], axis=0)
+                self.t = numpy.append(self.t, [new_time],  axis=0)
+                self.nfev += nfev_
 
                 if self.eta:
-                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t) / self.dt)
+                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[-1]) / self.dt)
                     tqdm_progress_bar.update()
                 steps += 1
-                if callback is not None: callback(self)
+                if callback is not None:
+                    callback(self)
             except KeyboardInterrupt:
-                if raise_KeyboardInterrupt: raise
-            except:
+                self.int_status = -2
                 raise
+            except:
+                self.int_state = -3
+                raise
+        else:
+            tqdm_progress_bar.close()
 
-        self.t = self.sample_times[-1]
+        self.int_status = 1
+        self.success = True
         if self.dense_output:
-            self.spline_interp = CubicSpline(self.sample_times, self.soln, extrapolate=True)
+            self.compute_dense_output()
+
+    def __repr__(self):
+        return "\n".join([
+            """{:>10}: {:<128}""".format("message", self.integration_status()),
+            """{:>10}: {:<128}""".format("nfev", str(self.nfev)),
+            """{:>10}: {:<128}""".format("sol", str(self.sol)),
+            """{:>10}: {:<128}""".format("t", str(self.t)),
+            """{:>10}: {:<128}""".format("y", str(self.y)),
+        ])

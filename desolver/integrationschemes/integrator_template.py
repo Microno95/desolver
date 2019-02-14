@@ -30,6 +30,7 @@ class ExplicitIntegrator(IntegratorTemplate):
         self.num_stages = numpy.shape(self.tableau)[0]
 
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
+        nfev = 0
         if self.tableau is None:
             raise NotImplementedError("In order to use the fixed step integrator, subclass this class and populate the butcher tableau")
         else:
@@ -39,15 +40,17 @@ class ExplicitIntegrator(IntegratorTemplate):
                 current_time  = initial_time  + self.tableau[stage, 0]*timestep
                 current_state = initial_state + deutil.contract_first_ndims(self.tableau[stage, 1:], aux)
                 aux[stage] = rhs(current_time, current_state, **constants) * timestep
+                nfev += 1
 
             final_time  = initial_time  + timestep
             final_state = initial_state + deutil.contract_first_ndims(self.final_state[0, 1:], aux)
+            nfev2 = 0
             if self.adaptive:
                 final_state2 = initial_state + deutil.contract_first_ndims(self.final_state[1, 1:], aux)
                 timestep, redo_step = self.update_timestep(final_state, final_state2, initial_time, timestep)
                 if redo_step:
-                    timestep, (final_time, final_state) = self(rhs, initial_time, initial_state, constants, timestep)
-            return timestep, (final_time, final_state)
+                    timestep, (final_time, final_state), nfev2 = self(rhs, initial_time, initial_state, constants, timestep)
+            return timestep, (final_time, final_state), nfev + nfev2
 
     __call__ = forward
 
@@ -85,6 +88,7 @@ class SymplecticIntegrator(IntegratorTemplate):
         return numpy.zeros_like(current_state)
 
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
+        nfev = 0
         if self.tableau is None:
             raise NotImplementedError("In order to use the fixed step integrator, subclass this class and populate the butcher tableau")
         else:
@@ -102,9 +106,10 @@ class SymplecticIntegrator(IntegratorTemplate):
                 current_time        += timestep  * self.tableau[stage, 0]
                 current_state[nmsk] += aux[nmsk] * self.tableau[stage, 1]
                 current_state[msk]  += aux[msk]  * self.tableau[stage, 2]
+                nfev += 1
             final_time  = current_time
             final_state = current_state
-            return timestep, (final_time, final_state)
+            return timestep, (final_time, final_state), nfev
 
     __call__ = forward
 

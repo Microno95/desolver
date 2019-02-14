@@ -35,3 +35,7 @@ class LengthError(Exception):
 class RecursionError(Exception):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
+
+class FailedIntegrationError(Exception):
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)

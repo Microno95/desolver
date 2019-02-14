@@ -26,6 +26,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy
 import time
+import sys
 
 from math import floor
 
@@ -41,8 +42,8 @@ def convert_suffix(value=3661, suffixes=('d', 'h', 'm', 's'), ratios=(24, 60, 60
     outputValues.append(tValue)
     return delimiter.join(["{:.2f}{}".format(*i) for i in zip(outputValues[::-1], suffixes)])
 
-def warning(message):
-    print(message)
+def warning(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 def named_integrator(name, alt_names=tuple(), order=1.0):
     def wrap(f):
