@@ -1,6 +1,3 @@
-# Include the license file
-include LICENSE.txt
-
 prune meta.yaml
 prune bld.bat
 prune build.sh
