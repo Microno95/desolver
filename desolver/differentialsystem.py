@@ -40,7 +40,6 @@ from . import exceptiontypes as etypes
 
 namespaceInitialised = False
 available_methods = {}
-methods_inv_order = {}
 
 def init_module():
     global namespaceInitialised
@@ -54,8 +53,6 @@ def init_module():
                 pass
         available_methods.update(dict([(func.__name__, func) for func in methods_ischemes if hasattr(func, "__alt_names__")] +
                                       [(alt_name, func) for func in methods_ischemes if hasattr(func, "__alt_names__") for alt_name in func.__alt_names__]))
-
-        methods_inv_order.update({func: 1.0/func.__order__ for name, func in available_methods.items()})
 
         namespaceInitialised = True
     else:
@@ -144,7 +141,7 @@ class OdeSystem:
         self.t = numpy.array([float(t[0])])
         self.t0 = float(t[0])
         self.t1 = float(t[1])
-        self.method_name = "RK45CK"
+        self.method = available_methods["RK45CK"]
         self.integrator  = None
         if (dt < 0 < t[1] - t[0]) or (dt > 0 > t[1] - t[0]):
             self.dt = -dt
@@ -276,32 +273,42 @@ class OdeSystem:
         """
         return self.atol
 
-    @staticmethod
-    def available_methods(suppress_print=False):
-        """Prints and then returns a dict of methods of integration that are available."""
-        if not suppress_print:
-            print(available_methods.keys())
-        return available_methods
-
     def initialise_integrator(self):
-        if available_methods[self.method_name].__adaptive__:
-            if self.staggered_mask is not None and available_methods[self.method_name].__symplectic__:
-                self.integrator = available_methods[self.method_name](self.dim, staggered_mask=self.staggered_mask, rtol=self.rtol, atol=self.atol)
+        if self.method.__adaptive__:
+            if self.staggered_mask is not None and self.method.__symplectic__:
+                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, rtol=self.rtol, atol=self.atol)
             else:
-                self.integrator = available_methods[self.method_name](self.dim, rtol=self.rtol, atol=self.atol)
+                self.integrator = self.method(self.dim, rtol=self.rtol, atol=self.atol)
         else:
-            if self.staggered_mask is not None and available_methods[self.method_name].__symplectic__:
-                self.integrator = available_methods[self.method_name](self.dim, staggered_mask=self.staggered_mask)
+            if self.staggered_mask is not None and self.method.__symplectic__:
+                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask)
             else:
-                self.integrator = available_methods[self.method_name](self.dim)
+                self.integrator = self.method(self.dim)
 
     def set_method(self, method, staggered_mask=None):
         """Sets the method of integration.
 
         Required arguments:
-        method: String that denotes the key to one of the available methods in the dict() returned by availmethods()."""
+        method: String that corresponds to a key in the desolver.available_methods dict OR
+                a subclass of ischemes.IntegratorTemplate such as an ischemes.ExplicitIntegrator or ischemes.SymplecticIntegrator
+                subclass that implements the forward method. The forward method should take as arguments:
+                    rhs, initial_time, initial_state, constants, timestep
+                and return:
+                    timestep, (final_time, final_state), nfev
+                where timestep is the new timestep (as appropriate) and nfev is the number of function evaluations.
+                If method is adaptive it should have the __adaptive__ property set to True and if it is
+                symplectic it should have the __symplectic__ property set to True.
+        """
         if method in available_methods.keys():
-            self.method_name = method
+            self.method = available_methods[method]
+            if staggered_mask is None and hasattr(self.integrator, "staggered_mask"):
+                staggered_mask = self.integrator.staggered_mask
+            self.staggered_mask = staggered_mask
+            self.integrator = None
+        elif issubclass(method, ischemes.IntegratorTemplate):
+            if method not in map(lambda x:x[1], available_methods.items()):
+                deutil.warning("This is not a method implemented as part of the DESolver package. Cannot guarantee results.")
+            self.method = method
             if staggered_mask is None and hasattr(self.integrator, "staggered_mask"):
                 staggered_mask = self.integrator.staggered_mask
             self.staggered_mask = staggered_mask

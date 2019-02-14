@@ -31,7 +31,7 @@ a.set_end_time(a.get_end_time())
 a.set_step_size(a.get_step_size())
 a.set_start_time(a.get_start_time())
 a.set_end_time(a.get_end_time())
-a.set_method(a.method_name)
+a.set_method(a.method)
 a.set_dimensions(a.dim)
 print(a.get_rtol(), a.get_atol(), a.y)
 a.show_system()
@@ -39,7 +39,7 @@ a.show_system()
 print("")
 
 with de.BlockTimer(section_label="Integrator Tests") as sttimer:
-    for i in sorted(de.OdeSystem.available_methods(suppress_print=True)):
+    for i in sorted(de.available_methods):
         print("Testing {}".format(str(i)))
         try:
             a.set_method(i)
