@@ -1,41 +1,60 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import desolver as de
+
 @de.rhs_prettifier("""[vx, x]""")
 def rhs(t, state, **kwargs):
     x,vx = state
 
     dx  = vx
-    dvx = -x
+    dvx = -x + t
 
     return de.numpy.array([dx, dvx])
 
+def analytic_soln(t, initial_conditions):
+    c1 =  initial_conditions[0]
+    c2 =  initial_conditions[1] - 1.0
+    return de.numpy.array([
+        c2 * de.numpy.sin(t) + c1 * de.numpy.cos(t) + t,
+        c2 * de.numpy.cos(t) - c1 * de.numpy.sin(t) + 1.
+    ])
+
+def kbinterrupt_cb(ode_sys):
+    if ode_sys.t[-1] > de.numpy.pi:
+        raise KeyboardInterrupt("Test Interruption and Catching")
+
 y_init = de.numpy.array([1., 0.])
 
-a = de.OdeSystem(rhs, y0=y_init, n=y_init.shape, t=(0, 2*de.numpy.pi), stpsz=0.01, rtol=1e-1, atol=1e-3)
+a = de.OdeSystem(rhs, y0=y_init, n=y_init.shape, eta=True, dense_output=True, t=(0, 2*de.numpy.pi), dt=0.01, rtol=1e-6, atol=1e-12)
 
 a.set_end_time(a.get_end_time())
 a.set_step_size(a.get_step_size())
 a.set_start_time(a.get_start_time())
-a.set_current_time(a.get_current_time())
-a.set_method(a.get_method())
-# a.set_dimensions(a.get_dimensions())
-a.record_trajectory(True)
-print(a.get_rtol(), a.get_atol(), a.get_trajectory())
+a.set_end_time(a.get_end_time())
+a.set_method(a.method_name)
+a.set_dimensions(a.dim)
+print(a.get_rtol(), a.get_atol(), a.y)
 a.show_system()
 
 print("")
 
 with de.BlockTimer(section_label="Integrator Tests") as sttimer:
-    for i in de.OdeSystem.available_methods(suppress_print=True):
+    for i in sorted(de.OdeSystem.available_methods(suppress_print=True)):
         print("Testing {}".format(str(i)))
         try:
             a.set_method(i)
+            try:
+                a.integrate(callback=kbinterrupt_cb)
+            except KeyboardInterrupt as e:
+                print("")
+                print(e)
+                print("")
             a.integrate()
-            max_diff = de.numpy.max(de.numpy.abs(a.get_trajectory()[0] - a.get_trajectory()[-1]).ravel())
+
+            max_diff = de.numpy.max(de.numpy.abs(analytic_soln(a.t[-1], a.y[0])-a.y[-1]))
             if de.OdeSystem.available_methods(suppress_print=True)[i].__adaptive__:
                 assert(max_diff < a.atol * 10)
-            print("{} Succeeded with max_diff = {}".format(str(i), max_diff))
+            print("{} Succeeded with max_diff from analytical solution = {}".format(str(i), max_diff))
             print()
             a.reset()
         except:
