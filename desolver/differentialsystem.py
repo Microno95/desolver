@@ -37,6 +37,7 @@ from tqdm.auto import tqdm
 
 from . import integrationschemes as ischemes
 from . import exceptiontypes as etypes
+from . import utilities as deutil
 
 namespaceInitialised = False
 available_methods = {}
