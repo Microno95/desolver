@@ -78,7 +78,7 @@ def rhs_prettifier(equRepr):
 
 class OdeSystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
-    def __init__(self, equ_rhs, y0=None, n=(1,), t=(0, 1), dense_output=False, dt=1.0, eta=0, rtol=1e-6, atol=1e-6, constants=None):
+    def __init__(self, equ_rhs, y0=None, n=(1,), t=(0, 1), dense_output=False, dt=1.0, rtol=1e-6, atol=1e-6, constants=None):
         """Initialises the system to the parameters passed or to default values.
 
         Required arguments:
@@ -110,10 +110,6 @@ class OdeSystem:
                           for the integration.
             dt: Sets the step-size for the integration, choose a value that is slightly less than the highest frequency
                    changes in value of the solutions to the equations.
-            eta: Set to True or False to specify whether or not the integration process should return an eta,
-                 current progress and simple information regarding step-size and current time.
-                 NOTE: This may slow the integration process down as the process of outputting
-                       these values create overhead.
             rtol: Denotes the target relative error. Useful for adaptive methods.
             atol: Denotes the target absolute error. Useful for adaptive methods.
 
@@ -133,7 +129,6 @@ class OdeSystem:
         self.rtol = rtol
         self.atol = atol
         self.consts = constants if constants is not None else dict()
-        self.eta = eta
         self.dim = tuple(list(n))
         self.y = numpy.array([numpy.array(y0) if y0 is not None else numpy.zeros(self.dim)])
         if not numpy.all(self.y[0].shape == self.dim):
@@ -424,14 +419,20 @@ class OdeSystem:
         self.sol = None
         self.dt = self.dt0
 
-    def integrate(self, t=None, callback=None):
+    def integrate(self, t=None, callback=None, eta=False):
         """Integrates the system to a specified time.
 
         Keyword arguments:
         t: If t is specified, then the system will be integrated to time t.
            Otherwise the system will integrate to the specified final time.
            NOTE: t can be negative in order to integrate backwards in time, but use this with caution as this
-                 functionality is slightly unstable."""
+                 functionality is slightly unstable.
+        callback: A callable object that is called as callback(self) at each time step.
+                  This is useful for logging purposes.
+        eta: Set to True or False to specify whether or not the integration process should return an eta,
+             current progress and simple information regarding step-size and current time.
+             NOTE: This may slow the integration process down as the process of outputting
+                   these values create overhead."""
 
         if t:
             tf = t
@@ -451,7 +452,7 @@ class OdeSystem:
 
         etaString = ''
 
-        if self.eta:
+        if eta:
             tqdm_progress_bar = tqdm(total=(tf-self.t[-1])/self.dt)
 
         self.nfev = 0 if self.int_status == 1 else self.nfev
@@ -475,7 +476,7 @@ class OdeSystem:
                 self.t = numpy.append(self.t, [new_time],  axis=0)
                 self.nfev += nfev_
 
-                if self.eta:
+                if eta:
                     tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[-1]) / self.dt)
                     tqdm_progress_bar.update()
                 steps += 1
@@ -488,7 +489,8 @@ class OdeSystem:
                 self.int_state = -3
                 raise
         else:
-            tqdm_progress_bar.close()
+            if eta:
+                tqdm_progress_bar.close()
 
         self.int_status = 1
         self.success = True
