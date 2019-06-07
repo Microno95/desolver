@@ -43,7 +43,7 @@ def rhs(t, state, **kwargs):
 
 y_init = de.numpy.array([1., 0.])
 
-a = de.OdeSystem(rhs, y0=y_init, n=y_init.shape, eta=True, dense_output=True, t=(0, 2*de.numpy.pi), dt=0.01, rtol=1e-6, atol=1e-9)
+a = de.OdeSystem(rhs, y0=y_init, n=y_init.shape, dense_output=True, t=(0, 2*de.numpy.pi), dt=0.01, rtol=1e-6, atol=1e-9)
 
 a.show_system()
 
