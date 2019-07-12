@@ -45,7 +45,7 @@ from .integrator_template import ExplicitIntegrator, IntegratorTemplate, Symplec
 #         raise NotImplementedError("This method has not yet been implemented!")
 
 @deutil.named_integrator("Explicit RK45CK",
-                       alt_names=("RK45CK", "Runge-Kutta-Cash-Karp"),
+                       alt_names=("RK45CK", "Runge-Kutta-Cash-Karp", "RK45"),
                        order=4.0)
 class RK45CKSolver(ExplicitIntegrator):
     # Based on RK45 Cash-Karp

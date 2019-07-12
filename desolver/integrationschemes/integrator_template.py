@@ -52,30 +52,29 @@ class ExplicitIntegrator(IntegratorTemplate):
         self.atol=atol
         self.adaptive = numpy.shape(self.final_state)[0] == 2
         self.num_stages = numpy.shape(self.tableau)[0]
-
+        self.aux = numpy.zeros((self.num_stages, *self.dim), dtype=numpy.float64)
+    
+    @profile
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
-        nfev = 0
         if self.tableau is None:
             raise NotImplementedError("In order to use the fixed step integrator, subclass this class and populate the butcher tableau")
         else:
-            aux = self.get_aux_array(initial_state)
+            aux = self.aux
 
             for stage in range(self.num_stages):
-                current_time  = initial_time  + self.tableau[stage, 0]*timestep
                 current_state = initial_state + numpy.einsum("n,n...->...", self.tableau[stage, 1:], aux)
-                aux[stage] = rhs(current_time, current_state, **constants) * timestep
-                nfev += 1
+                aux[stage] = rhs(initial_time  + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
 
             final_time  = initial_time  + timestep
             dState      = numpy.einsum("n,n...->...", self.final_state[0, 1:], aux)
-            final_state = initial_state + numpy.einsum("n,n...->...", self.final_state[0, 1:], aux)
-            nfev2 = 0
+            final_state = initial_state + dState
             if self.adaptive:
                 final_state2 = initial_state + numpy.einsum("n,n...->...", self.final_state[1, 1:], aux)
                 timestep, redo_step = self.update_timestep(final_state, final_state2, initial_time, timestep)
                 if redo_step:
-                    timestep, (final_time, final_state, dState), nfev2 = self(rhs, initial_time, initial_state, constants, timestep)
-            return timestep, (final_time, final_state, dState), nfev + nfev2
+                    timestep, (final_time, final_state, dState) = self(rhs, initial_time, initial_state, constants, timestep)
+            aux[:]      = 0.0
+            return timestep, (final_time, final_state, dState)
 
     __call__ = forward
 
@@ -109,11 +108,7 @@ class SymplecticIntegrator(IntegratorTemplate):
         self.adaptive = False
         self.num_stages = numpy.shape(self.tableau)[0]
 
-    def get_aux_array(self, current_state):
-        return numpy.zeros_like(current_state)
-
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
-        nfev = 0
         if self.tableau is None:
             raise NotImplementedError("In order to use the fixed step integrator, subclass this class and populate the butcher tableau")
         else:
@@ -127,18 +122,15 @@ class SymplecticIntegrator(IntegratorTemplate):
             # print(msk, nmsk)
             
             for stage in range(self.num_stages):
-                aux = self.get_aux_array(initial_state)
-                aux = rhs(current_time, current_state, **constants) * timestep
-                current_time        += timestep  * self.tableau[stage, 0]
-                current_state[nmsk] += aux[nmsk] * self.tableau[stage, 1]
-                current_state[msk]  += aux[msk]  * self.tableau[stage, 2]
-                dState[nmsk]        += aux[nmsk] * self.tableau[stage, 1]
-                dState[msk]         += aux[msk]  * self.tableau[stage, 2]
-                nfev += 1
+                aux = rhs(current_time, initial_state + dState, **constants) * timestep
+                current_time  += timestep  * self.tableau[stage, 0]
+                dState[nmsk]  += aux[nmsk] * self.tableau[stage, 1]
+                dState[msk]   += aux[msk]  * self.tableau[stage, 2]
                 
             final_time  = current_time
-            final_state = current_state
-            return timestep, (final_time, final_state, dState), nfev
+            final_state = initial_state + dState
+            
+            return timestep, (final_time, final_state, dState)
 
     __call__ = forward
 

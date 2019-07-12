@@ -120,7 +120,11 @@ class OdeSystem:
             raise etypes.LengthError("Two time bounds were required, only {} were given.".format(len(t)))
         if not hasattr(equ_rhs, "__call__"):
             raise TypeError("equ_rhs is not callable, please pass a callable object for the right hand side.")
-        self.equ_rhs = equ_rhs
+        self.nfev = 0
+        def equ_rhs_wrapped(*args, **kwargs):
+            self.nfev += 1
+            return equ_rhs(*args, **kwargs)
+        self.equ_rhs = equ_rhs_wrapped
         self.rtol = rtol
         self.atol = atol
         self.consts = constants if constants is not None else dict()
@@ -141,7 +145,6 @@ class OdeSystem:
         self.int_status = 0
         self.success = False
         self.sol = None
-        self.nfev = 0
         self.initialise_integrator()
 
     def set_kick_vars(self, staggered_mask):
@@ -394,6 +397,7 @@ class OdeSystem:
         self.t = numpy.array([self.t[0]])
         self.sol = None
         self.dt = self.dt0
+        self.nfev = 0
 
     def integrate(self, t=None, callback=None, eta=False):
         """Integrates the system to a specified time.
@@ -443,13 +447,13 @@ class OdeSystem:
                 if abs(self.dt + self.t[counter]) > abs(tf):
                     self.dt = (tf - self.t[counter])
                 try:
-                    self.dt, (new_time, new_state, state_change), nfev_ = self.integrator(self.equ_rhs, self.t[counter], self.y[counter], self.consts, timestep=self.dt)
+                    self.dt, (new_time, new_state, state_change) = self.integrator(self.equ_rhs, self.t[counter], self.y[counter], self.consts, timestep=self.dt)
                 except etypes.RecursionError:
                     print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. ",
                           "If this fails, either use a different rtol/atol or ",
                           "increase maximum recursion depth.")
                     self.dt = 0.5 * self.dt
-                    self.dt, (new_time, new_state, state_change), nfev_ = self.integrator(self.equ_rhs, self.t[counter], self.y[counter], self.consts, timestep=self.dt)
+                    self.dt, (new_time, new_state, state_change) = self.integrator(self.equ_rhs, self.t[counter], self.y[counter], self.consts, timestep=self.dt)
                 except:
                     self.int_status = -1
                     raise
@@ -460,13 +464,12 @@ class OdeSystem:
                     self.t = numpy.append(self.t, numpy.empty((total_steps//10 + 1,), dtype=self.t.dtype), axis=0)
                 self.y[counter] = new_state # + dState
                 self.t[counter] = new_time
-                self.nfev += nfev_
                 dState    = (self.y[counter] - self.y[counter - 1])
                 dState   -= state_change
 
                 if eta:
                     tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[counter]) / self.dt)
-                    tqdm_progress_bar.desc  = f"{self.t[counter]:>10.2f} | {tf:<10.2f}"
+                    tqdm_progress_bar.desc  = f"{self.t[counter]:>10.2f} | {tf:.2f} | {self.dt:<10.2e}"
                     tqdm_progress_bar.update()
                 steps += 1
                 if callback is not None:
