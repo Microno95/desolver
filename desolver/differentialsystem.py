@@ -79,7 +79,7 @@ def rhs_prettifier(equRepr):
 
 class OdeSystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
-    def __init__(self, equ_rhs, y0=None, n=(1,), t=(0, 1), dense_output=False, dt=1.0, rtol=1e-6, atol=1e-6, constants=None):
+    def __init__(self, equ_rhs, y0, t=(0, 1), dense_output=False, dt=1.0, rtol=1e-6, atol=1e-6, constants=dict()):
         """Initialises the system to the parameters passed or to default values.
 
         Required arguments:
@@ -100,12 +100,6 @@ class OdeSystem:
         Keyword arguments:
             y0: Specifies the initial state of the system. This is set to
                 numpy.zeros(n) by default.
-            n: Specifies the dimensions of the system in the form of a tuple.
-               Can be arbitrary as long as the values are integral. Uses numpy convention so
-               a scalar is (1,), a vector is (1,3), a 2x2 matrix is (1,2,2),
-               an (M,T) tensor is (1,n_1,...,n_M,k_1,...,k_T) as expected.
-               A numpy array of shape n will be passed to the integration routines,
-               thus equ_rhs should be able to take this as input.
             t: A tuple of the form (initial time, final time) aka the integration limits.
             dense_output: Set to True or False to specify whether or not a cubic spline fit should be computed
                           for the integration.
@@ -130,10 +124,8 @@ class OdeSystem:
         self.rtol = rtol
         self.atol = atol
         self.consts = constants if constants is not None else dict()
-        self.dim = tuple(list(n))
-        self.y = numpy.array([numpy.array(y0) if y0 is not None else numpy.zeros(self.dim)])
-        if not numpy.all(self.y[0].shape == self.dim):
-            raise ValueError("initial y0 has the wrong shape, expected y0 with shape {} but got with shape {}".format(self.dim, self.y[0].shape))
+        self.y = numpy.array([y0])
+        self.dim = self.y[0].shape
         self.t = numpy.array([float(t[0])])
         self.t0 = float(t[0])
         self.t1 = float(t[1])
@@ -180,7 +172,7 @@ class OdeSystem:
                                  "or equal to the initial time!")
             self.t1 = t[0]
             if self.t1 < self.t[-1]:
-                ischemes.deutil.warning("You have set the end time to less than the current time, "
+                deutil.warning("You have set the end time to less than the current time, "
                                         "this has automatically reset the integration.")
                 self.reset()
         elif len(t) == 2:
@@ -189,11 +181,11 @@ class OdeSystem:
                                  "or equal to the initial time!")
             self.t0 = t[0]
             self.t1 = t[1]
-            ischemes.deutil.warning("You have set the start time to a different value,",
+            deutil.warning("You have set the start time to a different value,",
                                     "this has automatically reset the integration.")
             self.reset()
         elif len(t) > 2:
-            ischemes.deutil.warning("You have passed an array longer than 2 elements, "
+            deutil.warning("You have passed an array longer than 2 elements, "
                                     "the first 2 will be taken as the principle values.")
             self.set_time(t=t[:2])
         elif len(t) == 0:
@@ -295,6 +287,9 @@ class OdeSystem:
                 If method is adaptive it should have the __adaptive__ property set to True and if it is
                 symplectic it should have the __symplectic__ property set to True.
         """
+        if self.int_status == 1:
+            deutil.warning("An integration was already run, the system will be reset")
+            self.reset()
         if method in available_methods.keys():
             self.method = available_methods[method]
             if staggered_mask is None and hasattr(self.integrator, "staggered_mask"):
@@ -348,26 +343,6 @@ class OdeSystem:
         for i in constants_removal:
             if i in self.consts.keys():
                 del self.consts[i]
-
-    def set_dimensions(self, m=None):
-        """Changes the dimensions of the system.
-
-        Keyword arguments:
-        m: Takes a tuple that describes the dimensions of the system. For example, to integrate 3d vectors one would
-        pass (3,)."""
-        if m is not None:
-            if isinstance(m, float):
-                raise ValueError('The dimension of a system cannot be a float')
-            elif isinstance(m, int):
-                self.dim = (m,)
-            else:
-                if any([not isinstance(m_elem, int) for m_elem in m]):
-                    raise ValueError("The dimensions of a system cannot contain a float")
-                self.dim = tuple(m)
-            self.y[0] = numpy.resize(self.y[0], self.dim)
-            self.reset()
-
-        self.initialise_integrator()
 
     def integration_status(self):
         if self.int_status == 0:
@@ -452,47 +427,66 @@ class OdeSystem:
         time_remaining = [0, 0]
 
         etaString = ''
+        
+        total_steps = int((tf-self.t[-1])/self.dt)
 
         if eta:
-            tqdm_progress_bar = tqdm(total=(tf-self.t[-1])/self.dt)
+            tqdm_progress_bar = tqdm(total=total_steps)
 
         self.nfev = 0 if self.int_status == 1 else self.nfev
-        while self.dt != 0 and abs(self.t[-1]) < abs(tf * (1 - 4e-16)):
+        dState = numpy.zeros_like(self.y[-1])
+        counter = self.y.shape[0] - 1
+        self.y = numpy.append(self.y, numpy.empty((total_steps, *self.dim), dtype=self.y.dtype), axis=0)
+        self.t = numpy.append(self.t, numpy.empty((total_steps,), dtype=self.t.dtype), axis=0)
+        while self.dt != 0 and abs(self.t[counter]) < abs(tf * (1 - 4e-16)):
             try:
-                if abs(self.dt + self.t[-1]) > abs(tf):
-                    self.dt = (tf - self.t[-1])
+                if abs(self.dt + self.t[counter]) > abs(tf):
+                    self.dt = (tf - self.t[counter])
                 try:
-                    self.dt, (new_time, new_state), nfev_ = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
+                    self.dt, (new_time, new_state, state_change), nfev_ = self.integrator(self.equ_rhs, self.t[counter], self.y[counter], self.consts, timestep=self.dt)
                 except etypes.RecursionError:
                     print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. ",
                           "If this fails, either use a different rtol/atol or ",
                           "increase maximum recursion depth.")
                     self.dt = 0.5 * self.dt
-                    self.dt, (new_time, new_state), nfev_ = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
+                    self.dt, (new_time, new_state, state_change), nfev_ = self.integrator(self.equ_rhs, self.t[counter], self.y[counter], self.consts, timestep=self.dt)
                 except:
                     self.int_status = -1
                     raise
 
-                self.y = numpy.append(self.y, [new_state], axis=0)
-                self.t = numpy.append(self.t, [new_time],  axis=0)
+                counter += 1
+                if counter >= self.y.shape[0]:
+                    self.y = numpy.append(self.y, numpy.empty((total_steps//10 + 1, *self.dim), dtype=self.y.dtype), axis=0)
+                    self.t = numpy.append(self.t, numpy.empty((total_steps//10 + 1,), dtype=self.t.dtype), axis=0)
+                self.y[counter] = new_state # + dState
+                self.t[counter] = new_time
                 self.nfev += nfev_
+                dState    = (self.y[counter] - self.y[counter - 1])
+                dState   -= state_change
 
                 if eta:
-                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[-1]) / self.dt)
+                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[counter]) / self.dt)
+                    tqdm_progress_bar.desc  = f"{self.t[counter]:>10.2f} | {tf:<10.2f}"
                     tqdm_progress_bar.update()
                 steps += 1
                 if callback is not None:
                     callback(self)
             except KeyboardInterrupt:
                 self.int_status = -2
+                self.y = self.y[:counter+1]
+                self.t = self.t[:counter+1]
                 raise
             except:
                 self.int_state = -3
+                self.y = self.y[:counter+1]
+                self.t = self.t[:counter+1]
                 raise
         else:
             if eta:
                 tqdm_progress_bar.close()
 
+        self.y = self.y[:counter+1]
+        self.t = self.t[:counter+1]
         self.int_status = 1
         self.success = True
         if self.dense_output:

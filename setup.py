@@ -28,11 +28,16 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from setuptools import setup
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(name='DESolver',
-      version='2.1.4',
+      version='2.1.6',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
+      long_description=long_description,
+      long_description_content_type="text/markdown",
       install_requires=['numpy', 'tqdm', 'scipy>=0.18.0'],
       license='MIT',
       keywords=['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode'],

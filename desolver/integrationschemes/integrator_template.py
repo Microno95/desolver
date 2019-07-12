@@ -62,19 +62,20 @@ class ExplicitIntegrator(IntegratorTemplate):
 
             for stage in range(self.num_stages):
                 current_time  = initial_time  + self.tableau[stage, 0]*timestep
-                current_state = initial_state + deutil.contract_first_ndims(self.tableau[stage, 1:], aux)
+                current_state = initial_state + numpy.einsum("n,n...->...", self.tableau[stage, 1:], aux)
                 aux[stage] = rhs(current_time, current_state, **constants) * timestep
                 nfev += 1
 
             final_time  = initial_time  + timestep
-            final_state = initial_state + deutil.contract_first_ndims(self.final_state[0, 1:], aux)
+            dState      = numpy.einsum("n,n...->...", self.final_state[0, 1:], aux)
+            final_state = initial_state + numpy.einsum("n,n...->...", self.final_state[0, 1:], aux)
             nfev2 = 0
             if self.adaptive:
-                final_state2 = initial_state + deutil.contract_first_ndims(self.final_state[1, 1:], aux)
+                final_state2 = initial_state + numpy.einsum("n,n...->...", self.final_state[1, 1:], aux)
                 timestep, redo_step = self.update_timestep(final_state, final_state2, initial_time, timestep)
                 if redo_step:
-                    timestep, (final_time, final_state), nfev2 = self(rhs, initial_time, initial_state, constants, timestep)
-            return timestep, (final_time, final_state), nfev + nfev2
+                    timestep, (final_time, final_state, dState), nfev2 = self(rhs, initial_time, initial_state, constants, timestep)
+            return timestep, (final_time, final_state, dState), nfev + nfev2
 
     __call__ = forward
 
@@ -121,19 +122,23 @@ class SymplecticIntegrator(IntegratorTemplate):
 
             current_time = numpy.copy(initial_time)
             current_state = numpy.copy(initial_state)
+            dState = numpy.zeros_like(current_state)
 
             # print(msk, nmsk)
-
+            
             for stage in range(self.num_stages):
                 aux = self.get_aux_array(initial_state)
                 aux = rhs(current_time, current_state, **constants) * timestep
                 current_time        += timestep  * self.tableau[stage, 0]
                 current_state[nmsk] += aux[nmsk] * self.tableau[stage, 1]
                 current_state[msk]  += aux[msk]  * self.tableau[stage, 2]
+                dState[nmsk]        += aux[nmsk] * self.tableau[stage, 1]
+                dState[msk]         += aux[msk]  * self.tableau[stage, 2]
                 nfev += 1
+                
             final_time  = current_time
             final_state = current_state
-            return timestep, (final_time, final_state), nfev
+            return timestep, (final_time, final_state, dState), nfev
 
     __call__ = forward
 
