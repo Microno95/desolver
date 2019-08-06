@@ -25,7 +25,6 @@ SOFTWARE.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import numpy
-import numpy.linalg
 
 from .. import utilities as deutil
 from .integrator_template import ExplicitIntegrator, IntegratorTemplate, SymplecticIntegrator
@@ -55,12 +54,12 @@ class RK45CKSolver(ExplicitIntegrator):
          [3/10, 3/40,       9/40,    0.0,       0.0,          0.0,      0.0],
          [3/5,  3/10,       -9/10,   6/5,       0.0,          0.0,      0.0],
          [1,    -11/54,     5/2,     -70/27,    35/27,        0.0,      0.0],
-         [7/8,  1631/55296, 175/512, 575/13824, 44275/110592, 253/4096, 0.0]]
+         [7/8,  1631/55296, 175/512, 575/13824, 44275/110592, 253/4096, 0.0]], dtype=numpy.float64
     )
 
     final_state = numpy.array(
         [[0., 37/378,     0, 250/621,     125/594,     0,         512/1771],
-         [0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ]]
+         [0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ]], dtype=numpy.float64
     )
 
 @deutil.named_integrator("Explicit Midpoint",
@@ -69,11 +68,11 @@ class RK45CKSolver(ExplicitIntegrator):
 class MidpointSolver(ExplicitIntegrator):
     tableau = numpy.array(
         [[0,    0,   0],
-         [1/2,  1/2, 0]]
+         [1/2,  1/2, 0]], dtype=numpy.float64
     )
 
     final_state = numpy.array(
-        [[0,    0,   1]]
+        [[0,    0,   1]], dtype=numpy.float64
     )
 
 @deutil.named_integrator("Explicit Heun's",
@@ -82,11 +81,11 @@ class MidpointSolver(ExplicitIntegrator):
 class HeunsSolver(ExplicitIntegrator):
     tableau = numpy.array(
         [[0,    0,   0  ],
-         [1,    1,   0  ]]
+         [1,    1,   0  ]], dtype=numpy.float64
     )
 
     final_state = numpy.array(
-        [[0,    1/4, 3/4]]
+        [[0,    1/4, 3/4]], dtype=numpy.float64
     )
 
 @deutil.named_integrator("Explicit Euler",
@@ -94,11 +93,11 @@ class HeunsSolver(ExplicitIntegrator):
                        order=1.0)
 class EulerSolver(ExplicitIntegrator):
     tableau = numpy.array(
-        [[0,    0]]
+        [[0,    0]], dtype=numpy.float64
     )
 
     final_state = numpy.array(
-        [[0,    1]]
+        [[0,    1]], dtype=numpy.float64
     )
 
 @deutil.named_integrator("Explicit Euler-Trapezoidal",
@@ -109,11 +108,11 @@ class EulerTrapSolver(ExplicitIntegrator):
         [[0,   0,   0,     0,   0  ],
          [1,   1,   0,     0,   0  ],
          [1,   1/2, 1/2,   0,   0  ],
-         [1,   1/2, 0,     1/2, 0  ]]
+         [1,   1/2, 0,     1/2, 0  ]], dtype=numpy.float64
     )
 
     final_state = numpy.array(
-        [[0,   1/2, 0,    0,   1/2]]
+        [[0,   1/2, 0,    0,   1/2]], dtype=numpy.float64
     )
 
 @deutil.named_integrator("Explicit Adaptive Heun-Euler",
@@ -122,12 +121,12 @@ class EulerTrapSolver(ExplicitIntegrator):
 class HeunEulerSolver(ExplicitIntegrator):
     tableau = numpy.array(
         [[0,   0,   0],
-         [1,   1,   0]]
+         [1,   1,   0]], dtype=numpy.float64
     )
 
     final_state = numpy.array(
         [[0,    1/2, 1/2],
-         [0,    1,   0]]
+         [0,    1,   0]], dtype=numpy.float64
     )
 
 @deutil.named_integrator("Explicit Symplectic Forward Euler",
@@ -137,7 +136,7 @@ class SymplecticEulerSolver(SymplecticIntegrator):
     tableau = numpy.array(
         [[0.5, 0,   0.5],
          [0,   1.0, 0  ],
-         [0.5, 0,   0.5]]
+         [0.5, 0,   0.5]], dtype=numpy.float64
     )
 
 @deutil.named_integrator("Explicit BABS9O7H",
@@ -164,7 +163,7 @@ class BABs9o7HSolver(SymplecticIntegrator):
         [ 0.                  ,  0.10907642985488271 ,  0.                  ],
         [ 0.                  ,  0.                  ,  0.154901012702888   ],
         [ 0.                  ,  0.1289555065927298  ,  0.                  ],
-        [ 1.                  ,  0.                  ,  0.04649290043965892 ]]
+        [ 1.                  ,  0.                  ,  0.04649290043965892 ]], dtype=numpy.float64
     )
 
 @deutil.named_integrator("Explicit ABAS5O6H",

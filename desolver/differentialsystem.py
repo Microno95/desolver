@@ -35,6 +35,7 @@ from scipy.interpolate import CubicSpline
 
 from tqdm.auto import tqdm
 
+from . import backend as D
 from . import integrationschemes as ischemes
 from . import exceptiontypes as etypes
 from . import utilities as deutil
@@ -63,6 +64,7 @@ class DiffRHS:
     def __init__(self, rhs, equRepr=""):
         self.rhs = rhs
         self.equRepr = equRepr
+        
     def __call__(self, t, y, **kwargs):
         return self.rhs(t, y, **kwargs)
 
@@ -124,27 +126,29 @@ class OdeSystem:
         def equ_rhs_wrapped(*args, **kwargs):
             self.nfev += 1
             return equ_rhs(*args, **kwargs)
-        self.equ_rhs = equ_rhs_wrapped
-        self.rtol = rtol
-        self.atol = atol
-        self.consts = constants if constants is not None else dict()
-        self.y = numpy.array([y0])
-        self.dim = self.y[0].shape
-        self.t = numpy.array([float(t[0])])
-        self.t0 = float(t[0])
-        self.t1 = float(t[1])
-        self.method = available_methods["RK45CK"]
+        
+        self.equ_rhs     = DiffRHS(equ_rhs_wrapped, equ_rhs.equRepr)
+        self.rtol        = rtol
+        self.atol        = atol
+        self.consts      = constants if constants is not None else dict()
+        self.y           = D.reshape(D.copy(y0), [1, *D.shape(y0)])
+        self.dim         = D.shape(self.y[0])
+        self.t           = D.array([D.to_float(t[0])])
+        self.t0          = D.to_float(t[0])
+        self.t1          = D.to_float(t[1])
+        self.method      = available_methods["RK45CK"]
         self.integrator  = None
         if (dt < 0 < t[1] - t[0]) or (dt > 0 > t[1] - t[0]):
             self.dt = -dt
         else:
             self.dt = dt
-        self.dt0 = self.dt
+        self.dt             = D.to_float(self.dt)
+        self.dt0            = self.dt
         self.staggered_mask = None
-        self.dense_output = dense_output
-        self.int_status = 0
-        self.success = False
-        self.sol = None
+        self.dense_output   = dense_output
+        self.int_status     = 0
+        self.success        = False
+        self.sol            = None
         self.initialise_integrator()
 
     def set_kick_vars(self, staggered_mask):
@@ -173,7 +177,7 @@ class OdeSystem:
             if t[0] <= self.t0:
                 raise ValueError("The end time of the integration cannot be less than "
                                  "or equal to the initial time!")
-            self.t1 = t[0]
+            self.t1 = D.to_float(t[0])
             if self.t1 < self.t[-1]:
                 deutil.warning("You have set the end time to less than the current time, "
                                         "this has automatically reset the integration.")
@@ -182,8 +186,8 @@ class OdeSystem:
             if t[1] <= t[0]:
                 raise ValueError("The end time of the integration cannot be less than "
                                  "or equal to the initial time!")
-            self.t0 = t[0]
-            self.t1 = t[1]
+            self.t0 = D.to_float(t[0])
+            self.t1 = D.to_float(t[1])
             deutil.warning("You have set the start time to a different value,",
                                     "this has automatically reset the integration.")
             self.reset()
@@ -219,7 +223,7 @@ class OdeSystem:
         return self.t0
 
     def check_time_bounds(self):
-        if not (abs(self.t0) < abs(self.t[-1]) < abs(self.t1)):
+        if not (D.abs(self.t0) < D.abs(self.t[-1]) < D.abs(self.t1)):
             self.reset()
 
     def get_current_time(self):
@@ -267,14 +271,14 @@ class OdeSystem:
     def initialise_integrator(self):
         if self.method.__adaptive__:
             if self.staggered_mask is not None and self.method.__symplectic__:
-                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, rtol=self.rtol, atol=self.atol)
+                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, rtol=self.rtol, atol=self.atol, dtype=self.y[0].dtype)
             else:
-                self.integrator = self.method(self.dim, rtol=self.rtol, atol=self.atol)
+                self.integrator = self.method(self.dim, rtol=self.rtol, atol=self.atol, dtype= self.y[0].dtype)
         else:
             if self.staggered_mask is not None and self.method.__symplectic__:
-                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask)
+                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, dtype=self.y[0].dtype)
             else:
-                self.integrator = self.method(self.dim)
+                self.integrator = self.method(self.dim, dtype=self.y[0].dtype)
 
     def set_method(self, method, staggered_mask=None):
         """Sets the method of integration.
@@ -388,15 +392,15 @@ class OdeSystem:
                 )
             else:
                 raise etypes.FailedIntegrationError("Integration failed with message:"+self.integration_status())
-        self.sol = CubicSpline(self.t, self.y, extrapolate=True)
+        self.sol = CubicSpline(D.to_numpy(self.t), D.to_numpy(self.y), extrapolate=True)
         return self.sol
 
     def reset(self):
         """Resets the system to the initial time."""
-        self.y = numpy.array([self.y[0]])
-        self.t = numpy.array([self.t[0]])
-        self.sol = None
-        self.dt = self.dt0
+        self.y    = D.reshape(D.copy(self.y[0]), [1, *D.shape(self.y[0])])
+        self.t    = D.array([D.to_float(self.t[0])])
+        self.sol  = None
+        self.dt   = self.dt0
         self.nfev = 0
 
     def integrate(self, t=None, callback=None, eta=False):
@@ -418,15 +422,20 @@ class OdeSystem:
             tf = t
         else:
             tf = self.t1
+            
+        if D.abs(tf - self.t[-1]) < D.epsilon():
+            if self.dense_output:
+                self.compute_dense_output()
+            return
 
-        steps = 0
+        steps   = 0
         self.dt = self.dt
 
-        if numpy.sign(tf - self.t[-1]) != numpy.sign(self.dt):
-            self.dt = numpy.copysign(self.dt, tf - self.dt)
+        if D.sign(tf - self.t[-1]) != D.sign(self.dt):
+            self.dt *= -1
 
-        if abs(self.dt) > abs(tf - self.t[-1]):
-            self.dt = abs(tf - self.t[-1])*0.5
+        if D.abs(self.dt) > D.abs(tf - self.t[-1]):
+            self.dt = D.abs(tf - self.t[-1])*0.5
 
         time_remaining = [0, 0]
 
@@ -438,13 +447,13 @@ class OdeSystem:
             tqdm_progress_bar = tqdm(total=total_steps)
 
         self.nfev = 0 if self.int_status == 1 else self.nfev
-        dState = numpy.zeros_like(self.y[-1])
+        dState  = D.zeros_like(self.y[-1])
         counter = self.y.shape[0] - 1
-        self.y = numpy.append(self.y, numpy.empty((total_steps, *self.dim), dtype=self.y.dtype), axis=0)
-        self.t = numpy.append(self.t, numpy.empty((total_steps,), dtype=self.t.dtype), axis=0)
-        while self.dt != 0 and abs(self.t[counter]) < abs(tf * (1 - 4e-16)):
+        self.y  = D.append(self.y, D.empty((total_steps, *self.dim), dtype=self.y.dtype), axis=0)
+        self.t  = D.append(self.t, D.empty((total_steps,), dtype=self.t.dtype), axis=0)
+        while self.dt != 0 and D.abs(self.t[counter]) < D.abs(tf * (1 - D.epsilon())):
             try:
-                if abs(self.dt + self.t[counter]) > abs(tf):
+                if abs(self.dt + self.t[counter]) > D.abs(tf):
                     self.dt = (tf - self.t[counter])
                 try:
                     self.dt, (new_time, new_state, state_change) = self.integrator(self.equ_rhs, self.t[counter], self.y[counter], self.consts, timestep=self.dt)
@@ -457,11 +466,10 @@ class OdeSystem:
                 except:
                     self.int_status = -1
                     raise
-
                 counter += 1
                 if counter >= self.y.shape[0]:
-                    self.y = numpy.append(self.y, numpy.empty((total_steps//10 + 1, *self.dim), dtype=self.y.dtype), axis=0)
-                    self.t = numpy.append(self.t, numpy.empty((total_steps//10 + 1,), dtype=self.t.dtype), axis=0)
+                    self.y = D.append(self.y, D.empty((total_steps//10 + 1, *self.dim), dtype=self.y.dtype), axis=0)
+                    self.t = D.append(self.t, D.empty((total_steps//10 + 1,), dtype=self.t.dtype), axis=0)
                 self.y[counter] = new_state # + dState
                 self.t[counter] = new_time
                 dState    = (self.y[counter] - self.y[counter - 1])

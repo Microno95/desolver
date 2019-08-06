@@ -24,7 +24,7 @@ SOFTWARE.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import numpy
+from .. import backend as D
 import time
 import sys
 
@@ -51,14 +51,14 @@ def named_integrator(name, alt_names=tuple(), order=1.0):
         f.__alt_names__ = alt_names
         f.__order__ = order
         if hasattr(f, "final_state"):
-            f.__adaptive__ = numpy.shape(f.final_state)[0] == 2
+            f.__adaptive__ = D.shape(f.final_state)[0] == 2
         else:
             f.__adaptive__ = False
         return f
     return wrap
 
 def resize_to_correct_dims(x, eqnum, dim):
-    return numpy.resize(x, tuple([eqnum] + list(dim)))
+    return D.resize(x, tuple([eqnum] + list(dim)))
 
 def contract_first_ndims(a, b, n=1):
     # Contracts the first n-dims of two tensors.
@@ -68,7 +68,14 @@ def contract_first_ndims(a, b, n=1):
         a,b = b,a
     if n > len(a.shape):
         raise ValueError("Cannot contract along more dims than there exists!")
-    return numpy.einsum(a, [i for i in range(len(a.shape))], b, [i for i in range(n)] + [i + len(a.shape) - 1 for i in range(n, len(b.shape))], [i + len(a.shape) - 1 for i in range(n, len(b.shape))])
+    na = len(a.shape)
+    nb = len(b.shape)
+    einsum_str = "{},{}->{}"
+    estr1      = "".join([chr(97 + i) for i in range(na)])
+    estr2      = "".join([chr(97 + i) for i in range(nb)])
+    estr3      = "".join([chr(97 + i + n) for i in range(nb - n)])
+    einsum_str = einsum_str.format(estr1, estr2, estr3)
+    return D.einsum(einsum_str, a, b)
 
 class BlockTimer():
     # Class to time a block of code.
