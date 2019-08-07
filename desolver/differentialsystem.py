@@ -136,29 +136,33 @@ class OdeSystem:
         self.rtol        = rtol
         self.atol        = atol
         self.consts      = constants if constants is not None else dict()
-        self.y           = [D.copy(y0)]
+        if D.backend() == 'numpy':
+            self.y       = D.stack([D.copy(y0)])
+            self.t       = D.array([D.to_float(t[0])])
+        else:
+            self.y       = [D.copy(y0)]
+            self.t       = [D.to_float(t[0])]
         self.dim         = D.shape(self.y[0])
-        self.t           = [D.to_float(t[0])]
         self.counter     = 0
         self.t0          = D.to_float(t[0])
         self.t1          = D.to_float(t[1])
         self.method      = available_methods["RK45CK"]
         self.integrator  = None
         if (dt < 0 < t[1] - t[0]) or (dt > 0 > t[1] - t[0]):
-            self.dt = -dt
+            self.dt      = -dt
         else:
-            self.dt = dt
-        self.dt             = D.to_float(self.dt)
-        self.dt0            = self.dt
+            self.dt      = dt
+        self.dt          = D.to_float(self.dt)
+        self.dt0         = self.dt
         
         if D.backend() == 'torch':
             self.device = y0.device
-            self.y[0] = self.y[0].to(self.device)
-            self.t[0] = self.t[0].to(self.device)
-            self.t0 = self.t0.to(self.device)
-            self.t1 = self.t1.to(self.device)
-            self.dt = self.dt.to(self.device)
-            self.dt0 = self.dt0.to(self.device)
+            self.y[0]   = self.y[0].to(self.device)
+            self.t[0]   = self.t[0].to(self.device)
+            self.t0     = self.t0.to(self.device)
+            self.t1     = self.t1.to(self.device)
+            self.dt     = self.dt.to(self.device)
+            self.dt0    = self.dt0.to(self.device)
         else:
             self.device = None
             
@@ -263,6 +267,7 @@ class OdeSystem:
         self.dt = D.to_float(dt)
         if D.backend() == 'torch':
             self.dt = self.dt.to(self.device)
+        self.dt0 = self.dt
 
     def get_step_size(self):
         """Returns the step size that will be attempted for the next integration step"""
@@ -297,7 +302,7 @@ class OdeSystem:
             if self.staggered_mask is not None and self.method.__symplectic__:
                 self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, rtol=self.rtol, atol=self.atol, dtype=self.y[0].dtype, device=self.device)
             else:
-                self.integrator = self.method(self.dim, rtol=self.rtol, atol=self.atol, dtype= self.y[0].dtype, device=self.device)
+                self.integrator = self.method(self.dim, rtol=self.rtol, atol=self.atol, dtype=self.y[0].dtype, device=self.device)
         else:
             if self.staggered_mask is not None and self.method.__symplectic__:
                 self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, dtype=self.y[0].dtype, device=self.device)
@@ -416,17 +421,32 @@ class OdeSystem:
                 )
             else:
                 raise etypes.FailedIntegrationError("Integration failed with message:"+self.integration_status())
-        self.sol = CubicSpline(D.to_numpy(D.stack(self.t[:self.counter+1])), D.to_numpy(D.stack(self.y[:self.counter+1])), extrapolate=True)
+        self.__trim_soln_space()
+        if D.backend() == 'numpy':
+            self.sol = CubicSpline(D.to_numpy(self.t), D.to_numpy(self.y), extrapolate=True)
+        else:
+            self.sol = CubicSpline(D.to_numpy(D.stack(self.t)), D.to_numpy(D.stack(self.y)), extrapolate=True)
         return self.sol
 
     def reset(self):
         """Resets the system to the initial time."""
-        self.y       = [self.y[0]]
-        self.t       = [self.t[0]]
         self.counter = 0
+        self.__trim_soln_space()
         self.sol     = None
         self.dt      = self.dt0
         self.nfev    = 0
+        
+    def __allocate_soln_space(self, num_units):
+        if D.backend() == 'numpy':
+            self.y  = D.concatenate([self.y, D.zeros((num_units, *self.y.shape[1:]), dtype=self.y[0].dtype)], axis=0)
+            self.t  = D.concatenate([self.t, D.zeros((num_units, *self.t.shape[1:]), dtype=self.y[0].dtype)], axis=0)
+        else:
+            self.y  = self.y + [None for _ in range(num_units)]
+            self.t  = self.t + [None for _ in range(num_units)]
+    
+    def __trim_soln_space(self):
+        self.y = self.y[:self.counter+1]
+        self.t = self.t[:self.counter+1]
 
     def integrate(self, t=None, callback=None, eta=False):
         """Integrates the system to a specified time.
@@ -473,8 +493,7 @@ class OdeSystem:
 
         self.nfev = 0 if self.int_status == 1 else self.nfev
         dState  = D.zeros_like(self.y[-1])
-        self.y  = self.y + [None for _ in range(total_steps)]
-        self.t  = self.t + [None for _ in range(total_steps)]
+        self.__allocate_soln_space(total_steps)
         while self.dt != 0 and D.abs(self.t[self.counter]) < D.abs(tf * (1 - D.epsilon())):
             try:
                 if abs(self.dt + self.t[self.counter]) > D.abs(tf):
@@ -493,8 +512,7 @@ class OdeSystem:
                 
                 if self.counter+1 >= len(self.y):
                     total_steps = int((tf-new_time)/self.dt) + 1
-                    self.y  = self.y + [None for _ in range(total_steps)]
-                    self.t  = self.t + [None for _ in range(total_steps)]
+                    self.__allocate_soln_space(total_steps)
                 
                 self.y[self.counter+1] = new_state # + dState
                 
@@ -517,20 +535,17 @@ class OdeSystem:
                         callback(self)
             except KeyboardInterrupt:
                 self.int_status = -2
-                self.y = self.y[:self.counter+1]
-                self.t = self.t[:self.counter+1]
+                self.__trim_soln_space()
                 raise
             except:
                 self.int_state = -3
-                self.y = self.y[:self.counter+1]
-                self.t = self.t[:self.counter+1]
+                self.__trim_soln_space()
                 raise
         else:
             if eta:
                 tqdm_progress_bar.close()
 
-        self.y = self.y[:self.counter+1]
-        self.t = self.t[:self.counter+1]
+        self.__trim_soln_space()
         self.int_status = 1
         self.success = True
         if self.dense_output:

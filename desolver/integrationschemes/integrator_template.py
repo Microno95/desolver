@@ -27,7 +27,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from .. import backend as D
 from .. import utilities as deutil
 
-class IntegratorTemplate(object):
+class IntegratorTemplate:
     def __init__(self):
         raise NotImplementedError("Do not initialise this class directly!")
 
@@ -38,6 +38,16 @@ class IntegratorTemplate(object):
 
     def get_aux_array(self, current_state):
         return D.stack([D.zeros_like(current_state) for i in range(self.num_stages)])
+    
+    @classmethod
+    def __str__(cls):
+        return cls.__name__
+    
+    def __repr__(self):
+        if D.backend() == 'torch':
+            return "<{}({},{},{},{})>".format(self.__class__.__name__, self.sys_dim, self.dtype, self.rtol, self.atol)
+        else:
+            return "<{}({},{},{},{},{})>".format(self.__class__.__name__, self.sys_dim, self.dtype, self.rtol, self.atol, self.device)
 
 class ExplicitIntegrator(IntegratorTemplate):
     tableau = None
