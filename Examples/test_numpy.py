@@ -32,19 +32,19 @@ def kbinterrupt_cb(ode_sys):
 
 y_init = D.array([1., 0.])
 
-a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi - 0.01), dt=0.1, rtol=1e-5, atol=1e-8)
+a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi - 0.01), dt=0.01, rtol=1e-10, atol=1e-10)
 
 prev_val = a.get_start_time()
-a.set_start_time(prev_val + D.to_float(0.0))
+a.set_start_time(prev_val + 0.0)
 
 if a.get_start_time() - prev_val > D.epsilon():
     raise ValueError("Start time mismatch, expected {}, got {}".format(prev_val, a.get_start_time()))
 
 prev_val = a.get_end_time()
-a.set_end_time(prev_val + D.to_float(0.01))
+a.set_end_time(prev_val + 0.01)
 
-if a.get_end_time() - prev_val > D.to_float(0.01) + D.epsilon():
-    raise ValueError("End time mismatch, expected {}, got {}".format(prev_val + D.to_float(0.01), a.get_end_time()))
+if a.get_end_time() - prev_val > 0.01 + D.epsilon():
+    raise ValueError("End time mismatch, expected {}, got {}".format(prev_val + 0.01, a.get_end_time()))
 
 prev_val = a.get_step_size()
 a.set_step_size(a.get_step_size() / 10)
@@ -58,7 +58,7 @@ a.show_system()
 print("")
 
 with de.BlockTimer(section_label="Integrator Tests") as sttimer:
-    for i in sorted(de.available_methods):
+    for i in sorted(set(de.available_methods.values()), key=lambda x:x.__name__):
         print("Testing {}".format(str(i)))
         try:
             a.set_method(i)

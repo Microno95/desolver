@@ -32,7 +32,7 @@ def kbinterrupt_cb(ode_sys):
 
 y_init = D.array([1., 0.], requires_grad=True, device='cuda:0')
 
-a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi - 0.01), dt=0.1, rtol=1e-3, atol=1e-6)
+a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi - 0.01), dt=0.01, rtol=1e-10, atol=1e-10)
 
 prev_val = a.get_start_time()
 a.set_start_time(prev_val + 0.0)
@@ -58,9 +58,7 @@ a.show_system()
 print("")
 
 with de.BlockTimer(section_label="Integrator Tests") as sttimer:
-    for i in sorted(de.available_methods):
-        if de.available_methods[i].__adaptive__:
-            continue
+    for i in sorted(set(de.available_methods.values()), key=lambda x:x.__name__):
         print("Testing {}".format(str(i)))
         try:
             a.set_method(i)
@@ -79,7 +77,7 @@ with de.BlockTimer(section_label="Integrator Tests") as sttimer:
             print("{} Succeeded with max_diff from analytical solution = {}".format(str(i), max_diff))
             print()
             with de.BlockTimer(section_label="Jacobian Computation Test"):
-                print("Jacobian of the final state wrt the initial state:\n   ", D.jacobian(a.y[-1], a.y[0]))
+                print("Jacobian of the final state wrt the initial state:\n   ", D.jacobian(D.norm(a.y[-1]), a.y[0][0]))
                 print("Jacobian should be:\n   ", D.eye(2))
             a.reset()
         except:
