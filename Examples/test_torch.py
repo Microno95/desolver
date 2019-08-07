@@ -32,20 +32,19 @@ def kbinterrupt_cb(ode_sys):
 
 y_init = D.array([1., 0.], requires_grad=True, device='cuda:0')
 
-a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi - 0.01), dt=0.1, rtol=1e-5, atol=1e-8)
+a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi - 0.01), dt=0.1, rtol=1e-3, atol=1e-6)
 
 prev_val = a.get_start_time()
-a.set_start_time(prev_val + D.to_float(0.0))
+a.set_start_time(prev_val + 0.0)
 
 if a.get_start_time() - prev_val > D.epsilon():
     raise ValueError("Start time mismatch, expected {}, got {}".format(prev_val, a.get_start_time()))
 
 prev_val = a.get_end_time()
-a.set_end_time(prev_val + D.to_float(0.01))
+a.set_end_time(prev_val + 0.01)
 
-if a.get_end_time() - prev_val > D.to_float(0.01) + D.epsilon():
-    print((a.get_end_time() - prev_val) - D.to_float(0.01))
-    raise ValueError("End time mismatch, expected {}, got {}".format(prev_val + D.to_float(0.01), a.get_end_time()))
+if a.get_end_time() - prev_val > 0.01 + D.epsilon():
+    raise ValueError("End time mismatch, expected {}, got {}".format(prev_val + 0.01, a.get_end_time()))
 
 prev_val = a.get_step_size()
 a.set_step_size(a.get_step_size() / 10)
@@ -60,6 +59,8 @@ print("")
 
 with de.BlockTimer(section_label="Integrator Tests") as sttimer:
     for i in sorted(de.available_methods):
+        if de.available_methods[i].__adaptive__:
+            continue
         print("Testing {}".format(str(i)))
         try:
             a.set_method(i)
@@ -76,11 +77,10 @@ with de.BlockTimer(section_label="Integrator Tests") as sttimer:
             if a.method.__adaptive__:
                 assert(max_diff < a.atol * 10)
             print("{} Succeeded with max_diff from analytical solution = {}".format(str(i), max_diff))
-            print(a.y[0], a.y[-1])
             print()
             with de.BlockTimer(section_label="Jacobian Computation Test"):
                 print("Jacobian of the final state wrt the initial state:\n   ", D.jacobian(a.y[-1], a.y[0]))
-#                 print("Jacobian should be the identity
+                print("Jacobian should be:\n   ", D.eye(2))
             a.reset()
         except:
             raise RuntimeError("Test failed for integration method: {}".format(i))

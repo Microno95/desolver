@@ -149,17 +149,19 @@ class OdeSystem:
         else:
             self.dt = dt
         self.dt             = D.to_float(self.dt)
+        self.dt0            = self.dt
         
         if D.backend() == 'torch':
             self.device = y0.device
-            self.y[0].to(self.device)
-            self.t[0].to(self.device)
-            self.t0.to(self.device)
-            self.t1.to(self.device)
-            self.dt.to(self.device)
+            self.y[0] = self.y[0].to(self.device)
+            self.t[0] = self.t[0].to(self.device)
+            self.t0 = self.t0.to(self.device)
+            self.t1 = self.t1.to(self.device)
+            self.dt = self.dt.to(self.device)
+            self.dt0 = self.dt0.to(self.device)
         else:
             self.device = None
-        self.dt0            = self.dt
+            
         self.staggered_mask = None
         self.dense_output   = dense_output
         self.int_status     = 0
@@ -217,8 +219,8 @@ class OdeSystem:
             raise ValueError("You have not passed an array, this does not make sense.")
             
         if D.backend() == 'torch':
-            self.t0.to(self.device)
-            self.t1.to(self.device)
+            self.t0 = self.t0.to(self.device)
+            self.t1 = self.t1.to(self.device)
 
     def set_end_time(self, t):
         """Changes the final time for the integration of the ODE system
@@ -258,7 +260,9 @@ class OdeSystem:
             a value slightly less than the highest frequency of oscillation. If unsure, use an adaptive method in the
             list of available methods (view by calling availmethods()) followed by setmethod(), and finally call
             setrelerr() with the keyword argument auto_calc_dt set to True for an approximately good step size."""
-        self.dt = dt
+        self.dt = D.to_float(dt)
+        if D.backend() == 'torch':
+            self.dt = self.dt.to(self.device)
 
     def get_step_size(self):
         """Returns the step size that will be attempted for the next integration step"""
@@ -469,8 +473,8 @@ class OdeSystem:
 
         self.nfev = 0 if self.int_status == 1 else self.nfev
         dState  = D.zeros_like(self.y[-1])
-        self.y  = self.y + [D.zeros_like(self.y[0]) for _ in range(total_steps)]
-        self.t  = self.t + [D.zeros_like(self.t[0]) for _ in range(total_steps)]
+        self.y  = self.y + [None for _ in range(total_steps)]
+        self.t  = self.t + [None for _ in range(total_steps)]
         while self.dt != 0 and D.abs(self.t[self.counter]) < D.abs(tf * (1 - D.epsilon())):
             try:
                 if abs(self.dt + self.t[self.counter]) > D.abs(tf):
@@ -489,10 +493,10 @@ class OdeSystem:
                 
                 if self.counter+1 >= len(self.y):
                     total_steps = int((tf-new_time)/self.dt) + 1
-                    self.y  = self.y + [D.zeros_like(self.y[0]) for _ in range(total_steps)]
-                    self.t  = self.t + [D.zeros_like(self.t[0]) for _ in range(total_steps)]
+                    self.y  = self.y + [None for _ in range(total_steps)]
+                    self.t  = self.t + [None for _ in range(total_steps)]
                 
-                self.y[self.counter+1][:] = new_state # + dState
+                self.y[self.counter+1] = new_state # + dState
                 
                 self.t[self.counter+1] = new_time
                 

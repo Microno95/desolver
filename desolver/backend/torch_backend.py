@@ -151,9 +151,15 @@ def logspace(start, end, num=100, out=None, dtype=None):
 @type_reg
 def eye(N, M=None, out=None, dtype=None):
     if out is None:
-        return torch.eye(N, m=M, dtype=dtype)
+        if M is None:
+            return torch.eye(N, dtype=dtype)
+        else:
+            return torch.eye(N, m=M, dtype=dtype)
     else:
-        out.data = torch.eye(N, m=M, dtype=dtype)
+        if M is None:
+            out.data = torch.eye(N, dtype=dtype)
+        else:
+            out.data = torch.eye(N, m=M, dtype=dtype)        
     return out
 
 # Reduction Ops
@@ -216,7 +222,7 @@ def asarray(x):
     return x
 
 def to_numpy(x):
-    return x.detach().cpu().numpy()
+    return x.clone().detach().cpu().numpy()
 
 def as_bool_array(x):
     return x.to(bool)

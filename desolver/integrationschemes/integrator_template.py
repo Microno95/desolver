@@ -62,7 +62,7 @@ class ExplicitIntegrator(IntegratorTemplate):
             self.aux         = self.aux.to(device)
             self.tableau     = self.tableau.to(device)
             self.final_state = self.final_state.to(device)
-    
+            
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
         if self.tableau is None:
             raise NotImplementedError("In order to use the fixed step integrator, subclass this class and populate the butcher tableau")
@@ -72,7 +72,7 @@ class ExplicitIntegrator(IntegratorTemplate):
             for stage in range(self.num_stages):
                 current_state = initial_state + D.einsum("n,n...->...", self.tableau[stage, 1:], aux)
                 aux[stage] = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
-
+                
             final_time  = initial_time  + timestep
             dState      = D.einsum("n,n...->...", self.final_state[0, 1:], aux)
             final_state = initial_state + dState
@@ -82,6 +82,7 @@ class ExplicitIntegrator(IntegratorTemplate):
                 timestep, redo_step = self.update_timestep(final_state, final_state2, initial_time, timestep)
                 if redo_step:
                     timestep, (final_time, final_state, dState) = self(rhs, initial_time, initial_state, constants, timestep)
+            
             
             return timestep, (final_time, final_state, dState)
 

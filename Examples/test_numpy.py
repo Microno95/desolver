@@ -2,7 +2,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-os.environ['DES_BACKEND'] = 'numpy'
+os.environ['DES_BACKEND']          = 'numpy'
+
+
 
 import desolver as de
 import desolver.backend as D
@@ -42,7 +44,7 @@ prev_val = a.get_end_time()
 a.set_end_time(prev_val + D.to_float(0.01))
 
 if a.get_end_time() - prev_val > D.to_float(0.01) + D.epsilon():
-    raise ValueError("End time mismatch, expected {}, got {}".format(prev_val, a.get_end_time() + D.to_float(0.01)))
+    raise ValueError("End time mismatch, expected {}, got {}".format(prev_val + D.to_float(0.01), a.get_end_time()))
 
 prev_val = a.get_step_size()
 a.set_step_size(a.get_step_size() / 10)
@@ -73,7 +75,6 @@ with de.BlockTimer(section_label="Integrator Tests") as sttimer:
             if a.method.__adaptive__:
                 assert(max_diff < a.atol * 10)
             print("{} Succeeded with max_diff from analytical solution = {}".format(str(i), max_diff))
-            print(a.y[0], a.y[-1])
             print()
             a.reset()
         except:
