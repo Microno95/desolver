@@ -44,7 +44,7 @@ class ExplicitIntegrator(IntegratorTemplate):
     final_state = None
     __symplectic__ = False
 
-    def __init__(self, sys_dim, dtype=None, rtol=None, atol=None):
+    def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
         if dtype is None:
             self.tableau     = D.array(self.tableau)
             self.final_state = D.array(self.final_state)
@@ -58,6 +58,10 @@ class ExplicitIntegrator(IntegratorTemplate):
         self.adaptive   = D.shape(self.final_state)[0] == 2
         self.num_stages = D.shape(self.tableau)[0]
         self.aux        = D.zeros((self.num_stages, *self.dim))
+        if D.backend() == 'torch':
+            self.aux         = self.aux.to(device)
+            self.tableau     = self.tableau.to(device)
+            self.final_state = self.final_state.to(device)
     
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
         if self.tableau is None:
@@ -67,7 +71,7 @@ class ExplicitIntegrator(IntegratorTemplate):
 
             for stage in range(self.num_stages):
                 current_state = initial_state + D.einsum("n,n...->...", self.tableau[stage, 1:], aux)
-                aux[stage] = rhs(initial_time  + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
+                aux[stage] = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
 
             final_time  = initial_time  + timestep
             dState      = D.einsum("n,n...->...", self.final_state[0, 1:], aux)
@@ -78,7 +82,7 @@ class ExplicitIntegrator(IntegratorTemplate):
                 timestep, redo_step = self.update_timestep(final_state, final_state2, initial_time, timestep)
                 if redo_step:
                     timestep, (final_time, final_state, dState) = self(rhs, initial_time, initial_state, constants, timestep)
-            aux[:]      = 0.0
+            
             return timestep, (final_time, final_state, dState)
 
     __call__ = forward
@@ -99,7 +103,7 @@ class SymplecticIntegrator(IntegratorTemplate):
     tableau = None
     __symplectic__ = True
 
-    def __init__(self, sys_dim, dtype=None, staggered_mask=None, rtol=None, atol=None):
+    def __init__(self, sys_dim, dtype=None, staggered_mask=None, rtol=None, atol=None, device=None):
         if staggered_mask is None:
             staggered_mask      = D.arange(sys_dim[0]//2, sys_dim[0], dtype=D.int64)
             self.staggered_mask = D.zeros(sys_dim, dtype=D.bool)
@@ -117,6 +121,8 @@ class SymplecticIntegrator(IntegratorTemplate):
         self.atol       = atol
         self.adaptive   = False
         self.num_stages = D.shape(self.tableau)[0]
+        if D.backend() == 'torch':
+            self.tableau     = self.tableau.to(device)
 
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
         if self.tableau is None:

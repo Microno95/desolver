@@ -79,6 +79,11 @@ def rhs_prettifier(equRepr):
         return DiffRHS(rhs, equRepr)
     return rhs_wrapper
 
+class OdeState:
+    def __init__(self, t, y):
+        self.t = t
+        self.y = y
+
 class OdeSystem:
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
     def __init__(self, equ_rhs, y0, t=(0, 1), dense_output=False, dt=1.0, rtol=1e-6, atol=1e-6, constants=dict()):
@@ -131,9 +136,10 @@ class OdeSystem:
         self.rtol        = rtol
         self.atol        = atol
         self.consts      = constants if constants is not None else dict()
-        self.y           = D.reshape(D.copy(y0), [1, *D.shape(y0)])
+        self.y           = [D.copy(y0)]
         self.dim         = D.shape(self.y[0])
-        self.t           = D.array([D.to_float(t[0])])
+        self.t           = [D.to_float(t[0])]
+        self.counter     = 0
         self.t0          = D.to_float(t[0])
         self.t1          = D.to_float(t[1])
         self.method      = available_methods["RK45CK"]
@@ -143,6 +149,16 @@ class OdeSystem:
         else:
             self.dt = dt
         self.dt             = D.to_float(self.dt)
+        
+        if D.backend() == 'torch':
+            self.device = y0.device
+            self.y[0].to(self.device)
+            self.t[0].to(self.device)
+            self.t0.to(self.device)
+            self.t1.to(self.device)
+            self.dt.to(self.device)
+        else:
+            self.device = None
         self.dt0            = self.dt
         self.staggered_mask = None
         self.dense_output   = dense_output
@@ -199,6 +215,10 @@ class OdeSystem:
             raise ValueError("You have passed an array that is empty, this does not make sense.")
         else:
             raise ValueError("You have not passed an array, this does not make sense.")
+            
+        if D.backend() == 'torch':
+            self.t0.to(self.device)
+            self.t1.to(self.device)
 
     def set_end_time(self, t):
         """Changes the final time for the integration of the ODE system
@@ -228,7 +248,7 @@ class OdeSystem:
 
     def get_current_time(self):
         """Returns the current time of the ODE system"""
-        return self.t[-1]
+        return self.t[self.counter]
 
     def set_step_size(self, dt):
         """Sets the step size that will be used for the integration.
@@ -271,14 +291,14 @@ class OdeSystem:
     def initialise_integrator(self):
         if self.method.__adaptive__:
             if self.staggered_mask is not None and self.method.__symplectic__:
-                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, rtol=self.rtol, atol=self.atol, dtype=self.y[0].dtype)
+                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, rtol=self.rtol, atol=self.atol, dtype=self.y[0].dtype, device=self.device)
             else:
-                self.integrator = self.method(self.dim, rtol=self.rtol, atol=self.atol, dtype= self.y[0].dtype)
+                self.integrator = self.method(self.dim, rtol=self.rtol, atol=self.atol, dtype= self.y[0].dtype, device=self.device)
         else:
             if self.staggered_mask is not None and self.method.__symplectic__:
-                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, dtype=self.y[0].dtype)
+                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, dtype=self.y[0].dtype, device=self.device)
             else:
-                self.integrator = self.method(self.dim, dtype=self.y[0].dtype)
+                self.integrator = self.method(self.dim, dtype=self.y[0].dtype, device=self.device)
 
     def set_method(self, method, staggered_mask=None):
         """Sets the method of integration.
@@ -326,8 +346,8 @@ class OdeSystem:
         """Prints the equations, initial conditions, final states, time limits and defined constants in the system."""
         print_str = "y({t0}) = {init_val}\ndy = {equation}\ny({t}) = {cur_val}\n"
         print(print_str.format(init_val=self.y[0], t0=self.t0,
-                               equation=str(self.equ_rhs), t=self.t[-1],
-                               cur_val=self.y[-1]))
+                               equation=str(self.equ_rhs), t=self.t[:self.counter+1][-1],
+                               cur_val=self.y[:self.counter+1][-1]))
         if self.consts:
             print("The constants that have been defined for this system are: ")
             print(self.consts)
@@ -392,16 +412,17 @@ class OdeSystem:
                 )
             else:
                 raise etypes.FailedIntegrationError("Integration failed with message:"+self.integration_status())
-        self.sol = CubicSpline(D.to_numpy(self.t), D.to_numpy(self.y), extrapolate=True)
+        self.sol = CubicSpline(D.to_numpy(D.stack(self.t[:self.counter+1])), D.to_numpy(D.stack(self.y[:self.counter+1])), extrapolate=True)
         return self.sol
 
     def reset(self):
         """Resets the system to the initial time."""
-        self.y    = D.reshape(D.copy(self.y[0]), [1, *D.shape(self.y[0])])
-        self.t    = D.array([D.to_float(self.t[0])])
-        self.sol  = None
-        self.dt   = self.dt0
-        self.nfev = 0
+        self.y       = [self.y[0]]
+        self.t       = [self.t[0]]
+        self.counter = 0
+        self.sol     = None
+        self.dt      = self.dt0
+        self.nfev    = 0
 
     def integrate(self, t=None, callback=None, eta=False):
         """Integrates the system to a specified time.
@@ -442,62 +463,70 @@ class OdeSystem:
         etaString = ''
         
         total_steps = int((tf-self.t[-1])/self.dt)
-
+        
         if eta:
             tqdm_progress_bar = tqdm(total=total_steps)
 
         self.nfev = 0 if self.int_status == 1 else self.nfev
         dState  = D.zeros_like(self.y[-1])
-        counter = self.y.shape[0] - 1
-        self.y  = D.append(self.y, D.empty((total_steps, *self.dim), dtype=self.y.dtype), axis=0)
-        self.t  = D.append(self.t, D.empty((total_steps,), dtype=self.t.dtype), axis=0)
-        while self.dt != 0 and D.abs(self.t[counter]) < D.abs(tf * (1 - D.epsilon())):
+        self.y  = self.y + [D.zeros_like(self.y[0]) for _ in range(total_steps)]
+        self.t  = self.t + [D.zeros_like(self.t[0]) for _ in range(total_steps)]
+        while self.dt != 0 and D.abs(self.t[self.counter]) < D.abs(tf * (1 - D.epsilon())):
             try:
-                if abs(self.dt + self.t[counter]) > D.abs(tf):
-                    self.dt = (tf - self.t[counter])
+                if abs(self.dt + self.t[self.counter]) > D.abs(tf):
+                    self.dt = (tf - self.t[self.counter])
                 try:
-                    self.dt, (new_time, new_state, state_change) = self.integrator(self.equ_rhs, self.t[counter], self.y[counter], self.consts, timestep=self.dt)
+                    self.dt, (new_time, new_state, state_change) = self.integrator(self.equ_rhs, self.t[self.counter], self.y[self.counter], self.consts, timestep=self.dt)
                 except etypes.RecursionError:
                     print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. ",
                           "If this fails, either use a different rtol/atol or ",
-                          "increase maximum recursion depth.")
+                          "increase maximum recursion depth.", file=sys.stderr)
                     self.dt = 0.5 * self.dt
-                    self.dt, (new_time, new_state, state_change) = self.integrator(self.equ_rhs, self.t[counter], self.y[counter], self.consts, timestep=self.dt)
+                    self.dt, (new_time, new_state, state_change) = self.integrator(self.equ_rhs, self.t[self.counter], self.y[self.counter], self.consts, timestep=self.dt)
                 except:
                     self.int_status = -1
                     raise
-                counter += 1
-                if counter >= self.y.shape[0]:
-                    self.y = D.append(self.y, D.empty((total_steps//10 + 1, *self.dim), dtype=self.y.dtype), axis=0)
-                    self.t = D.append(self.t, D.empty((total_steps//10 + 1,), dtype=self.t.dtype), axis=0)
-                self.y[counter] = new_state # + dState
-                self.t[counter] = new_time
-                dState    = (self.y[counter] - self.y[counter - 1])
+                
+                if self.counter+1 >= len(self.y):
+                    total_steps = int((tf-new_time)/self.dt) + 1
+                    self.y  = self.y + [D.zeros_like(self.y[0]) for _ in range(total_steps)]
+                    self.t  = self.t + [D.zeros_like(self.t[0]) for _ in range(total_steps)]
+                
+                self.y[self.counter+1][:] = new_state # + dState
+                
+                self.t[self.counter+1] = new_time
+                
+                self.counter += 1
+                dState    = (self.y[self.counter] - self.y[self.counter - 1])
                 dState   -= state_change
-
+                
                 if eta:
-                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[counter]) / self.dt)
-                    tqdm_progress_bar.desc  = f"{self.t[counter]:>10.2f} | {tf:.2f} | {self.dt:<10.2e}"
+                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[self.counter]) / self.dt)
+                    tqdm_progress_bar.desc  = f"{self.t[self.counter]:>10.2f} | {tf:.2f} | {self.dt:<10.2e}"
                     tqdm_progress_bar.update()
                 steps += 1
                 if callback is not None:
-                    callback(self)
+                    if isinstance(callback, (list, tuple)):
+                        for i in callback:
+                            i(self)
+                    else:
+                        callback(self)
             except KeyboardInterrupt:
                 self.int_status = -2
-                self.y = self.y[:counter+1]
-                self.t = self.t[:counter+1]
+                self.y = self.y[:self.counter+1]
+                self.t = self.t[:self.counter+1]
                 raise
             except:
                 self.int_state = -3
-                self.y = self.y[:counter+1]
-                self.t = self.t[:counter+1]
+                self.y = self.y[:self.counter+1]
+                self.t = self.t[:self.counter+1]
                 raise
         else:
             if eta:
                 tqdm_progress_bar.close()
 
-        self.y = self.y[:counter+1]
-        self.t = self.t[:counter+1]
+        self.y = self.y[:self.counter+1]
+        self.t = self.t[:self.counter+1]
         self.int_status = 1
         self.success = True
         if self.dense_output:
@@ -508,6 +537,16 @@ class OdeSystem:
             """{:>10}: {:<128}""".format("message", self.integration_status()),
             """{:>10}: {:<128}""".format("nfev", str(self.nfev)),
             """{:>10}: {:<128}""".format("sol", str(self.sol)),
-            """{:>10}: {:<128}""".format("t", str(self.t)),
-            """{:>10}: {:<128}""".format("y", str(self.y)),
+            """{:>10}: {:<128}""".format("t", str(self.t[:self.counter+1])),
+            """{:>10}: {:<128}""".format("y", str(self.y[:self.counter+1])),
         ])
+    
+    def __getitem__(self, index):
+        if isinstance(index, int):
+            return OdeState(self.t[:self.counter+1][index], self.y[:self.counter+1][index])
+        elif isinstance(index, float):
+            if self.dense_output and self.sol is not None:
+                return OdeState(index, self.sol[index])
+            else:
+                nearest_idx = deutil.search_bisection(self.t[:self.counter+1], index)
+                return OdeState(self.t[nearest_idx], self.y[nearest_idx])

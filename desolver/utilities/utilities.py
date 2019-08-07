@@ -77,6 +77,24 @@ def contract_first_ndims(a, b, n=1):
     einsum_str = einsum_str.format(estr1, estr2, estr3)
     return D.einsum(einsum_str, a, b)
 
+def search_bisection(array, value):
+    jlower = 0
+    jupper = len(array) - 1
+    
+    if value <= array[jlower]:
+        return jlower
+    elif value >= array[jupper]:
+        return jupper
+    
+    while (jupper - jlower) > 1:
+        jmid = (jupper + jlower) >> 2
+        if (value >= array[jmid]):
+            jlower = jmid
+        else:
+            jupper = jmid
+            
+        return jlower
+
 class BlockTimer():
     # Class to time a block of code.
     #

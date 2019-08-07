@@ -56,11 +56,11 @@ def epsilon():
     """
     
     if _FLOAT_FORMAT == 'float16':
-        return 1e-3
+        return 5e-3
     elif _FLOAT_FORMAT == 'float32':
-        return 1e-7
+        return 5e-7
     elif _FLOAT_FORMAT == 'float64':
-        return 4e-16
+        return 5e-16
 
 def float_fmt():
     """Returns float format as a string

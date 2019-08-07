@@ -12,11 +12,6 @@ int16   = torch.int16
 int32   = torch.int32
 int64   = torch.int64
 
-def asarray(x):
-    if not torch.is_tensor(x):
-        return array(x)
-    return x
-
 def to_float(x):
     if not torch.is_tensor(x):
         return torch.tensor(x, dtype=torch.get_default_dtype())
@@ -215,8 +210,13 @@ ones_like  = type_reg(torch.ones_like)
 empty_like = type_reg(torch.empty_like)
 full_like  = type_reg(torch.full_like)
 
+def asarray(x):
+    if not torch.is_tensor(x):
+        return array(x)
+    return x
+
 def to_numpy(x):
-    return x.detach().numpy()
+    return x.detach().cpu().numpy()
 
 def as_bool_array(x):
     return x.to(bool)
@@ -266,41 +266,100 @@ def logical_xor(a, b, out=None, where=None):
         out[where] = a[where] ^ b[where]
     return out
 
-def jacobian(inputs, outputs, batch_mode=False, nu=1, create_graph=True):
-    # Computes the jacobian matrix of a given pytorch function/module
-    # wrt the inputs.
-    # Can be slow for higher order derivatives due to the recursion and
-    # the exponential increase in the number of parameters.
-    # (Could be optimized via taking advantage of symmetries in the resulting
-    # tensors.)
-    if batch_mode:
-        outputs_view = outputs.view(outputs.shape[0], -1)
-        temp = sum(
-            torch.autograd.grad(
-                outputs_view[:, j], 
-                inputs,
-                grad_outputs=torch.ones_like(outputs_view[:, j]),
+def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True):
+    """Computes the derivative of an output tensor wrt an input tensor.
+
+    Computes the full nu-th order derivative for the output tensor wrt an input tensor. 
+    For nu = 1, this is the Jacobian, for nu = 2, this is the Hessian, etc.
+    The computation scales with the number of output values, ie. out_tensor.numel(), thus it will
+    become quite slow for very large tensors.
+    
+    The batched computation assumes that the first dimension is the batch dimension and computes the 
+    derivative for all the batch elements. The batches are computed in parallel thus for reasonable batch
+    sizes the computation should scale as out_tensor.numel() / out_tensor.shape[0].
+
+    Parameters
+    ----------
+    out_tensor : torch.tensor
+        The function whose derivative is to be computed
+    in_tensor  : torch.tensor
+        The input wrt which the derivative is to be computed
+    batch_mode : bool
+        Determines if the first dimension is to be treated as a batch dimension or not
+    nu : int
+        Order of the derivative to be computed
+    create_graph : bool
+        To keep the computational graph after the jacobian is computed. This is useful if you intend to
+        compute further derivatives on the derivative, e.g. for gradient descent.
+
+    Returns
+    -------
+    torch.tensor
+        The derivative tensor of out_tensor wrt in_tensor
+
+    Raises
+    ------
+    ValueError
+        If nu < 0 as that is not a valid derivative order.
+
+    See Also
+    --------
+    torch.autograd.grad : The base function through which gradients are computed
+
+    Examples
+    --------
+    ```python
+    >>> b   = torch.tensor( [0.0, 1.0], dtype=torch.float64, requires_grad=True)
+    >>> mat = torch.tensor([[0.0, 1.0], [-5.0, 0.0]], dtype=torch.float64, requires_grad=True)
+    >>> k   = mat@b
+    >>> jacobian(k, b, nu=1)
+    tensor([[ 0.,  1.],
+            [-5.,  0.]], dtype=torch.float64)
+    >>> jacobian(k, mat, nu=1)
+    tensor([[[0., 1.],
+             [0., 0.]],
+
+            [[0., 0.],
+             [0., 1.]]], dtype=torch.float64, grad_fn=<AsStridedBackward>)
+    ```
+    """
+    if nu < 0:
+        raise ValueError("nu cannot be less than zero! That's not a derivative...")
+    if nu == 0:
+        return out_tensor
+    if out_tensor.requires_grad == False:
+        if batch_mode:
+            temp = torch.zeros(out_tensor.shape + in_tensor.shape[1:], dtype=in_tensor.dtype, device=in_tensor.device, requires_grad=False)
+        else:
+            temp = torch.zeros(out_tensor.shape + in_tensor.shape, dtype=in_tensor.dtype, device=in_tensor.device, requires_grad=False)
+    else:
+        if batch_mode:
+            outputs_view = out_tensor.view(out_tensor.shape[0], -1)
+            batch_one    = torch.ones_like(outputs_view[:, 0])
+            temp = [
+                torch.autograd.grad(
+                    outputs_view[:, j], 
+                    in_tensor,
+                    grad_outputs=batch_one,
+                    allow_unused=True,
+                    retain_graph=True,
+                    create_graph=create_graph if nu==1 else True
+                )[0] for j in range(outputs_view.shape[1])]
+            final_shape = out_tensor.shape + in_tensor.shape[1:]
+        else:
+            outputs_view = out_tensor.view(-1)
+            temp = [torch.autograd.grad(
+                outputs_view[i], 
+                in_tensor,
                 allow_unused=True,
                 retain_graph=True,
-                create_graph=create_graph if nu==1 else True
-            )[0] for j in range(outputs_view.shape[1]))
-        temp = torch.reshape(temp, outputs.shape + inputs.shape[1:])
-    else:
-        outputs_view = outputs.view(-1)
-        temp = [torch.autograd.grad(
-            outputs_view[i], 
-            inputs,
-            allow_unused=True,
-            retain_graph=True,
-            create_graph=create_graph if nu==1 else True,
-        )[0] for i in range(outputs_view.shape[0])]
+                create_graph=create_graph if nu==1 else True,
+            )[0] for i in range(outputs_view.shape[0])]
+            final_shape = out_tensor.shape + in_tensor.shape
         temp = torch.stack([
-            i if i is not None else torch.zeros_like(inputs) for i in temp
+            i if i is not None else torch.zeros_like(in_tensor) for i in temp
         ])
-        if temp[0] is None:
-            temp = torch.reshape(torch.stack([torch.zeros_like(inputs) for _ in outputs.numel()]), outputs.shape + inputs.shape)
-        else:
-            temp = torch.reshape(temp, outputs.shape + inputs.shape)
+        temp = temp.view(final_shape)
     if nu > 1:
-        temp = jacobian(inputs, temp, create_graph=create_graph, nu=nu-1, batch_mode=batch_mode)
+        temp = jacobian(temp, in_tensor, create_graph=create_graph, nu=nu-1, batch_mode=batch_mode)
     return temp
