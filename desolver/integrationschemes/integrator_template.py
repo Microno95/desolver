@@ -36,8 +36,17 @@ class IntegratorTemplate:
 
     __call__ = forward
 
-    def get_aux_array(self, current_state):
-        return D.stack([D.zeros_like(current_state) for i in range(self.num_stages)])
+    def update_timestep(self, final_state1, final_state2, initial_time, timestep, tol=0.9):
+        err_estimate = D.max(D.abs(final_state1 - final_state2))
+        relerr = self.atol + self.rtol * err_estimate
+        if err_estimate != 0:
+            corr = timestep * tol * (relerr / err_estimate) ** (1.0 / self.num_stages)
+            if corr != 0:
+                timestep = corr
+        if err_estimate > relerr:
+            return timestep, True
+        else:
+            return timestep, False
     
     @classmethod
     def __str__(cls):
@@ -98,18 +107,6 @@ class ExplicitIntegrator(IntegratorTemplate):
 
     __call__ = forward
 
-    def update_timestep(self, final_state1, final_state2, initial_time, timestep, tol=0.9):
-        err_estimate = D.max(D.abs(final_state1 - final_state2))
-        relerr = self.atol + self.rtol * err_estimate
-        if err_estimate != 0:
-            corr = timestep * tol * (relerr / err_estimate) ** (1.0 / self.num_stages)
-            if corr != 0:
-                timestep = corr
-        if err_estimate > relerr:
-            return timestep, True
-        else:
-            return timestep, False
-
 class SymplecticIntegrator(IntegratorTemplate):
     tableau = None
     __symplectic__ = True
@@ -158,15 +155,3 @@ class SymplecticIntegrator(IntegratorTemplate):
             return timestep, (final_time, final_state, dState)
 
     __call__ = forward
-
-    def update_timestep(self, final_state1, final_state2, initial_time, timestep, tol=0.9):
-        err_estimate = D.abs(D.abs(final_state1 - final_state2))
-        relerr = self.atol + self.rtol * err_estimate
-        if err_estimate != 0:
-            corr = timestep * tol * (relerr / err_estimate) ** (1.0 / self.num_stages)
-            if corr != 0:
-                timestep = corr
-        if err_estimate > relerr:
-            return timestep, True
-        else:
-            return timestep, False

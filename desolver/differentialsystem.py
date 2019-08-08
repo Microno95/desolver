@@ -127,7 +127,7 @@ class OdeSystem:
             consts: Arbitrary set of keyword arguments that define the constants to be used in the system."""
 
         if len(t) != 2:
-            raise etypes.LengthError("Two time bounds were required, only {} were given.".format(len(t)))
+            raise etypes.LengthError("Two time bounds are required, only {} were given.".format(len(t)))
         if not hasattr(equ_rhs, "__call__"):
             raise TypeError("equ_rhs is not callable, please pass a callable object for the right hand side.")
         self.nfev = 0
@@ -214,49 +214,17 @@ class OdeSystem:
         Does nothing if integrator is not symplectic.
         """
         self.staggered_mask = staggered_mask
-
-    def set_time(self, t=[]):
-        """Alternate interface for changing current, beginning and end times.
-
-        Keyword arguments:
-        t:  -- A length of 1 denotes changes to end time.
-            -- A length of 2 denotes changes to beginning and end times in that order.
-            -- A length larger than 2 will behave the same as above and ignore values beyond the 2nd index."""
-        if len(t) == 1:
-            if t[0] <= self.t0:
-                raise ValueError("The end time of the integration cannot be less than "
-                                 "or equal to the initial time!")
-            self.t1 = D.to_float(t[0])
-            if self.t1 < self.t[-1]:
-                deutil.warning("You have set the end time to less than the current time, "
-                                        "this has automatically reset the integration.")
-                self.reset()
-        elif len(t) == 2:
-            if t[1] <= t[0]:
-                raise ValueError("The end time of the integration cannot be less than "
-                                 "or equal to the initial time!")
-            self.t0 = D.to_float(t[0])
-            self.t1 = D.to_float(t[1])
-            deutil.warning("You have set the start time to a different value,",
-                                    "this has automatically reset the integration.")
-            self.reset()
-        elif len(t) > 2:
-            deutil.warning("You have passed an array longer than 2 elements, "
-                                    "the first 2 will be taken as the principle values.")
-            self.set_time(t=t[:2])
-        elif len(t) == 0:
-            raise ValueError("You have passed an array that is empty, this does not make sense.")
-        else:
-            raise ValueError("You have not passed an array, this does not make sense.")
-            
-        self.__move_to_device()
         
     def set_end_time(self, t):
         """Changes the final time for the integration of the ODE system
 
         Required arguments:
         t: Denotes the final time."""
-        self.set_time([self.t0, t])
+        if t <= self.t0:
+            raise ValueError("The end time of the integration cannot be less than "
+                             "or equal to the initial time!")
+        self.t1 = D.to_float(t)
+        self.__move_to_device()
 
     def get_end_time(self):
         """Returns the final time of the ODE system."""
@@ -267,7 +235,11 @@ class OdeSystem:
 
         Required arguments:
         t: Denotes the initial time."""
-        self.set_time([t, self.t1])
+        if self.t1 <= t:
+            raise ValueError("The start time of the integration cannot be greater "
+                             "than or equal to the end time!")
+        self.t0 = D.to_float(t)
+        self.__move_to_device()
 
     def get_start_time(self):
         """Returns the initial time of the ODE system."""
@@ -334,6 +306,11 @@ class OdeSystem:
             else:
                 self.integrator = self.method(self.dim, dtype=self.y[0].dtype, device=self.device)
 
+    def __get_integrator_mask(self, staggered_mask):
+        if staggered_mask is None and hasattr(self.integrator, "staggered_mask"):
+            return self.integrator.staggered_mask
+        return staggered_mask
+    
     def set_method(self, method, staggered_mask=None):
         """Sets the method of integration.
 
@@ -348,23 +325,16 @@ class OdeSystem:
                 If method is adaptive it should have the __adaptive__ property set to True and if it is
                 symplectic it should have the __symplectic__ property set to True.
         """
+        self.staggered_mask = self.__get_integrator_mask(staggered_mask)
         if self.int_status == 1:
             deutil.warning("An integration was already run, the system will be reset")
             self.reset()
         if method in available_methods.keys():
             self.method = available_methods[method]
-            if staggered_mask is None and hasattr(self.integrator, "staggered_mask"):
-                staggered_mask = self.integrator.staggered_mask
-            self.staggered_mask = staggered_mask
-            self.integrator = None
         elif issubclass(method, ischemes.IntegratorTemplate):
             if method not in map(lambda x:x[1], available_methods.items()):
                 deutil.warning("This is not a method implemented as part of the DESolver package. Cannot guarantee results.")
             self.method = method
-            if staggered_mask is None and hasattr(self.integrator, "staggered_mask"):
-                staggered_mask = self.integrator.staggered_mask
-            self.staggered_mask = staggered_mask
-            self.integrator = None
         else:
             raise ValueError("The method you selected does not exist in the list of available methods, \
                               call desolver.available_methods() to see what these are")
@@ -436,7 +406,7 @@ class OdeSystem:
            incomplete.
         """
         if self.int_status == 0:
-            raise etypes.ValueError("Cannot compute dense output for non-existent integration.")
+            raise ValueError("Cannot compute dense output for non-existent integration.")
         elif self.int_status != 1:
             if self.int_status == -2:
                 deutil.warning(
