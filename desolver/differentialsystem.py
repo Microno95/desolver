@@ -61,15 +61,18 @@ def init_module():
         pass
 
 class DiffRHS:
-    def __init__(self, rhs, equRepr=""):
-        self.rhs = rhs
+    def __init__(self, rhs, equRepr=None):
+        self.rhs     = rhs
         self.equRepr = equRepr
         
     def __call__(self, t, y, **kwargs):
         return self.rhs(t, y, **kwargs)
 
     def __str__(self):
-        return self.equRepr
+        if self.equRepr is not None:
+            return self.equRepr
+        else:
+            return str(self.rhs)
 
     def __repr__(self):
         return "<DiffRHS({},{})>".format(repr(self.rhs), self.equRepr)
@@ -128,11 +131,17 @@ class OdeSystem:
         if not hasattr(equ_rhs, "__call__"):
             raise TypeError("equ_rhs is not callable, please pass a callable object for the right hand side.")
         self.nfev = 0
+        
         def equ_rhs_wrapped(*args, **kwargs):
             self.nfev += 1
             return equ_rhs(*args, **kwargs)
         
-        self.equ_rhs     = DiffRHS(equ_rhs_wrapped, equ_rhs.equRepr)
+        try:
+            self.equ_rhs     = DiffRHS(equ_rhs_wrapped, equ_rhs.equRepr)
+        except AttributeError:
+            self.equ_rhs     = DiffRHS(equ_rhs_wrapped)
+        except:
+            raise
         self.rtol        = rtol
         self.atol        = atol
         self.consts      = constants if constants is not None else dict()
@@ -569,3 +578,6 @@ class OdeSystem:
             else:
                 nearest_idx = deutil.search_bisection(self.t[:self.counter+1], index)
                 return OdeState(self.t[nearest_idx], self.y[nearest_idx])
+            
+    def __len__(self):
+        return self.counter + 1
