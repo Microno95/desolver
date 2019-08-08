@@ -61,6 +61,12 @@ def epsilon():
         return 5e-7
     elif _FLOAT_FORMAT == 'float64':
         return 5e-16
+    
+def available_float_fmt():
+    if _BACKEND == 'numpy':
+        return ['float16', 'float32', 'float64']
+    else:
+        return ['float32', 'float64']
 
 def float_fmt():
     """Returns float format as a string
@@ -116,11 +122,11 @@ def set_float_fmt(new_fmt):
     global _FLOAT_FORMAT
     
     if _BACKEND == 'numpy':
-        if new_fmt not in {'float16', 'float32', 'float64'}:
+        if new_fmt not in available_float_fmt():
             raise ValueError("Unknown float type " + str(new_fmt) + " for backend " + str(_BACKEND))
     elif _BACKEND == 'torch':
         import torch
-        if new_fmt not in {'float32', 'float64'}:
+        if new_fmt not in available_float_fmt():
             raise ValueError("Unknown float type " + str(new_fmt) + " for backend " + str(_BACKEND))
         elif new_fmt == 'float32':
             torch.set_default_dtype(torch.float32)

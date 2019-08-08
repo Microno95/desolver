@@ -91,10 +91,11 @@ def addcdiv(x, value=1, y1=None, y2=None, out=None):
         raise ValueError("y1 and y2 must both be specified")
     if out is None:
         out = value * div(y1, y2)
+        out = x + out
     else:
         div(y1, y2, out=out)
         mul(value, out, out=out)
-    add(x, out, out=out)
+        add(x, out, out=out)
     return out
 
 def addcmul(x, value=1, y1=None, y2=None, out=None):
@@ -102,10 +103,11 @@ def addcmul(x, value=1, y1=None, y2=None, out=None):
         raise ValueError("y1 and y2 must both be specified")
     if out is None:
         out = value * mul(y1, y2)
+        out = x + out
     else:
         mul(y1, y2, out=out)
         mul(value, out, out=out)
-    add(x, out, out=out)
+        add(x, out, out=out)
     return out
 
 def frac(x, out=None):
