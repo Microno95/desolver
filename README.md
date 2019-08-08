@@ -61,6 +61,6 @@ a.integrate()
 
 print(a)
 
-print("If the integration was successful and correct, a.y[0] and a.y[-1] should be near identical.")
-print(a.y[0], a.y[-1])
+print("If the integration was successful and correct, a[0].y and a[-1].y should be near identical.")
+print(a[0].y, a[-1].y)
 ```
