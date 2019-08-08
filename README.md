@@ -1,8 +1,14 @@
 # DESolver
+[![BCH compliance](https://bettercodehub.com/edge/badge/Microno95/desolver?branch=master)](https://bettercodehub.com/)
+
 This is a python package for solving Initial Value Problems using various numerical integrators.
 Many integration routines are included ranging from fixed step to symplectic to adaptive integrators.
 
 Implicit integrators are intended for release 3.0, but that's far off for now.
+
+# Latest Release
+**2.2.0** - PyTorch backend is now implemented. It is now possible to numerically integrate a system of equations that use pytorch tensors and then compute gradients from these.
+**Requires installation of PyTorch from [here](https://pytorch.org/get-started/locally/). Torch backend will not work without pytorch!**
 
 # To Install:
 Just type
@@ -22,7 +28,8 @@ Just type
 3. Euler's Method
 4. Euler-Trapezoidal Method
 5. BABs9o7H Method  -- Based on arXiv:1501.04345v2 - BAB's9o7H
-5. ABAs5o6HA Method -- Based on arXiv:1501.04345v2 - ABAs5o6H
+6. ABAs5o6HA Method -- Based on arXiv:1501.04345v2 - ABAs5o6H
+7. Runge-Kutta 5 - The 5th order integrator from RK45. Very accurate with fixed step size.
 #### Implicit Methods
 **NOT YET IMPLEMENTED**
 
@@ -33,6 +40,7 @@ This example shows the integration of a harmonic oscillator using DESolver.
 
 ``` python
 import desolver as de
+import desolver.backend as D
 
 @de.rhs_prettifier("""[vx, x]""")
 def rhs(t, state, **kwargs):
@@ -41,11 +49,11 @@ def rhs(t, state, **kwargs):
     dx  = vx
     dvx = -x
 
-    return de.numpy.array([dx, dvx])
+    return D.array([dx, dvx])
 
-y_init = de.numpy.array([1., 0.])
+y_init = D.array([1., 0.])
 
-a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*de.numpy.pi), dt=0.01, rtol=1e-6, atol=1e-9)
+a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi), dt=0.01, rtol=1e-6, atol=1e-9)
 
 a.show_system()
 
