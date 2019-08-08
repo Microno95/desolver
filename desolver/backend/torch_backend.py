@@ -222,6 +222,8 @@ def asarray(x):
     return x
 
 def to_numpy(x):
+    if isinstance(x, (list, tuple)):
+        return stack(x).detach().cpu().numpy()
     return x.clone().detach().cpu().numpy()
 
 def as_bool_array(x):

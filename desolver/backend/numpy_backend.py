@@ -21,7 +21,7 @@ def to_float(x):
     return float(x)
 
 def to_type(x, dtype):
-    return numpy.asarray(x).astype(dtype)
+    return numpy.asanyarray(x).astype(dtype)
 
 # Convenience Decorators
 def type_reg(f):
@@ -194,10 +194,10 @@ def copy(x):
     return numpy.copy(x)
 
 def reshape(x, new_dims):
-    return x.reshape(new_dims)
+    return numpy.reshape(asarray(x), new_dims)
 
 def shape(x):
-    return x.shape
+    return numpy.shape(x)
 
 def logical_not(x, out=None, where=True):
     return numpy.logical_not(x, out=out, where=where)

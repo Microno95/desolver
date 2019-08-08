@@ -33,7 +33,7 @@ def kbinterrupt_cb(ode_sys):
     if ode_sys[-1].t > D.pi:
         raise KeyboardInterrupt("Test Interruption and Catching")
 
-y_init = D.array([1., 0.], requires_grad=True, device=device)
+y_init = D.array([1., 0.], device=device)
 
 a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi - 0.01), dt=0.01, rtol=5e-6, atol=5e-6)
 
@@ -63,27 +63,25 @@ print("")
 with de.BlockTimer(section_label="Integrator Tests") as sttimer:
     for i in sorted(set(de.available_methods.values()), key=lambda x:x.__name__):
         try:
-            a.set_method(i)
-            print("Testing {}".format(a.integrator))
-            try:
-                a.integrate(callback=kbinterrupt_cb, eta=True)
-            except KeyboardInterrupt as e:
-                print("")
-                print(e)
-                print(a.integration_status())
-                print("")
-            a.integrate(eta=True)
+            with D.torch.no_grad():
+                a.set_method(i)
+                print("Testing {}".format(a.integrator))
+                try:
+                    a.integrate(callback=kbinterrupt_cb, eta=True)
+                except KeyboardInterrupt as e:
+                    print("")
+                    print(e)
+                    print(a.integration_status())
+                    print("")
+                a.integrate(eta=True)
 
-            max_diff = D.max(D.abs(analytic_soln(a.t[-1], a.y[0])-a.y[-1]))
-            if a.method.__adaptive__ and max_diff >= a.atol * 10 + D.epsilon():
-                print("{} Failed with max_diff from analytical solution = {}".format(a.integrator, max_diff))
-                raise RuntimeError("Failed to meet tolerances for adaptive integrator {}".format(str(i)))
-            else:
-                print("{} Succeeded with max_diff from analytical solution = {}".format(a.integrator, max_diff))
-            with de.BlockTimer(section_label="Jacobian Computation Test"):
-                print("Jacobian of the final state wrt the initial state:\n   ", D.jacobian(a.y[-1], a.y[0]))
-                print("Jacobian should be:\n   ", D.eye(2))
-            a.reset()
+                max_diff = D.max(D.abs(analytic_soln(a.t[-1], a.y[0])-a.y[-1]))
+                if a.method.__adaptive__ and max_diff >= a.atol * 10 + D.epsilon():
+                    print("{} Failed with max_diff from analytical solution = {}".format(a.integrator, max_diff))
+                    raise RuntimeError("Failed to meet tolerances for adaptive integrator {}".format(str(i)))
+                else:
+                    print("{} Succeeded with max_diff from analytical solution = {}".format(a.integrator, max_diff))
+                a.reset()
         except:
             raise RuntimeError("Test failed for integration method: {}".format(a.integrator))
     print("")
