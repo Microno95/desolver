@@ -10,16 +10,38 @@ def test_backend(backend):
         import numpy as np
         import scipy
         
+        assert(D.backend() == backend)
+        
         if backend not in ['torch']:
             # Default datatype test
             for i in D.available_float_fmt():
                 D.set_float_fmt(i)
                 assert(D.array(1.0).dtype  == np.dtype(D.float_fmt()))
 
+        expected_eps = {'float16': 5e-3, 'float32': 5e-7, 'float64': 5e-16}
+        test_array   = np.array([1], dtype=np.int64)
         # Test Function Evals
         for i in D.available_float_fmt():
             D.set_float_fmt(i)
+            assert(D.float_fmt() == str(i))
+            assert(D.epsilon() == expected_eps[str(i)])
+            assert(isinstance(D.available_float_fmt(), list))
+            assert(D.cast_to_float_fmt(test_array).dtype == np.dtype(str(i)))
+            
+            arr1 = D.array([[2.0, 1.0],[1.0, 0.0]])
+            arr2 = D.array([[1.0, 1.0],[-1.0, 1.0]])
+            
+            arr3 = D.contract_first_ndims(arr1, arr2, 1)
+            arr4 = D.contract_first_ndims(arr1, arr2, 2)
+            
+            true_arr3 = D.array([1.0, 1.0])
+            true_arr4 = D.array(2.)
+            
+            assert(D.norm(arr3 - true_arr3) <= 2 * D.epsilon())
+            assert(D.norm(arr4 - true_arr4) <= 2 * D.epsilon())
+            
             de.deutil.warning("Testing float format {}".format(D.float_fmt()))
+            
             pi = D.to_float(D.pi)
             
             assert(np.pi - 2*D.epsilon()          <= pi                        <= np.pi + 2*D.epsilon())
