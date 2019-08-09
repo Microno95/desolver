@@ -12,7 +12,8 @@ Implicit integrators are intended for release 3.0, but that's far off for now.
 
 # To Install:
 Just type
-	pip install DESolver
+
+`pip install desolver`
 
 ## Implemented Integration Methods
 ### Adaptive Methods
