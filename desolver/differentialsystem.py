@@ -354,18 +354,6 @@ class OdeSystem:
         print("dy = {}".format(str(self.equ_rhs)))
         return str(self.equ_rhs)
 
-    def show_system(self):
-        """Prints the equations, initial conditions, final states, time limits and defined constants in the system."""
-        print_str = "y({t0}) = {init_val}\ndy = {equation}\ny({t}) = {cur_val}\n"
-        print(print_str.format(init_val=self.y[0], t0=self.t0,
-                               equation=str(self.equ_rhs), t=self.t[:self.counter+1][-1],
-                               cur_val=self.y[:self.counter+1][-1]))
-        if self.consts:
-            print("The constants that have been defined for this system are: ")
-            print(self.consts)
-        print("The time limits for this system are:\n "
-              "t0 = {}, t1 = {}, t_current = {}, step_size = {}".format(self.t0, self.t1, self.t[-1], self.dt))
-
     def add_constants(self, **additional_constants):
         """Takes an arbitrary list of keyword arguments to add to the list of available constants.
 
@@ -373,14 +361,16 @@ class OdeSystem:
         additional_constants: A dict containing constants and their corresponding values."""
         self.consts.update(additional_constants)
 
-    def remove_constants(self, **constants_removal):
+    def remove_constants(self, *constants_removal):
         """Takes an arbitrary list of keyword arguments to remove from the list of available constants.
 
         Variable-length arguments:
         additional_constants: A tuple or list containing the names of the constants to remove.
                               The names must be denoted by strings."""
         for i in constants_removal:
-            if i in self.consts.keys():
+            if isinstance(i, (list, tuple, dict)):
+                self.constants_removal(*list(i))
+            elif i in self.consts.keys():
                 del self.consts[i]
 
     def integration_status(self):
@@ -546,6 +536,23 @@ class OdeSystem:
             """{:>10}: {:<128}""".format("t", str(self.t)),
             """{:>10}: {:<128}""".format("y", str(self.y)),
         ])
+
+    def __str__(self):
+        """Prints the equations, initial conditions, final states, time limits and defined constants in the system."""
+        print_str = "y({t0}) = {init_val}\ndy = {equation}\ny({t}) = {cur_val}\n"
+        print_str = print_str.format(init_val=self.y[0], 
+                                     t0=self.t0,
+                                     equation=str(self.equ_rhs), 
+                                     t=self.t[-1],
+                                     cur_val=self.y[-1])
+        if self.consts:
+            print_str += "\nThe constants that have been defined for this system are: "
+            print_str += "\n" + str(self.consts)
+        
+        print_str += "The time limits for this system are:\n"
+        print_str += "t0 = {}, t1 = {}, t_current = {}, step_size = {}".format(self.t0, self.t1, self.t[-1], self.dt)
+        
+        return print_str
     
     def __getitem__(self, index):
         if isinstance(index, int):

@@ -24,6 +24,8 @@ SOFTWARE.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import numpy
+
 _BACKEND      = 'numpy'
 _FLOAT_FORMAT = 'float64'
 
@@ -194,4 +196,4 @@ def cast_to_float_fmt(x):
     ```
     """
     
-    return np.asarray(x, dtype=_FLOAT_FORMAT)
+    return numpy.asarray(x, dtype=_FLOAT_FORMAT)

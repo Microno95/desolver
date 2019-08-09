@@ -57,26 +57,6 @@ def named_integrator(name, alt_names=tuple(), order=1.0):
         return f
     return wrap
 
-def resize_to_correct_dims(x, eqnum, dim):
-    return D.resize(x, tuple([eqnum] + list(dim)))
-
-def contract_first_ndims(a, b, n=1):
-    # Contracts the first n-dims of two tensors.
-    # Useful interface to einsum when the inner dimensions may vary
-    # depending on the arguments to the function.
-    if len(a.shape) > len(b.shape):
-        a,b = b,a
-    if n > len(a.shape):
-        raise ValueError("Cannot contract along more dims than there exists!")
-    na = len(a.shape)
-    nb = len(b.shape)
-    einsum_str = "{},{}->{}"
-    estr1      = "".join([chr(97 + i) for i in range(na)])
-    estr2      = "".join([chr(97 + i) for i in range(nb)])
-    estr3      = "".join([chr(97 + i + n) for i in range(nb - n)])
-    einsum_str = einsum_str.format(estr1, estr2, estr3)
-    return D.einsum(einsum_str, a, b)
-
 def search_bisection(array, value):
     jlower = 0
     jupper = len(array) - 1
@@ -87,13 +67,13 @@ def search_bisection(array, value):
         return jupper
     
     while (jupper - jlower) > 1:
-        jmid = (jupper + jlower) >> 2
+        jmid = (jupper + jlower) // 2
         if (value >= array[jmid]):
             jlower = jmid
         else:
             jupper = jmid
             
-        return jlower
+    return jlower
 
 class BlockTimer():
     # Class to time a block of code.
@@ -106,6 +86,7 @@ class BlockTimer():
     #
     def __init__(self, section_label=None, start_now=True, suppress_print=False):
         self.start_now = start_now
+        self.stopped   = not start_now
         self.start_time = None
         self.end_time = None
         self.label = section_label
@@ -117,6 +98,8 @@ class BlockTimer():
         return self
 
     def __exit__(self, type, value, traceback):
+        if not self.stopped:
+            self.end()
         if not self.suppress_print:
             if self.start_time is None and not self.start_now:
                 print("Timer was never started, cannot give run-time of code.")
@@ -135,6 +118,7 @@ class BlockTimer():
 
     def end(self):
         self.end_time = time.perf_counter()
+        self.stopped  = True
         return self
 
     def elapsed(self):
@@ -142,7 +126,9 @@ class BlockTimer():
             return time.perf_counter() - self.start_time
         else:
             return self.end_time - self.start_time
+        
     def restart_timer(self):
         if self.stopped:
             self.stopped = False
-        self.start = time.perf_counter()
+        self.start_time = time.perf_counter()
+        self.end_time   = None
