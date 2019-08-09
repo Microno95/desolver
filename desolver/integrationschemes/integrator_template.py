@@ -54,9 +54,9 @@ class IntegratorTemplate:
     
     def __repr__(self):
         if D.backend() == 'torch':
-            return "<{}({},{},{},{})>".format(self.__class__.__name__, self.sys_dim, self.dtype, self.rtol, self.atol)
+            return "<{}({},{},{},{})>".format(self.__class__.__name__, self.dim, self.dtype, self.rtol, self.atol)
         else:
-            return "<{}({},{},{},{},{})>".format(self.__class__.__name__, self.sys_dim, self.dtype, self.rtol, self.atol, self.device)
+            return "<{}({},{},{},{},{})>".format(self.__class__.__name__, self.dim, self.dtype, self.rtol, self.atol, self.device)
 
 class ExplicitIntegrator(IntegratorTemplate):
     tableau = None
@@ -129,15 +129,19 @@ class SymplecticIntegrator(IntegratorTemplate):
         self.atol       = atol
         self.adaptive   = False
         self.num_stages = D.shape(self.tableau)[0]
+        self.msk  = self.staggered_mask
+        self.nmsk = D.logical_not(self.staggered_mask)
         if D.backend() == 'torch':
             self.tableau     = self.tableau.to(device)
+            self.msk  = self.msk.to(self.tableau)
+            self.nmsk = self.nmsk.to(self.tableau)
 
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
         if self.tableau is None:
             raise NotImplementedError("In order to use the fixed step integrator, subclass this class and populate the butcher tableau")
         else:
-            msk  = self.staggered_mask
-            nmsk = D.logical_not(self.staggered_mask)
+            msk  = self.msk
+            nmsk = self.nmsk
 
             current_time  = D.copy(initial_time)
             current_state = D.copy(initial_state)
@@ -145,9 +149,9 @@ class SymplecticIntegrator(IntegratorTemplate):
 
             for stage in range(self.num_stages):
                 aux            = rhs(current_time, initial_state + dState, **constants) * timestep
-                current_time  += timestep  * self.tableau[stage, 0]
-                dState[nmsk]  += aux[nmsk] * self.tableau[stage, 1]
-                dState[msk]   += aux[msk]  * self.tableau[stage, 2]
+                current_time   = current_time + timestep  * self.tableau[stage, 0]
+                
+                dState += aux * self.tableau[stage, 1] * msk+ aux * self.tableau[stage, 2] * nmsk
                 
             final_time  = current_time
             final_state = initial_state + dState

@@ -27,7 +27,7 @@ from .common import *
 import torch
 
 # Datatypes
-bool    = torch.uint8
+bool    = torch.bool
 float16 = torch.float16
 float32 = torch.float32
 float64 = torch.float64
