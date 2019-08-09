@@ -190,11 +190,16 @@ class OdeSystem:
         
     def __allocate_soln_space(self, num_units):
         if D.backend() == 'numpy':
-            self.y  = D.concatenate([self.y, D.zeros((num_units, *D.shape(self.y[0])), dtype=self.y[0].dtype)], axis=0)
-            self.t  = D.concatenate([self.t, D.zeros((num_units, *D.shape(self.t[0])), dtype=self.y[0].dtype)], axis=0)
+            if num_units == 0:
+                self.y = D.stack(self.y)
+                self.t = D.stack(self.t)
+            else:
+                self.y  = D.concatenate([self.y, D.zeros((num_units, *D.shape(self.y[0])), dtype=self.y[0].dtype)], axis=0)
+                self.t  = D.concatenate([self.t, D.zeros((num_units, *D.shape(self.t[0])), dtype=self.y[0].dtype)], axis=0)
         else:
-            self.y  = self.y + [None for _ in range(num_units)]
-            self.t  = self.t + [None for _ in range(num_units)]
+            if num_units != 0:
+                self.y  = self.y + [None for _ in range(num_units)]
+                self.t  = self.t + [None for _ in range(num_units)]
     
     def __trim_soln_space(self):
         self.y = self.y[:self.counter+1]
@@ -449,29 +454,29 @@ class OdeSystem:
         else:
             tf = self.t1
             
-        if D.abs(tf - self.t[-1]) < D.epsilon():
+        if D.abs(tf - self.t[self.counter]) < D.epsilon():
             if self.dense_output:
                 self.compute_dense_output()
             return
 
         steps   = 0
         
-        self.__fix_dt_dir(tf, self.t[-1])
+        self.__fix_dt_dir(tf, self.t[self.counter])
 
-        if D.abs(self.dt) > D.abs(tf - self.t[-1]):
-            self.dt = D.abs(tf - self.t[-1])*0.5
+        if D.abs(self.dt) > D.abs(tf - self.t[self.counter]):
+            self.dt = D.abs(tf - self.t[self.counter])*0.5
 
         time_remaining = [0, 0]
 
         etaString = ''
         
-        total_steps = int((tf-self.t[-1])/self.dt)
+        total_steps = int((tf-self.t[self.counter])/self.dt)
         
         if eta:
             tqdm_progress_bar = tqdm(total=total_steps)
 
         self.nfev = 0 if self.int_status == 1 else self.nfev
-        dState  = D.zeros_like(self.y[-1])
+        dState  = D.zeros_like(self.y[self.counter])
         self.__allocate_soln_space(total_steps)
         while self.dt != 0 and D.abs(self.t[self.counter]) < D.abs(tf * (1 - D.epsilon())):
             try:
