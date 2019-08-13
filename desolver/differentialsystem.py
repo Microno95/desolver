@@ -494,14 +494,19 @@ class OdeSystem:
                     total_steps = int((tf-self._t[self.counter]-dTime)/self.dt) + 1
                     self.__allocate_soln_space(total_steps)
                 
-                dState = dState - cState
-                dTime  = dTime  - cTime
+                #
+                # Compensated Summation based on 
+                # https://reference.wolfram.com/language/tutorial/NDSolveSPRK.html
+                #
+                
+                dState = dState + cState
+                dTime  = dTime  + cTime
                 
                 self._y[self.counter+1] = self._y[self.counter] + dState
                 self._t[self.counter+1] = self._t[self.counter] + dTime 
                 
-                cState = (self._y[self.counter+1] - self._y[self.counter]) - dState
-                cTime  = (self._t[self.counter+1] - self._t[self.counter]) - dTime
+                cState = (self._y[self.counter] - self._y[self.counter+1]) + dState
+                cTime  = (self._t[self.counter] - self._t[self.counter+1]) + dTime
                 
                 self.counter += 1
                 
