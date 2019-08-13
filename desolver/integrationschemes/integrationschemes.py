@@ -62,8 +62,8 @@ class RK45CKSolver(ExplicitIntegrator):
     )
     
 @named_integrator("Explicit RK5",
-                       alt_names=("RK5", "Runge-Kutta 5", "RK5"),
-                       order=5.0)
+                   alt_names=("RK5", "Runge-Kutta 5", "RK5"),
+                   order=5.0)
 class RK5Solver(ExplicitIntegrator):
     # The 5th order integrator from RK45 Cash-Karp
     tableau = numpy.copy(RK45CKSolver.tableau)

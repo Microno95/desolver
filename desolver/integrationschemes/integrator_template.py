@@ -100,8 +100,8 @@ class ExplicitIntegrator(IntegratorTemplate):
             aux = self.aux
 
             for stage in range(self.num_stages):
-                current_state = initial_state + D.einsum("n,n...->...", self.tableau[stage, 1:], aux)
-                aux[stage] = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
+                current_state = initial_state    + D.einsum("n,n...->...", self.tableau[stage, 1:], aux)
+                aux[stage]    = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
                 
             dState = D.einsum("n,n...->...", self.final_state[0, 1:], aux)
             dTime  = timestep
