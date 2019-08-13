@@ -26,24 +26,23 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy
 
-from .. import utilities as deutil
-from .integrator_template import ExplicitIntegrator, IntegratorTemplate, SymplecticIntegrator
+from .integrator_template import named_integrator, ExplicitIntegrator, IntegratorTemplate, SymplecticIntegrator
 #
-# @deutil.named_integrator("Explicit Runge-Kutta 4",
+# @named_integrator("Explicit Runge-Kutta 4",
 #                        alt_names=("Runge-Kutta 4", "RK4",),
 #                        order=4.0)
 # class RK4Solver(ExplicitIntegrator):
 #     def __init__(self):
 #         raise NotImplementedError("This method has not yet been implemented!")
 #
-# @deutil.named_integrator("Explicit Gill's",
+# @named_integrator("Explicit Gill's",
 #                        alt_names=("Gill's",),
 #                        order=5.0)
 # class GillsSolver(ExplicitIntegrator):
 #     def __init__(self):
 #         raise NotImplementedError("This method has not yet been implemented!")
 
-@deutil.named_integrator("Explicit RK45CK",
+@named_integrator("Explicit RK45CK",
                        alt_names=("RK45CK", "Runge-Kutta-Cash-Karp", "RK45"),
                        order=4.0)
 class RK45CKSolver(ExplicitIntegrator):
@@ -62,7 +61,7 @@ class RK45CKSolver(ExplicitIntegrator):
          [0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ]], dtype=numpy.float64
     )
     
-@deutil.named_integrator("Explicit RK5",
+@named_integrator("Explicit RK5",
                        alt_names=("RK5", "Runge-Kutta 5", "RK5"),
                        order=5.0)
 class RK5Solver(ExplicitIntegrator):
@@ -73,7 +72,7 @@ class RK5Solver(ExplicitIntegrator):
         [[0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ]], dtype=numpy.float64
     )
 
-@deutil.named_integrator("Explicit Midpoint",
+@named_integrator("Explicit Midpoint",
                        alt_names=("Midpoint",),
                        order=2.0)
 class MidpointSolver(ExplicitIntegrator):
@@ -86,7 +85,7 @@ class MidpointSolver(ExplicitIntegrator):
         [[0,    0,   1]], dtype=numpy.float64
     )
 
-@deutil.named_integrator("Explicit Heun's",
+@named_integrator("Explicit Heun's",
                        alt_names=("Heun's",),
                        order=2.0)
 class HeunsSolver(ExplicitIntegrator):
@@ -99,7 +98,7 @@ class HeunsSolver(ExplicitIntegrator):
         [[0,    1/4, 3/4]], dtype=numpy.float64
     )
 
-@deutil.named_integrator("Explicit Euler",
+@named_integrator("Explicit Euler",
                        alt_names=("Forward Euler", "Euler"),
                        order=1.0)
 class EulerSolver(ExplicitIntegrator):
@@ -111,7 +110,7 @@ class EulerSolver(ExplicitIntegrator):
         [[0,    1]], dtype=numpy.float64
     )
 
-@deutil.named_integrator("Explicit Euler-Trapezoidal",
+@named_integrator("Explicit Euler-Trapezoidal",
                        alt_names=("Euler-Trapezoidal", "Euler-Trap", "Predictor-Corrector Euler"),
                        order=3.0)
 class EulerTrapSolver(ExplicitIntegrator):
@@ -126,7 +125,7 @@ class EulerTrapSolver(ExplicitIntegrator):
         [[0,   1/2, 0,    0,   1/2]], dtype=numpy.float64
     )
 
-@deutil.named_integrator("Explicit Adaptive Heun-Euler",
+@named_integrator("Explicit Adaptive Heun-Euler",
                        alt_names=("Adaptive Heun-Euler", "AHE"),
                        order=1.0)
 class HeunEulerSolver(ExplicitIntegrator):
@@ -140,7 +139,7 @@ class HeunEulerSolver(ExplicitIntegrator):
          [0,    1,   0]], dtype=numpy.float64
     )
 
-@deutil.named_integrator("Explicit Symplectic Forward Euler",
+@named_integrator("Explicit Symplectic Forward Euler",
                        alt_names=("Symplectic Euler",),
                        order=1.0)
 class SymplecticEulerSolver(SymplecticIntegrator):
@@ -150,7 +149,7 @@ class SymplecticEulerSolver(SymplecticIntegrator):
          [0.5, 0,   0.5]], dtype=numpy.float64
     )
 
-@deutil.named_integrator("Explicit BABS9O7H",
+@named_integrator("Explicit BABS9O7H",
                        alt_names=("BABS9O7H", "BABs9o7H"),
                        order=7.0)
 class BABs9o7HSolver(SymplecticIntegrator):
@@ -177,7 +176,7 @@ class BABs9o7HSolver(SymplecticIntegrator):
         [ 1.                  ,  0.                  ,  0.04649290043965892 ]], dtype=numpy.float64
     )
 
-@deutil.named_integrator("Explicit ABAS5O6H",
+@named_integrator("Explicit ABAS5O6H",
                        alt_names=("ABAS5O6H", "ABAs5o6H"),
                        order=6.0)
 class ABAs5o6HSolver(SymplecticIntegrator):

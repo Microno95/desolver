@@ -25,7 +25,18 @@ SOFTWARE.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from .. import backend as D
-from .. import utilities as deutil
+
+def named_integrator(name, alt_names=tuple(), order=1.0):
+    def wrap(f):
+        f.__name__ = str(name)
+        f.__alt_names__ = alt_names
+        f.__order__ = order
+        if hasattr(f, "final_state"):
+            f.__adaptive__ = D.shape(f.final_state)[0] == 2
+        else:
+            f.__adaptive__ = False
+        return f
+    return wrap
 
 class IntegratorTemplate:
     def __init__(self):
@@ -36,8 +47,8 @@ class IntegratorTemplate:
 
     __call__ = forward
 
-    def update_timestep(self, final_state1, final_state2, initial_time, timestep, tol=0.9):
-        err_estimate = D.max(D.abs(final_state1 - final_state2))
+    def update_timestep(self, diff, initial_time, timestep, tol=0.9):
+        err_estimate = D.max(D.abs(diff))
         relerr = self.atol + self.rtol * err_estimate
         if err_estimate != 0:
             corr = timestep * tol * (relerr / err_estimate) ** (1.0 / self.num_stages)
@@ -92,18 +103,16 @@ class ExplicitIntegrator(IntegratorTemplate):
                 current_state = initial_state + D.einsum("n,n...->...", self.tableau[stage, 1:], aux)
                 aux[stage] = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
                 
-            final_time  = initial_time  + timestep
-            dState      = D.einsum("n,n...->...", self.final_state[0, 1:], aux)
-            final_state = initial_state + dState
+            dState = D.einsum("n,n...->...", self.final_state[0, 1:], aux)
+            dTime  = timestep
             
             if self.adaptive:
-                final_state2 = initial_state + D.einsum("n,n...->...", self.final_state[1, 1:], aux)
-                timestep, redo_step = self.update_timestep(final_state, final_state2, initial_time, timestep)
+                diff = dState - D.einsum("n,n...->...", self.final_state[1, 1:], aux)
+                timestep, redo_step = self.update_timestep(diff, initial_time, timestep)
                 if redo_step:
-                    timestep, (final_time, final_state, dState) = self(rhs, initial_time, initial_state, constants, timestep)
+                    timestep, (dTime, dState) = self(rhs, initial_time, initial_state, constants, timestep)
             
-            
-            return timestep, (final_time, final_state, dState)
+            return timestep, (dTime, dState)
 
     __call__ = forward
 
@@ -148,14 +157,12 @@ class SymplecticIntegrator(IntegratorTemplate):
             dState        = D.zeros_like(current_state)
 
             for stage in range(self.num_stages):
-                aux            = rhs(current_time, initial_state + dState, **constants) * timestep
-                current_time   = current_time + timestep  * self.tableau[stage, 0]
+                aux          = rhs(current_time, initial_state + dState, **constants) * timestep
+                current_time = current_time + timestep * self.tableau[stage, 0]
+                dState      += aux * self.tableau[stage, 1] * msk + aux * self.tableau[stage, 2] * nmsk
                 
-                dState += aux * self.tableau[stage, 1] * msk+ aux * self.tableau[stage, 2] * nmsk
-                
-            final_time  = current_time
-            final_state = initial_state + dState
+            dTime = timestep
             
-            return timestep, (final_time, final_state, dState)
+            return timestep, (dTime, dState)
 
     __call__ = forward

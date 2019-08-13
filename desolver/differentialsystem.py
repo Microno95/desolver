@@ -303,17 +303,17 @@ class OdeSystem:
         return self.atol
 
     def initialise_integrator(self):
+        integrator_kwargs = dict(dtype=self.y[0].dtype, device=self.device)
+        
         if self.method.__adaptive__:
-            if self.staggered_mask is not None and self.method.__symplectic__:
-                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, rtol=self.rtol, atol=self.atol, dtype=self.y[0].dtype, device=self.device)
-            else:
-                self.integrator = self.method(self.dim, rtol=self.rtol, atol=self.atol, dtype=self.y[0].dtype, device=self.device)
-        else:
-            if self.staggered_mask is not None and self.method.__symplectic__:
-                self.integrator = self.method(self.dim, staggered_mask=self.staggered_mask, dtype=self.y[0].dtype, device=self.device)
-            else:
-                self.integrator = self.method(self.dim, dtype=self.y[0].dtype, device=self.device)
-
+            integrator_kwargs['atol'] = self.atol
+            integrator_kwargs['rtol'] = self.rtol
+            
+        if self.method.__symplectic__:
+            integrator_kwargs['staggered_mask'] = self.staggered_mask
+            
+        self.integrator = self.method(self.dim, **integrator_kwargs)
+        
     def __get_integrator_mask(self, staggered_mask):
         if staggered_mask is None and hasattr(self.integrator, "staggered_mask"):
             return self.integrator.staggered_mask
@@ -470,34 +470,40 @@ class OdeSystem:
 
         self.nfev = 0 if self.int_status == 1 else self.nfev
         dState  = D.zeros_like(self.y[-1])
+        dTime   = D.zeros_like(self.t[-1])
+        cState  = D.zeros_like(self.y[-1])
+        cTime   = D.zeros_like(self.t[-1])
         self.__allocate_soln_space(total_steps)
         while self.dt != 0 and D.abs(self.t[-1]) < D.abs(tf * (1 - D.epsilon())):
             try:
                 if abs(self.dt + self.t[-1]) > D.abs(tf):
                     self.dt = (tf - self.t[-1])
                 try:
-                    self.dt, (new_time, new_state, state_change) = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
+                    self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
                 except etypes.RecursionError:
                     print("Hit Recursion Limit. Will attempt to compute again with a smaller step-size. ",
                           "If this fails, either use a different rtol/atol or ",
                           "increase maximum recursion depth.", file=sys.stderr)
                     self.dt = 0.5 * self.dt
-                    self.dt, (new_time, new_state, state_change) = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
+                    self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
                 except:
                     self.int_status = -1
                     raise
                 
                 if self.counter+1 >= len(self._y):
-                    total_steps = int((tf-new_time)/self.dt) + 1
+                    total_steps = int((tf-self._t[self.counter]-dTime)/self.dt) + 1
                     self.__allocate_soln_space(total_steps)
                 
-                self._y[self.counter+1] = new_state # + dState
+                dState = dState - cState
+                dTime  = dTime  - cTime
                 
-                self._t[self.counter+1] = new_time
+                self._y[self.counter+1] = self._y[self.counter] + dState
+                self._t[self.counter+1] = self._t[self.counter] + dTime 
+                
+                cState = (self._y[self.counter+1] - self._y[self.counter]) - dState
+                cTime  = (self._t[self.counter+1] - self._t[self.counter]) - dTime
                 
                 self.counter += 1
-                dState    = (self.y[-1] - self.y[-2])
-                dState   -= state_change
                 
                 if eta:
                     tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[-1]) / self.dt)

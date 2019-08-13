@@ -45,18 +45,6 @@ def convert_suffix(value=3661, suffixes=('d', 'h', 'm', 's'), ratios=(24, 60, 60
 def warning(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-def named_integrator(name, alt_names=tuple(), order=1.0):
-    def wrap(f):
-        f.__name__ = str(name)
-        f.__alt_names__ = alt_names
-        f.__order__ = order
-        if hasattr(f, "final_state"):
-            f.__adaptive__ = D.shape(f.final_state)[0] == 2
-        else:
-            f.__adaptive__ = False
-        return f
-    return wrap
-
 def search_bisection(array, value):
     jlower = 0
     jupper = len(array) - 1
