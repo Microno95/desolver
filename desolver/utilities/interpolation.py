@@ -17,13 +17,21 @@ class CubicHermiteInterp:
         Function gradients wrt. t and t0 and t1
     """
     def __init__(self, t0, t1, p0, p1, m0, m1):
-        self.trange = t1 - t0
-        self.tshift = t0
-        self.p0     = p0
-        self.p1     = p1
-        self.m0     = m0
-        self.m1     = m1
+        self.t1 = t1.clone().detach()
+        self.t0 = t0.clone().detach()
+        self.p0 = p0.clone().detach()
+        self.p1 = p1.clone().detach()
+        self.m0 = m0.clone().detach()
+        self.m1 = m1.clone().detach()
         
+    @property
+    def trange(self):
+        return self.t1 - self.t0
+    
+    @property
+    def tshift(self):
+        return self.t0
+    
     def __affine_transform(self, t):
         return (t - self.tshift)/self.trange
     
@@ -39,4 +47,4 @@ class CubicHermiteInterp:
         t3       = t2 * t
         t3mt2    = t3 - t2
         p2t3m3t2 = 2 * t3mt2 - t2
-        return (1 + p2t3m3t2) * self.p0 + (t3mt2 - t2 + t) * self.m0 - p2t3m3t2 * self.p1 + t3mt2 * self.m1
+        return (1 + p2t3m3t2) * self.p0 + (t3mt2 - t2 + t) * self.trange * self.m0 - p2t3m3t2 * self.p1 + t3mt2 * self.trange * self.m1
