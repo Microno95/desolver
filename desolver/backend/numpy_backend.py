@@ -200,6 +200,8 @@ isinf      = numpy.isinf
 isnan      = numpy.isnan
 max        = numpy.max
 min        = numpy.min
+any        = numpy.any
+all        = numpy.all
 
 array      = type_reg(numpy.array)
 zeros      = type_reg(numpy.zeros)

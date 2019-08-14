@@ -230,6 +230,8 @@ def min(x, axis=None, keepdims=False, out=None):
     if axis is None:
         return torch.min(x.view(-1), dim=0, keepdim=keepdims, out=out)[0]
     return torch.min(x, dim=axis, keepdim=keepdims, out=out)[0]
+any        = torch.any
+all        = torch.all
 
 array      = type_reg(torch.tensor)
 zeros      = type_reg(torch.zeros)
