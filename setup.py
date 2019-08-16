@@ -42,7 +42,7 @@ setup(name='DESolver',
       license='MIT',
       keywords=['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode'],
       url='https://github.com/Microno95/desolver',
-      packages=['desolver', 'desolver.integrationschemes', 'desolver.exceptiontypes', 'desolver.utilities', 'desolver.backend'],
+      packages=['desolver', 'desolver.integration_schemes', 'desolver.exception_types', 'desolver.utilities', 'desolver.backend'],
       classifiers=[
           # How mature is this project? Common values are
           #   3 - Alpha
