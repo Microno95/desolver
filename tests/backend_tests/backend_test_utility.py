@@ -40,7 +40,7 @@ def test_backend(backend):
             assert(D.norm(arr3 - true_arr3) <= 2 * D.epsilon())
             assert(D.norm(arr4 - true_arr4) <= 2 * D.epsilon())
             
-            de.deutil.warning("Testing float format {}".format(D.float_fmt()))
+            de.utilities.warning("Testing float format {}".format(D.float_fmt()))
             
             pi = D.to_float(D.pi)
             

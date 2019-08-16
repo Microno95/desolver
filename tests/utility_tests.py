@@ -8,9 +8,9 @@ assert(de.deutil.convert_suffix() == "0.00d:1.00h:1.00m:1.00s")
 l1 = [0.0, 1.0, 2.0, 3.0, 5.0, 10.0]
 
 for idx, i in enumerate(l1):
-    assert(de.deutil.search_bisection(l1, i) == idx)
+    assert(de.utilities.search_bisection(l1, i) == idx)
     
-with de.deutil.BlockTimer(start_now=False) as test:
+with de.utilities.BlockTimer(start_now=False) as test:
     assert(isinstance(test.start_now, bool) and test.start_now == False)
     assert(test.start_time is None)
     assert(test.end_time is None)

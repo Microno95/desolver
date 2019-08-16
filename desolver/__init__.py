@@ -2,7 +2,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from . import backend
 
-from .differentialsystem import *
-from .utilities import *
+from .differential_system import DiffRHS, rhs_prettifier, OdeSystem
+from . import utilities
+from . import integration_schemes
+from .integration_schemes import available_methods
 
-init_module()
+

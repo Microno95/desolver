@@ -36,29 +36,9 @@ from scipy.interpolate import CubicSpline
 from tqdm.auto import tqdm
 
 from . import backend as D
-from . import integrationschemes as ischemes
-from . import exceptiontypes as etypes
+from . import integration_schemes as ischemes
+from . import exception_types as etypes
 from . import utilities as deutil
-
-namespaceInitialised = False
-available_methods = {}
-
-def init_module():
-    global namespaceInitialised
-    if not namespaceInitialised:
-        methods_ischemes = []
-        for a in dir(ischemes):
-            try:
-                if issubclass(ischemes.__dict__.get(a), ischemes.IntegratorTemplate):
-                    methods_ischemes.append(ischemes.__dict__.get(a))
-            except TypeError:
-                pass
-        available_methods.update(dict([(func.__name__, func) for func in methods_ischemes if hasattr(func, "__alt_names__")] +
-                                      [(alt_name, func) for func in methods_ischemes if hasattr(func, "__alt_names__") for alt_name in func.__alt_names__]))
-
-        namespaceInitialised = True
-    else:
-        pass
 
 class DiffRHS:
     def __init__(self, rhs, equRepr=None):
@@ -146,7 +126,7 @@ class OdeSystem:
         self.counter     = 0
         self.t0          = D.to_float(t[0])
         self.t1          = D.to_float(t[1])
-        self.method      = available_methods["RK45CK"]
+        self.method      = ischemes.available_methods["RK45CK"]
         self.integrator  = None
         self.dt          = D.to_float(dt)
         self.__fix_dt_dir(self.t1, self.t0)
@@ -337,10 +317,10 @@ class OdeSystem:
         if self.int_status == 1:
             deutil.warning("An integration was already run, the system will be reset")
             self.reset()
-        if method in available_methods.keys():
-            self.method = available_methods[method]
+        if method in ischemes.available_methods.keys():
+            self.method = ischemes.available_methods[method]
         elif issubclass(method, ischemes.IntegratorTemplate):
-            if method not in map(lambda x:x[1], available_methods.items()):
+            if method not in map(lambda x:x[1], ischemes.available_methods.items()):
                 deutil.warning("This is not a method implemented as part of the DESolver package. Cannot guarantee results.")
             self.method = method
         else:

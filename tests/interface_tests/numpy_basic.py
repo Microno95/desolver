@@ -40,7 +40,7 @@ for ffmt in D.available_float_fmt():
 
     a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
 
-    with de.BlockTimer(section_label="Integrator Tests") as sttimer:
+    with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
         for i in sorted(set(de.available_methods.values()), key=lambda x:x.__name__):
             try:
                 a.set_method(i)

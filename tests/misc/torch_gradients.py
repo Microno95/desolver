@@ -73,7 +73,7 @@ for ffmt in D.available_float_fmt():
 
             return dy + torch.cat([torch.tensor([0.0]), controller_effect * 2.0 - 1.0])
 
-    with de.BlockTimer(section_label="Integrator Tests"):
+    with de.utilities.BlockTimer(section_label="Integrator Tests"):
         for i in sorted(set(de.available_methods.values()), key=lambda x:x.__name__):
             try:
                 yi1 = torch.tensor([1.0, 1.0], requires_grad=True)
