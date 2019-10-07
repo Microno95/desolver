@@ -41,21 +41,39 @@ from . import exception_types as etypes
 from . import utilities as deutil
 
 class DiffRHS:
-    def __init__(self, rhs, equRepr=None):
+    """Differential Equation class. Designed to wrap around around a function for the right-hand side of an ordinary differential equation.
+    
+    Attributes
+    ----------
+    rhs : callable
+        Right-hand side of an ordinary differential equation
+    equ_repr : str
+        String representation of the right-hand side.
+    """
+    def __init__(self, rhs, equ_repr=None):
+        """Initialises the equation class possibly with a human-readable equation representation.
+        
+        Parameters
+        ----------
+        rhs : callable
+            A function for obtaining the rhs of an ordinary differential equation with the invocation patter rhs(t, y, **kwargs)
+        equ_repr : str, optional
+            A human-readable transcription of the differential equation represented by rhs
+        """
         self.rhs     = rhs
-        self.equRepr = equRepr
+        if equ_repr is not None:
+            self.equ_repr = str(equ_repr)
+        else:
+            self.equ_repr = str(self.rhs)
         
     def __call__(self, t, y, **kwargs):
         return self.rhs(t, y, **kwargs)
 
     def __str__(self):
-        if self.equRepr is not None:
-            return self.equRepr
-        else:
-            return str(self.rhs)
+        return self.equ_repr
 
     def __repr__(self):
-        return "<DiffRHS({},{})>".format(repr(self.rhs), self.equRepr)
+        return "<DiffRHS({},{})>".format(repr(self.rhs), self.equ_repr)
 
 def rhs_prettifier(equRepr):
     def rhs_wrapper(rhs):
@@ -67,39 +85,35 @@ class OdeSystem:
     def __init__(self, equ_rhs, y0, t=(0, 1), dense_output=False, dt=1.0, rtol=1e-6, atol=1e-6, constants=dict()):
         """Initialises the system to the parameters passed or to default values.
 
-        Required arguments:
-            equ_rhs: Specifies the right hand side of the system.
-                     The calling signature of equ_rhs should be:
-                     equ_rhs(t, y, **constants)
-                     where **constants refers to keyword arguments that define
-                     the constants of the system. These can be defined either
-                     upon calling OdeSystem.__init__ using the constants
-                     keyword argument or using the OdeSystem add_constants
-                     method.
-                     NOTE:
-                        To make the output prettier, you can decorate the rhs
-                        function with a @rhs_prettifier("Equation representation")
-                        call where "Equation Representation" is a text representation
-                        of your equation.
-
-        Keyword arguments:
-            y0: Specifies the initial state of the system. This is set to
-                numpy.zeros(n) by default.
-            t: A tuple of the form (initial time, final time) aka the integration limits.
-            dense_output: Set to True or False to specify whether or not a cubic spline fit should be computed
-                          for the integration.
-            dt: Sets the step-size for the integration, choose a value that is slightly less than the highest frequency
-                   changes in value of the solutions to the equations.
-            rtol: Denotes the target relative error. Useful for adaptive methods.
-            atol: Denotes the target absolute error. Useful for adaptive methods.
-
-            NOTE:
-                rtol and atol are used in the error computation as
-                    err_bound = atol + rtol * abs(y)
-                in the same way as it is used in the scipy routines.
-
-        Variable-length arguments:
-            consts: Arbitrary set of keyword arguments that define the constants to be used in the system."""
+        Parameters
+        ----------
+        equ_rhs : callable
+            Specifies the right hand side of the system.
+             The calling signature of equ_rhs should be:
+                 equ_rhs(t, y, **constants)
+             NOTE: To make the output prettier, you can decorate the rhs
+                   function with a @rhs_prettifier("Equation representation")
+                   call where "Equation Representation" is a text representation
+                   of your equation.
+        y0 : array-like or float
+            Specifies the initial state of the system.
+        t : tuple of floats, optional
+            A tuple of the form (initial time, final time) aka the integration limits.
+        dense_output : bool, optional
+            Set to True or False to specify whether or not a cubic spline fit should be 
+            computed for the integration.
+        dt : float, optional
+            Sets the step-size for the integration, choose a value that is slightly less 
+            than the highest frequency changes in value of the solutions to the equations.
+        rtol, atol : float, optional
+            Denotes the target relative and absolute errors respectively. 
+            Only for adaptive methods.
+            NOTE: rtol and atol are used in the error computation as
+                      err_bound = atol + rtol * abs(y)
+                  in the same way as it is used in the scipy routines.
+        constants : dict, optional
+            Dict of keyword arguments passed to equ_rhs.
+        """
 
         if len(t) != 2:
             raise etypes.LengthError("Two time bounds are required, only {} were given.".format(len(t)))
@@ -189,8 +203,7 @@ class OdeSystem:
         self._t = self._t[:self.counter+1]
         
     def set_kick_vars(self, staggered_mask):
-        """Sets the variable mask for the symplectic integrators. This mask denotes
-        the elements of y that are to be updated as part of the Kick step.
+        """Sets the variable mask for the symplectic integrators. 
 
         The conventional structure of a symplectic integrator is Kick-Drift-Kick
         or Drift-Kick-Drift where Drift is when the Positions are updated and
@@ -200,19 +213,35 @@ class OdeSystem:
         to be updated in the Kick step and the former half in the Drift step.
 
         Does nothing if integrator is not symplectic.
+        
+        Parameters
+        ----------
+        staggered_mask : array of bools
+            A boolean array with the same shape as y. Specifies the elements 
+            of y that are to be updated as part of the Kick step.
         """
         self.staggered_mask = staggered_mask
         
-    def set_end_time(self, t):
-        """Changes the final time for the integration of the ODE system
+    def set_end_time(self, tf):
+        """Changes the final time for the integration of the ODE system.
 
-        Required arguments:
-        t: Denotes the final time."""
-        if t <= self.t0:
+        Parameters
+        ----------
+        tf : float
+            Final integration time.
+            
+        Raises
+        ------
+        ValueError
+            If the final integration time is less than the initial time and the integration 
+            has been run (successfully or unsuccessfully).
+        """
+        if tf <= self.t0 and self.int_status != 0:
             raise ValueError("The end time of the integration cannot be less than "
-                             "or equal to the initial time!")
-        self.t1 = D.to_float(t)
+                             "or equal to {}!".format(self.t0))
+        self.t1 = D.to_float(tf)
         self.__move_to_device()
+        self.__fix_dt_dir(self.t1, self.t0)
 
     def get_end_time(self):
         """Returns the final time of the ODE system."""
@@ -221,21 +250,27 @@ class OdeSystem:
     def set_start_time(self, t):
         """Changes the initial time for the integration of the ODE system.
 
-        Required arguments:
-        t: Denotes the initial time."""
-        if self.t1 <= t:
+        Parameters
+        ----------
+        ti : float
+            Initial integration time.
+            
+        Raises
+        ------
+        ValueError
+            If the initial integration time is greater than the final time and the integration 
+            has been run (successfully or unsuccessfully).
+        """
+        if self.t1 <= ti and self.int_status != 0:
             raise ValueError("The start time of the integration cannot be greater "
-                             "than or equal to the end time!")
-        self.t0 = D.to_float(t)
+                             "than or equal to {}!".format(self.t1))
+        self.t0 = D.to_float(ti)
         self.__move_to_device()
+        self.__fix_dt_dir(self.t1, self.t0)
 
     def get_start_time(self):
         """Returns the initial time of the ODE system."""
         return self.t0
-
-    def check_time_bounds(self):
-        if not (D.abs(self.t0) < D.abs(self.t[-1]) < D.abs(self.t1)):
-            self.reset()
 
     def get_current_time(self):
         """Returns the current time of the ODE system"""
@@ -244,15 +279,16 @@ class OdeSystem:
     def set_step_size(self, dt):
         """Sets the step size that will be used for the integration.
 
-        Required arguments:
-        dt: Step size value. For systems that grow exponentially choose a smaller value, for oscillatory systems choose
-            a value slightly less than the highest frequency of oscillation. If unsure, use an adaptive method in the
-            list of available methods (view by calling availmethods()) followed by setmethod(), and finally call
-            setrelerr() with the keyword argument auto_calc_dt set to True for an approximately good step size."""
-        self.dt = D.to_float(dt)
+        Parameters
+        ----------
+        dt : float
+            Step size value. For systems that grow exponentially choose a smaller value, for oscillatory systems choose
+            a value slightly less than the highest frequency of oscillation."""
+        self.dt  = D.to_float(dt)
         self.dt0 = self.dt
             
         self.__move_to_device()
+        self.__fix_dt_dir(self.t1, self.t0)
 
     def get_step_size(self):
         """Returns the step size that will be attempted for the next integration step"""
@@ -302,16 +338,17 @@ class OdeSystem:
     def set_method(self, method, staggered_mask=None):
         """Sets the method of integration.
 
-        Required arguments:
-        method: String that corresponds to a key in the desolver.available_methods dict OR
-                a subclass of ischemes.IntegratorTemplate such as an ischemes.ExplicitIntegrator or ischemes.SymplecticIntegrator
-                subclass that implements the forward method. The forward method should take as arguments:
-                    rhs, initial_time, initial_state, constants, timestep
-                and return:
-                    timestep, (final_time, final_state), nfev
-                where timestep is the new timestep (as appropriate) and nfev is the number of function evaluations.
-                If method is adaptive it should have the __adaptive__ property set to True and if it is
-                symplectic it should have the __symplectic__ property set to True.
+        Parameters
+        ---------
+        method : str or stateful functor
+            A string that is the name of an integrator that is available in DESolver, OR a functor that 
+            takes the current state, time, time step and equation, and advances the state by 1 timestep 
+            adjusting the timestep as necessary. 
+            
+        Raises
+        ------
+        ValueError
+            If the string is not a valid integration scheme.
         """
         self.staggered_mask = self.__get_integrator_mask(staggered_mask)
         if self.int_status == 1:
@@ -328,25 +365,24 @@ class OdeSystem:
                               call desolver.available_methods() to see what these are")
         self.initialise_integrator()
 
-    def show_equations(self):
-        """Prints the equations that have been entered for the system.
-        Returns the equations themselves as a list of strings."""
-        print("dy = {}".format(str(self.equ_rhs)))
-        return str(self.equ_rhs)
-
     def add_constants(self, **additional_constants):
         """Takes an arbitrary list of keyword arguments to add to the list of available constants.
 
-        Variable-length arguments:
-        additional_constants: A dict containing constants and their corresponding values."""
+        Parameters
+        ----------
+        additional_constants : keyword arguments, variable-length
+            Keyword arguments of constants should be added/updated in the constants associated with the system.
+        """
         self.consts.update(additional_constants)
 
     def remove_constants(self, *constants_removal):
-        """Takes an arbitrary list of keyword arguments to remove from the list of available constants.
+        """Takes an arbitrary list of keyword arguments to add to the list of available constants.
 
-        Variable-length arguments:
-        additional_constants: A tuple or list containing the names of the constants to remove.
-                              The names must be denoted by strings."""
+        Parameters
+        ----------
+        constants_removal : string, list, tuple or dict arguments, variable-length
+            Keys of constants that should be removed from the constants list.
+        """
         for i in constants_removal:
             if isinstance(i, (list, tuple, dict)):
                 self.constants_removal(*list(i))
@@ -354,6 +390,13 @@ class OdeSystem:
                 del self.consts[i]
 
     def integration_status(self):
+        """Returns the integration status as a human-readable string.
+
+        Returns
+        -------
+        str
+            String containing the integration status message.
+        """
         if self.int_status == 0:
             return "Integration has not been run."
         elif self.int_status == 1:
@@ -368,20 +411,34 @@ class OdeSystem:
         elif self.int_status == -3:
             return "A generic exception was raised during integration."
 
-    def set_dense_output(self, dense_output=True):
-        """Sets self.dense_output to dense_output which determines if a CubicSpline
-        fit is computed for the integration results.
+    def set_dense_output(self, dense_output):
+        """Enables/Disables dense output of results.
+        
+        Parameters
+        ----------
+        dense_output : bool
+            Sets if dense_output should be computed. If a dense output exists, it is discarded.
         """
         if self.sol is not None:
             self.sol = None
         self.dense_output = dense_output
 
     def compute_dense_output(self):
-        """Computes an interpolating CubicSpline over the solution of the
-           integration.
-
-           Will not work if an integration error has occurred or integration is
-           incomplete.
+        """Computes an interpolating CubicSpline over the solution of the integration.
+        
+        Currently uses numpy arrays and does not permit torch.tensor interpolants.
+        
+        Returns
+        -------
+        CubicSpline
+            A cubic spline interpolant for the results of the numerical integration.
+            
+        Raises
+        ------
+        ValueError
+            Raised if a numerical integration was not run.
+        FailedIntegrationError
+            Raised if the numerical integration was abruptly terminated/did not converge.
         """
         if self.int_status == 0:
             raise ValueError("Cannot compute dense output for non-existent integration.")
@@ -410,18 +467,32 @@ class OdeSystem:
     def integrate(self, t=None, callback=None, eta=False):
         """Integrates the system to a specified time.
 
-        Keyword arguments:
-        t: If t is specified, then the system will be integrated to time t.
-           Otherwise the system will integrate to the specified final time.
-           NOTE: t can be negative in order to integrate backwards in time, but use this with caution as this
-                 functionality is slightly unstable.
-        callback: A callable object that is called as callback(self) at each time step.
-                  This is useful for logging purposes.
-        eta: Set to True or False to specify whether or not the integration process should return an eta,
-             current progress and simple information regarding step-size and current time.
-             NOTE: This may slow the integration process down as the process of outputting
-                   these values create overhead."""
-
+        Parameters
+        ----------
+        t : float
+            If t is specified, then the system will be integrated to time t. Otherwise the system will 
+            integrate to the specified final time. 
+            NOTE: t can be negative in order to integrate backwards in time, but use this with caution as this
+                  functionality is slightly unstable.
+                  
+        callback : callable
+            A callable object that is invoked as callback(self) at each time step.
+            e.g. for logging integration to disk, saving data, manipulating the state of the system, etc.
+                  
+        eta : bool
+            Specifies whether or not the integration process should return an eta, current progress 
+            and simple information regarding step-size and current time. Will be deprecated
+            in the future in favour of verbosity argument that prints once every n-steps.
+            NOTE: This may slow the integration process down as the process of outputting
+                  these values create overhead.
+                  
+        Raises
+        ------
+        RecursionError
+            Raised if an adaptive integrator recurses when attempting to compute a forward step.
+            This usually means that the numerical integration did not converge and that the 
+            behaviour of the system is highly unreliable. This could be due to numerical issues.
+        """
         if t:
             tf = t
         else:
