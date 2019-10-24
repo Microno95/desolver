@@ -24,11 +24,8 @@ SOFTWARE.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from .. import backend as D
 import time
 import sys
-
-from math import floor
 
 def convert_suffix(value, suffixes=('d', 'h', 'm', 's'), ratios=(24, 60, 60), delimiter=':'):
     """Converts a base value into a human readable format with the given suffixes and ratios.
@@ -99,7 +96,7 @@ def search_bisection(array, val):
     Returns
     -------
     int
-        returns the idnex of the position in the array with the value closest to val
+        returns the index of the position in the array with the value closest to val
 
     Examples
     --------

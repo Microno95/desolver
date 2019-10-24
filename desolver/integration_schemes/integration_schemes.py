@@ -26,21 +26,20 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy
 
-from .integrator_template import named_integrator, ExplicitIntegrator, IntegratorTemplate, SymplecticIntegrator
-#
-# @named_integrator("Explicit Runge-Kutta 4",
-#                        alt_names=("Runge-Kutta 4", "RK4",),
-#                        order=4.0)
-# class RK4Solver(ExplicitIntegrator):
-#     def __init__(self):
-#         raise NotImplementedError("This method has not yet been implemented!")
-#
-# @named_integrator("Explicit Gill's",
-#                        alt_names=("Gill's",),
-#                        order=5.0)
-# class GillsSolver(ExplicitIntegrator):
-#     def __init__(self):
-#         raise NotImplementedError("This method has not yet been implemented!")
+from .integrator_template import named_integrator, ExplicitIntegrator, SymplecticIntegrator
+
+__all__ = [
+    'RK45CKSolver',
+    'RK5Solver',
+    'MidpointSolver',
+    'HeunsSolver',
+    'EulerSolver',
+    'EulerTrapSolver',
+    'HeunEulerSolver',
+    'SymplecticEulerSolver',
+    'BABs9o7HSolver',
+    'ABAs5o6HSolver'
+]
 
 @named_integrator("Explicit RK45CK",
                        alt_names=("RK45CK", "Runge-Kutta-Cash-Karp", "RK45"),

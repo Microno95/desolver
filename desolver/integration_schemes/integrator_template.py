@@ -38,11 +38,11 @@ def named_integrator(name, alt_names=tuple(), order=1.0):
         return f
     return wrap
 
-class IntegratorTemplate:
+class IntegratorTemplate(object):
     def __init__(self):
         raise NotImplementedError("Do not initialise this class directly!")
 
-    def forward(self):
+    def forward(self, rhs, initial_time, initial_state, constants, timestep):
         raise NotImplementedError("Do not use this class directly! How did you initialise it??")
 
     __call__ = forward

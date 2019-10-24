@@ -31,3 +31,5 @@ class RecursionError(Exception):
 class FailedIntegrationError(Exception):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
+        
+__all__ = ["RecursionError", "FailedIntegrationError"]

@@ -24,13 +24,7 @@ SOFTWARE.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import re
-import numpy
-import numpy.linalg
 import sys
-import time
-import shutil
-import types
 from scipy.interpolate import CubicSpline
 
 from tqdm.auto import tqdm
@@ -40,7 +34,7 @@ from . import integration_schemes as ischemes
 from . import exception_types as etypes
 from . import utilities as deutil
 
-class DiffRHS:
+class DiffRHS(object):
     """Differential Equation class. Designed to wrap around around a function for the right-hand side of an ordinary differential equation.
     
     Attributes
@@ -80,7 +74,7 @@ def rhs_prettifier(equRepr):
         return DiffRHS(rhs, equRepr)
     return rhs_wrapper
 
-class OdeSystem:
+class OdeSystem(object):
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
     def __init__(self, equ_rhs, y0, t=(0, 1), dense_output=False, dt=1.0, rtol=1e-6, atol=1e-6, constants=dict()):
         """Initialises the system to the parameters passed or to default values.
@@ -510,10 +504,6 @@ class OdeSystem:
         if D.abs(self.dt) > D.abs(tf - self.t[-1]):
             self.dt = D.abs(tf - self.t[-1])*0.5
 
-        time_remaining = [0, 0]
-
-        etaString = ''
-        
         total_steps = int((tf-self.t[-1])/self.dt)
         
         if eta:
@@ -572,17 +562,19 @@ class OdeSystem:
                             i(self)
                     else:
                         callback(self)
+                        
             except KeyboardInterrupt:
                 self.int_status = -2
+                if eta:
+                    tqdm_progress_bar.close()
                 self.__trim_soln_space()
                 raise
             except:
                 self.int_state = -3
+                if eta:
+                    tqdm_progress_bar.close()
                 self.__trim_soln_space()
                 raise
-        else:
-            if eta:
-                tqdm_progress_bar.close()
 
         self.__trim_soln_space()
         self.int_status = 1
