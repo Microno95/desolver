@@ -22,9 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from .. import backend as D
+__all__ = [
+    'CubicHermiteInterp'
+]
 
-class CubicHermiteInterp:
+class CubicHermiteInterp(object):
     """Cubic Hermite Polynomial Interpolation Class
 
     Constructs a cubic Hermite polynomial interpolant for a function with values p0 and p1,

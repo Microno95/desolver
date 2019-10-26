@@ -26,6 +26,19 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy
 
+__all__ = [
+    'e',
+    'euler_gamma',
+    'pi',
+    'set_backend',
+    'backend',
+    'epsilon',
+    'available_float_fmt',
+    'float_fmt',
+    'set_float_fmt',
+    'cast_to_float_fmt'
+]
+
 _BACKEND      = 'numpy'
 _FLOAT_FORMAT = 'float64'
 

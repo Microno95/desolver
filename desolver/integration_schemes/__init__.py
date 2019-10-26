@@ -1,5 +1,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from .integrator_template import *
+from .integrator_types import *
 from .integration_schemes import *
 
 available_methods = dict()
@@ -19,3 +21,4 @@ __integration_methods__ = [
 
 available_methods.update(dict([(func.__name__, func) for func in __integration_methods__ if hasattr(func, "__alt_names__")] +
                               [(alt_name, func) for func in __integration_methods__ if hasattr(func, "__alt_names__") for alt_name in func.__alt_names__]))
+

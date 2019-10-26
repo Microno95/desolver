@@ -266,11 +266,17 @@ def shape(x):
 
 def logical_not(a, out=None, where=None):
     if where is None:
-        out = ~a
+        if a.is_cuda:
+            out = 1 - a
+        else:
+            out = (1 - a.to(torch.uint8)).to(torch.bool)
     else:
         if out is None:
             out = a.clone()
-        out[where] = ~out[where]
+        if a.is_cuda:
+            out[where] = 1 - out[where]
+        else:
+            out[where] = (1 - out[where].to(torch.uint8)).to(torch.bool)
     return out
 
 def logical_or(a, b, out=None, where=None):

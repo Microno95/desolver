@@ -26,7 +26,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy
 
-from .integrator_template import named_integrator, ExplicitIntegrator, SymplecticIntegrator
+from .integrator_template import named_integrator
+from .integrator_types import ExplicitIntegrator, SymplecticIntegrator
 
 __all__ = [
     'RK45CKSolver',

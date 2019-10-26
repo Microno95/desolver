@@ -25,6 +25,11 @@ SOFTWARE.
 import numpy
 from .. import backend as D
 
+__all__ = [
+    'brentsroot',
+    'brentsrootvec'
+]
+
 def brentsroot(f, lower_bound, upper_bound, tol=None, verbose=False):
     """Brent's algorithm for finding root of a bracketed function.
 

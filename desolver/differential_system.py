@@ -34,6 +34,12 @@ from . import integration_schemes as ischemes
 from . import exception_types as etypes
 from . import utilities as deutil
 
+__all__ = [
+    'DiffRHS',
+    'rhs_prettifier',
+    'OdeSystem'
+]
+
 class DiffRHS(object):
     """Differential Equation class. Designed to wrap around around a function for the right-hand side of an ordinary differential equation.
     
@@ -241,7 +247,7 @@ class OdeSystem(object):
         """Returns the final time of the ODE system."""
         return self.t1
 
-    def set_start_time(self, t):
+    def set_start_time(self, ti):
         """Changes the initial time for the integration of the ODE system.
 
         Parameters
