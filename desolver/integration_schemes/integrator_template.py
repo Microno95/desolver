@@ -49,6 +49,9 @@ class IntegratorTemplate(object):
 
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
         raise NotImplementedError("Do not use this class directly! How did you initialise it??")
+        
+    def dense_output(self):
+        raise NotImplementedError("Do not use this class directly! How did you initialise it??")
 
     __call__ = forward
 

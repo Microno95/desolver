@@ -25,7 +25,6 @@ SOFTWARE.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import sys
-from scipy.interpolate import CubicSpline
 
 from tqdm.auto import tqdm
 
@@ -34,11 +33,169 @@ from . import integration_schemes as ischemes
 from . import exception_types as etypes
 from . import utilities as deutil
 
+import numpy as np
+
+CubicHermiteInterp = deutil.interpolation.CubicHermiteInterp
+root_finder        = deutil.optimizer.brentsrootvec
+
 __all__ = [
     'DiffRHS',
     'rhs_prettifier',
     'OdeSystem'
 ]
+
+##### Code adapted from https://github.com/scipy/scipy/blob/v1.3.2/scipy/integrate/_ivp/ivp.py#L28 #####
+def prepare_events(events):
+    """Standardize event functions and extract is_terminal and direction."""
+    if callable(events):
+        events = (events,)
+
+    if events is not None:
+        is_terminal = D.zeros(len(events), dtype=bool)
+        direction   = D.zeros(len(events), dtype=D.int64)
+        for i, event in enumerate(events):
+            if hasattr(event, "terminal"):
+                is_terminal[i] = bool(event.terminal)
+
+            if hasattr(event, "direction"):
+                direction[i] = event.direction
+    else:
+        is_terminal = None
+        direction   = None
+
+    return events, is_terminal, direction
+
+
+# def solve_event_equation(event, sol, t_old, t):
+#     """Solve an equation corresponding to an ODE event.
+#     The equation is ``event(t, y(t)) = 0``, here ``y(t)`` is known from an
+#     ODE solver using some sort of interpolation. It is solved by
+#     `scipy.optimize.brentq` with xtol=atol=4*EPS.
+#     Parameters
+#     ----------
+#     event : callable
+#         Function ``event(t, y)``.
+#     sol : callable
+#         Function ``sol(t)`` which evaluates an ODE solution between `t_old`
+#         and  `t`.
+#     t_old, t : float
+#         Previous and new values of time. They will be used as a bracketing
+#         interval.
+#     Returns
+#     -------
+#     root : float
+#         Found solution.
+#     """
+#     from scipy.optimize import brentq
+#     return brentq(lambda t: event(t, sol(t)), t_old, t,
+#                   xtol=4 * EPS, rtol=4 * EPS)
+
+
+def handle_events(sol, events, direction, is_terminal, t_prev, t_next):
+    """Helper function to handle events.
+    Parameters
+    ----------
+    sol : DenseOutput
+        Function ``sol(t)`` which evaluates an ODE solution between `t_old`
+        and  `t`.
+    active_events : list of callables, length n_events
+        Event functions with signatures ``event(t, y)``.
+    is_terminal : array-type, shape (n_events,)
+        Which events are terminal.
+    t_old, t : float
+        Previous and new values of time.
+    Returns
+    -------
+    success : array
+        Indices of events which take zero between `t_old` and `t` and before
+        a possible termination.
+    roots : array
+        Values of t at which events occurred.
+    terminate : bool
+        Whether a terminal event occurred.
+    """
+    g = [event(t_prev, sol(t_prev)) for event in events]
+    roots, success = root_finder(
+        [lambda t: event(t, sol(t)) for event in events],
+        t_prev,
+        t_next,
+        tol=4*D.epsilon()
+    )
+
+    roots = D.asarray(roots)
+    
+    g_new  = [events[idx](t_root, sol(t_root)) for idx, t_root in enumerate(roots)]
+    
+    g     = D.asarray(g)
+    g_new = D.asarray(g_new)
+    
+    up     = (g <= 0) & (g_new >= 0)
+    down   = (g >= 0) & (g_new <= 0)
+    either = up | down
+    mask   = (up     & (direction > 0) |
+              down   & (direction < 0) |
+              either & (direction == 0))
+    
+    active_events = D.nonzero(mask)[0]
+
+    if D.any(is_terminal) and len(active_events) > 0:
+        if t_next > t_prev:
+            order = D.argsort(roots)
+        else:
+            order = D.argsort(-roots)
+        active_events = active_events[order]
+        roots         = roots[order]
+        t             = D.nonzero(is_terminal[active_events])[0][0]
+        active_events = active_events[:t + 1]
+        roots         = roots[:t + 1]
+        terminate     = True
+    else:
+        terminate     = False
+
+    return active_events, roots, terminate
+
+class DenseOutput(object):
+    """Dense Output class for storing the dense output from a numerical integration.
+    
+    Attributes
+    ----------
+    t_eval : list or array-type
+        time of evaluation of differential equations
+    y_interpolants : list of interpolants
+        interpolants of each timestep in a numerical integration
+    """
+    def __init__(self, t_eval, y_interpolants):
+        if t_eval is None and y_interpolants is None:
+            self.t_eval         = []
+            self.y_interpolants = []
+        else:
+            if t_eval is None or y_interpolants is None:
+                raise ValueError("Both t_eval and y_interpolants must not be NoneTypes")
+            elif len(t_eval) != len(y_interpolants):
+                raise ValueError("The number of evaluation times and interpolants must be equal!")
+            else:
+                self.t_eval         = list(t_eval)
+                self.y_interpolants = y_interpolants
+        
+    def __call__(self, t):
+        tidx = deutil.search_bisection(self.t_eval, t)
+        return self.y_interpolants[tidx](t)
+    
+    def add_interpolant(self, t, y_interp):
+        try:
+            if len(self.t_eval) == 0:
+                self.t_eval.append(D.to_float(0.0))
+            y_interp(self.t_eval[-1])
+        except:
+            raise
+        try:
+            y_interp(t)
+        except:
+            raise
+        assert t > self.t_eval[-1]
+        self.t_eval.append(t)
+        self.y_interpolants.append(y_interp)    
+    
 
 class DiffRHS(object):
     """Differential Equation class. Designed to wrap around around a function for the right-hand side of an ordinary differential equation.
@@ -160,6 +317,9 @@ class OdeSystem(object):
         self.__move_to_device()
         self.__allocate_soln_space(10)
         self.initialise_integrator()
+        
+        if self.dense_output:
+            self.sol = DenseOutput(None, None)
 
     @property
     def y(self):
@@ -401,6 +561,8 @@ class OdeSystem(object):
             return "Integration has not been run."
         elif self.int_status == 1:
             return "Integration completed successfully."
+        elif self.int_status == 2:
+            return "Integration terminated upon finding a triggered event."
         elif self.int_status == -1:
             return "Recursion limit was reached during integration, "+\
                    "this can be caused by the adaptive integrator being unable "+\
@@ -423,37 +585,37 @@ class OdeSystem(object):
             self.sol = None
         self.dense_output = dense_output
 
-    def compute_dense_output(self):
-        """Computes an interpolating CubicSpline over the solution of the integration.
+#     def compute_dense_output(self):
+#         """Computes an interpolating CubicSpline over the solution of the integration.
         
-        Currently uses numpy arrays and does not permit torch.tensor interpolants.
+#         Currently uses numpy arrays and does not permit torch.tensor interpolants.
         
-        Returns
-        -------
-        CubicSpline
-            A cubic spline interpolant for the results of the numerical integration.
+#         Returns
+#         -------
+#         CubicSpline
+#             A cubic spline interpolant for the results of the numerical integration.
             
-        Raises
-        ------
-        ValueError
-            Raised if a numerical integration was not run.
-        FailedIntegrationError
-            Raised if the numerical integration was abruptly terminated/did not converge.
-        """
-        if self.int_status == 0:
-            raise ValueError("Cannot compute dense output for non-existent integration.")
-        elif self.int_status != 1:
-            if self.int_status == -2:
-                deutil.warning(
-                    "A KeyboardInterrupt was raised during integration,",
-                    "the interpolating spline will only be valid between",
-                    "{} and {}.".format(self.t0, self.t[-1])
-                )
-            else:
-                raise etypes.FailedIntegrationError("Integration failed with message:"+self.integration_status())
-        self.__trim_soln_space()
-        self.sol = CubicSpline(D.to_numpy(self.t), D.to_numpy(self.y), extrapolate=True)
-        return self.sol
+#         Raises
+#         ------
+#         ValueError
+#             Raised if a numerical integration was not run.
+#         FailedIntegrationError
+#             Raised if the numerical integration was abruptly terminated/did not converge.
+#         """
+#         if self.int_status == 0:
+#             raise ValueError("Cannot compute dense output for non-existent integration.")
+#         elif self.int_status != 1:
+#             if self.int_status == -2:
+#                 deutil.warning(
+#                     "A KeyboardInterrupt was raised during integration,",
+#                     "the interpolating spline will only be valid between",
+#                     "{} and {}.".format(self.t0, self.t[-1])
+#                 )
+#             else:
+#                 raise etypes.FailedIntegrationError("Integration failed with message:"+self.integration_status())
+#         self.__trim_soln_space()
+#         self.sol = CubicSpline(D.to_numpy(self.t), D.to_numpy(self.y), extrapolate=True)
+#         return self.sol
 
     def reset(self):
         """Resets the system to the initial time."""
@@ -464,7 +626,7 @@ class OdeSystem(object):
         self.nfev    = 0
         self.__move_to_device()
 
-    def integrate(self, t=None, callback=None, eta=False):
+    def integrate(self, t=None, callback=None, eta=False, events=None):
         """Integrates the system to a specified time.
 
         Parameters
@@ -514,14 +676,17 @@ class OdeSystem(object):
         
         if eta:
             tqdm_progress_bar = tqdm(total=total_steps)
-
+            
+        events, is_terminal, direction = prepare_events(events)
+            
+        terminate_integration = False
         self.nfev = 0 if self.int_status == 1 else self.nfev
-        dState  = D.zeros_like(self.y[-1])
-        dTime   = D.zeros_like(self.t[-1])
+#         dState  = D.zeros_like(self.y[-1])
+#         dTime   = D.zeros_like(self.t[-1])
         cState  = D.zeros_like(self.y[-1])
         cTime   = D.zeros_like(self.t[-1])
         self.__allocate_soln_space(total_steps)
-        while self.dt != 0 and D.abs(self.t[-1]) < D.abs(tf * (1 - D.epsilon())):
+        while self.dt != 0 and D.abs(self.t[-1]) < D.abs(tf * (1 - D.epsilon())) and not terminate_integration:
             try:
                 if abs(self.dt + self.t[-1]) > D.abs(tf):
                     self.dt = (tf - self.t[-1])
@@ -557,10 +722,48 @@ class OdeSystem(object):
                 
                 self.counter += 1
                 
+                if events is not None or self.dense_output:
+                    tsol = CubicHermiteInterp(
+                        self.t[-2], 
+                        self.t[-1], 
+                        self.y[-2], 
+                        self.y[-1],
+                        self.equ_rhs(self.t[-2], self.y[-2], **self.consts),
+                        self.equ_rhs(self.t[-1], self.y[-1], **self.consts)
+                    )
+                    
+                if events is not None:
+                    active_events, roots, terminate_integration = handle_events(tsol, events, direction, is_terminal, self.t[-2], self.t[-1])
+
+                    if len(roots) > 0 and roots[-1] > self.t[-2]:
+                        self._t[self.counter] = roots[-1]+2*D.epsilon()
+                        self._y[self.counter] = tsol(self.t[-1])
+                        tsol = CubicHermiteInterp(
+                            self.t[-2], 
+                            self.t[-1], 
+                            self.y[-2], 
+                            self.y[-1],
+                            self.equ_rhs(self.t[-2], self.y[-2], **self.consts),
+                            self.equ_rhs(self.t[-1], self.y[-1], **self.consts)
+                        )
+
+                        cState  = D.zeros_like(self.y[-1])
+                        cTime   = D.zeros_like(self.t[-1])
+
+                    if terminate_integration:
+                        self.int_status = 2
+                        self.success    = True
+
+#                     print(active_events, roots, terminate_integration)
+                            
+                if self.dense_output:
+                    self.sol.add_interpolant(self.t[-1], tsol)
+                
                 if eta:
                     tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[-1]) / self.dt)
                     tqdm_progress_bar.desc  = f"{self.t[-1]:>10.2f} | {tf:.2f} | {self.dt:<10.2e}"
                     tqdm_progress_bar.update()
+                    
                 steps += 1
                 if callback is not None:
                     if isinstance(callback, (list, tuple)):
@@ -585,8 +788,6 @@ class OdeSystem(object):
         self.__trim_soln_space()
         self.int_status = 1
         self.success = True
-        if self.dense_output:
-            self.compute_dense_output()
 
     def __repr__(self):
         return "\n".join([

@@ -28,7 +28,6 @@ import torch
 
 # Datatypes
 bool    = torch.bool
-float16 = torch.float16
 float32 = torch.float32
 float64 = torch.float64
 uint8   = torch.uint8
@@ -305,6 +304,9 @@ def logical_xor(a, b, out=None, where=None):
             out = a.clone()
         out[where] = a[where] ^ b[where]
     return out
+
+nonzero = torch.nonzero
+argsort = torch.argsort
 
 def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True):
     """Computes the derivative of an output tensor wrt an input tensor.

@@ -51,6 +51,7 @@ class ExplicitIntegrator(IntegratorTemplate):
         self.adaptive   = D.shape(self.final_state)[0] == 2
         self.num_stages = D.shape(self.tableau)[0]
         self.aux        = D.zeros((self.num_stages, *self.dim))
+        
         if D.backend() == 'torch':
             self.aux         = self.aux.to(device)
             self.tableau     = self.tableau.to(device)
@@ -66,16 +67,26 @@ class ExplicitIntegrator(IntegratorTemplate):
                 current_state = initial_state    + D.einsum("n,n...->...", self.tableau[stage, 1:], aux)
                 aux[stage]    = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
                 
-            dState = D.einsum("n,n...->...", self.final_state[0, 1:], aux)
-            dTime  = timestep
+            self.dState = D.einsum("n,n...->...", self.final_state[0, 1:], aux)
+            self.dTime  = timestep
             
             if self.adaptive:
-                diff = dState - D.einsum("n,n...->...", self.final_state[1, 1:], aux)
+                diff = self.dState - D.einsum("n,n...->...", self.final_state[1, 1:], aux)
                 timestep, redo_step = self.update_timestep(diff, initial_time, timestep)
                 if redo_step:
-                    timestep, (dTime, dState) = self(rhs, initial_time, initial_state, constants, timestep)
+                    timestep, (self.dTime, self.dState) = self(rhs, initial_time, initial_state, constants, timestep)
             
-            return timestep, (dTime, dState)
+            return timestep, (self.dTime, self.dState)
+        
+    def dense_output(self, rhs, initial_time, initial_state):
+        return CubicHermiteInterp(
+            initial_time, 
+            initial_time + self.dTime, 
+            initial_state, 
+            initial_state + self.dState,
+            rhs(initial_time, initial_state),
+            rhs(initial_time + self.dTime, initial_state + self.dState)
+        )
 
     __call__ = forward
 
@@ -117,15 +128,25 @@ class SymplecticIntegrator(IntegratorTemplate):
 
             current_time  = D.copy(initial_time)
             current_state = D.copy(initial_state)
-            dState        = D.zeros_like(current_state)
+            self.dState   = D.zeros_like(current_state)
 
             for stage in range(self.num_stages):
-                aux          = rhs(current_time, initial_state + dState, **constants) * timestep
+                aux          = rhs(current_time, initial_state + self.dState, **constants) * timestep
                 current_time = current_time + timestep * self.tableau[stage, 0]
-                dState      += aux * self.tableau[stage, 1] * msk + aux * self.tableau[stage, 2] * nmsk
+                self.dState += aux * self.tableau[stage, 1] * msk + aux * self.tableau[stage, 2] * nmsk
                 
-            dTime = timestep
+            self.dTime = timestep
             
-            return timestep, (dTime, dState)
+            return timestep, (self.dTime, self.dState)
+        
+    def dense_output(self, rhs, initial_time, initial_state, constants):
+        return CubicHermiteInterp(
+            initial_time, 
+            initial_time + self.dTime, 
+            initial_state, 
+            initial_state + self.dState,
+            rhs(initial_time, initial_state, **constants),
+            rhs(initial_time + self.dTime, initial_state + self.dState, **constants)
+        )
 
     __call__ = forward

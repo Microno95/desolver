@@ -345,6 +345,9 @@ def brentsrootvec(f, lower_bound, upper_bound, tol=None, verbose=False):
         
         conv               = D.logical_not(D.logical_or(D.logical_or(fb == 0, fs == 0), D.abs(b - a) < tol))
         not_conv           = D.logical_not(conv)
+        
+#         if D.any(numiter > 10000):
+#             break
     if verbose:
         print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}, conv={not_conv}".format(**locals()))
     return b, D.abs(_f(b)) <= tol

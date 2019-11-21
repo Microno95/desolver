@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from .. import backend as D
+
 __all__ = [
     'CubicHermiteInterp'
 ]
@@ -42,12 +44,12 @@ class CubicHermiteInterp(object):
         Function gradients wrt. t and t0 and t1
     """
     def __init__(self, t0, t1, p0, p1, m0, m1):
-        self.t1 = t1.clone().detach()
-        self.t0 = t0.clone().detach()
-        self.p0 = p0.clone().detach()
-        self.p1 = p1.clone().detach()
-        self.m0 = m0.clone().detach()
-        self.m1 = m1.clone().detach()
+        self.t1 = D.copy(t1)
+        self.t0 = D.copy(t0)
+        self.p0 = D.copy(p0)
+        self.p1 = D.copy(p1)
+        self.m0 = D.copy(m0)
+        self.m1 = D.copy(m1)
         
     @property
     def trange(self):
