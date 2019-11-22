@@ -305,7 +305,12 @@ def logical_xor(a, b, out=None, where=None):
         out[where] = a[where] ^ b[where]
     return out
 
-nonzero = torch.nonzero
+def nonzero(a):
+    if len(shape(a)) == 0:
+        return (torch.nonzero(a.reshape(-1)), )
+    else:
+        return (torch.nonzero(a),)
+
 argsort = torch.argsort
 
 def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True):

@@ -277,7 +277,7 @@ def brentsrootvec(f, lower_bound, upper_bound, tol=None, verbose=False):
                 print(f[0](x[0]), f[1](x[1]))
             return D.stack([f[i](x[i]) for i in range(len(f))])
         else:
-            return D.stack([f[i](x[i]) if msk[i] else 0.0 for i in range(len(f))])
+            return D.stack([f[i](x[i]) if msk[i] else D.to_float(0.0) for i in range(len(f))])
     
     if verbose:
         print(_f(a))
