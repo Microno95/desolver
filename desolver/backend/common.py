@@ -210,3 +210,5 @@ def cast_to_float_fmt(x):
     """
     
     return numpy.asarray(x, dtype=_FLOAT_FORMAT)
+    
+del numpy

@@ -95,3 +95,5 @@ def contract_first_ndims(a, b, n=1):
     estr3      = "".join([chr(97 + i + n) for i in range(nb - n)])
     einsum_str = einsum_str.format(estr1, estr2, estr3)
     return einsum(einsum_str, a, b)
+
+del os, sys

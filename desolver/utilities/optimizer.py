@@ -268,13 +268,19 @@ def brentsrootvec(f, lower_bound, upper_bound, tol=None, verbose=False):
     if tol < D.epsilon():
         tol = D.epsilon()
     tol = D.to_float(tol)
-    a,b = D.stack([lower_bound]*len(f)), D.stack([upper_bound]*len(f))
+    a,b = D.stack([lower_bound for _ in range(len(f))]), D.stack([upper_bound for _ in range(len(f))])
     
     def _f(x, msk=None):
         if msk is None:
+            if verbose:
+                print([f[i](x[i]) for i in range(len(f))])
+                print(f[0](x[0]), f[1](x[1]))
             return D.stack([f[i](x[i]) for i in range(len(f))])
         else:
             return D.stack([f[i](x[i]) if msk[i] else 0.0 for i in range(len(f))])
+    
+    if verbose:
+        print(_f(a))
     
     conv = D.ones_like(a, dtype=bool)
     
@@ -295,6 +301,7 @@ def brentsrootvec(f, lower_bound, upper_bound, tol=None, verbose=False):
     conv[fa * fb >= 0] = False
     not_conv           = D.logical_not(conv)
     numiter            = D.ones_like(a, dtype=D.int64)*3
+    true_conv          = D.abs(_f(b)) <= tol
     
     while D.any(conv):
         if verbose:
@@ -345,9 +352,10 @@ def brentsrootvec(f, lower_bound, upper_bound, tol=None, verbose=False):
         
         conv               = D.logical_not(D.logical_or(D.logical_or(fb == 0, fs == 0), D.abs(b - a) < tol))
         not_conv           = D.logical_not(conv)
+        true_conv          = D.abs(_f(b)) <= tol
         
-#         if D.any(numiter > 10000):
-#             break
+        if D.any(numiter > 1000):
+            break
     if verbose:
-        print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}, conv={not_conv}".format(**locals()))
-    return b, D.abs(_f(b)) <= tol
+        print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}, conv={true_conv}".format(**locals()))
+    return b, true_conv
