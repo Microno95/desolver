@@ -99,8 +99,7 @@ def handle_events(sol, events, consts, direction, is_terminal, t_prev, t_next):
     
     roots, success = root_finder(
         ev_f,
-        t_prev,
-        t_next,
+        [t_prev, t_next],
         tol=4*D.epsilon()
     )
     
@@ -126,24 +125,20 @@ def handle_events(sol, events, consts, direction, is_terminal, t_prev, t_next):
     else:
         active_events = D.reshape(D.nonzero(mask)[0], (-1,))
     
-    roots = roots[active_events]
+    roots     = roots[active_events]
+    terminate = False
     
     if len(active_events) > 0:
-        if t_next > t_prev:
-            order = D.argsort(roots)
-        else:
-            order = D.argsort(-roots)
+        order = D.argsort(D.sign(t_next - t_prev) * roots)
         active_events = active_events[order]
         roots         = roots[order]
-    
-    if D.any(is_terminal) and len(active_events) > 0:
-        t             = D.nonzero(is_terminal[active_events])[0][0]
-        active_events = active_events[:t + 1]
-        roots         = roots[:t + 1]
-        terminate     = True
-    else:
-        terminate     = False
-
+        
+        if D.any(is_terminal):
+            t             = D.nonzero(is_terminal[active_events])[0][0]
+            active_events = active_events[:t + 1]
+            roots         = roots[:t + 1]
+            terminate     = True
+            
     return active_events, roots, terminate
 
 class DenseOutput(object):
@@ -552,6 +547,17 @@ class OdeSystem(object):
                 self.constants_removal(*list(i))
             elif i in self.consts.keys():
                 del self.consts[i]
+                
+    def get_step_interpolant(self):
+        "Computes the 3rd order Hermite polynomial interpolant over one step."
+        return CubicHermiteInterp(
+                    self.t[-2], 
+                    self.t[-1], 
+                    self.y[-2], 
+                    self.y[-1],
+                    self.equ_rhs(self.t[-2], self.y[-2], **self.consts),
+                    self.equ_rhs(self.t[-1], self.y[-1], **self.consts)
+                )
 
     def integration_status(self):
         """Returns the integration status as a human-readable string.
@@ -687,14 +693,7 @@ class OdeSystem(object):
                 self.counter += 1
                 
                 if events is not None or self.__dense_output:
-                    tsol = CubicHermiteInterp(
-                        self.t[-2], 
-                        self.t[-1], 
-                        self.y[-2], 
-                        self.y[-1],
-                        self.equ_rhs(self.t[-2], self.y[-2], **self.consts),
-                        self.equ_rhs(self.t[-1], self.y[-1], **self.consts)
-                    )
+                    tsol = self.get_step_interpolant()
                     
                 if events is not None:
                     active_events, roots, end_int = handle_events(tsol, events, self.consts, direction, is_terminal, self.t[-2], self.t[-1])
@@ -714,14 +713,7 @@ class OdeSystem(object):
                             self.counter += 1
 
                     if end_int:
-                        tsol = CubicHermiteInterp(
-                            self.t[-2], 
-                            self.t[-1], 
-                            self.y[-2], 
-                            self.y[-1],
-                            self.equ_rhs(self.t[-2], self.y[-2], **self.consts),
-                            self.equ_rhs(self.t[-1], self.y[-1], **self.consts)
-                        )
+                        tsol = self.get_step_interpolant()
                         self.int_status = 2
                         self.success    = True
                     else:

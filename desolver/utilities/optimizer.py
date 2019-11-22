@@ -30,17 +30,15 @@ __all__ = [
     'brentsrootvec'
 ]
 
-def brentsroot(f, lower_bound, upper_bound, tol=None, verbose=False):
+def brentsroot(f, bounds, tol=None, verbose=False):
     """Brent's algorithm for finding root of a bracketed function.
 
     Parameters
     ----------
     f : callable
         callable that evaluates the function whose roots are to be found
-    lower_bound : float-type
-        lower bound of interval to find root in
-    upper_bound : float-type
-        upper bound of interval to find root in
+    bounds : tuple of float, shape (2,)
+        lower and upper bound of interval to find root in
     tol : float-type
         numerical tolerance for the precision of the root
     verbose : bool
@@ -62,6 +60,7 @@ def brentsroot(f, lower_bound, upper_bound, tol=None, verbose=False):
     (True, 0.34595481584824206, 6.938893903907228e-17)
     ```
     """
+    lower_bound, upper_bound = bounds
     if tol is None:
         tol = D.epsilon()
     if tol < D.epsilon():
@@ -230,17 +229,15 @@ def brentsroot(f, lower_bound, upper_bound, tol=None, verbose=False):
 #     else:
 #         return brentsroot(flist, lower_bound, upper_bound, tol=tol, verbose=verbose)
 
-def brentsrootvec(f, lower_bound, upper_bound, tol=None, verbose=False):
+def brentsrootvec(f, bounds, tol=None, verbose=False):
     """Vectorised Brent's algorithm for finding root of bracketed functions.
 
     Parameters
     ----------
     f : list of callables
         list of callables each of which evaluates the function to find the root of
-    lower_bound : float-type
-        lower bound of interval to find roots in
-    upper_bound : float-type
-        upper bound of interval to find roots in
+    bounds : tuple of float, shape (2,)
+        lower and upper bound of interval to find root in
     tol : float-type
         numerical tolerance for the precision of the roots
     verbose : bool
@@ -262,7 +259,7 @@ def brentsrootvec(f, lower_bound, upper_bound, tol=None, verbose=False):
     (array([ True,  True,  True]), array([0.        , 1.        , 1.61803399]), [0.0, 0.0, 0.0])
     ```
     """
-    
+    lower_bound, upper_bound = bounds
     if tol is None:
         tol = D.epsilon()
     if tol < D.epsilon():
