@@ -8,6 +8,7 @@ Implicit integrators are intended for release 3.0, but that's far off for now.
 
 # Latest Release
 **2.5.0** - Event detection has been added to the library. It is now possible to do numerical integration with terminal and non-terminal events.
+ 
 **2.2.0** - PyTorch backend is now implemented. It is now possible to numerically integrate a system of equations that use pytorch tensors and then compute gradients from these.
 
 **Use of PyTorch backend requires installation of PyTorch from [here](https://pytorch.org/get-started/locally/).**
