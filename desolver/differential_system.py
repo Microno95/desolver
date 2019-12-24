@@ -24,6 +24,7 @@ SOFTWARE.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import collections
 import sys
 
 from tqdm.auto import tqdm
@@ -43,6 +44,8 @@ __all__ = [
     'rhs_prettifier',
     'OdeSystem'
 ]
+
+StateTuple = collections.namedtuple('StateTuple', ['t', 'y'])
 
 ##### Code adapted from https://github.com/scipy/scipy/blob/v1.3.2/scipy/integrate/_ivp/ivp.py#L28 #####
 def prepare_events(events):
@@ -782,13 +785,13 @@ class OdeSystem(object):
     
     def __getitem__(self, index):
         if isinstance(index, int):
-            return (self.t[index], self.y[index])
+            return StateTuple(t=self.t[index], y=self.y[index])
         elif isinstance(index, float):
             if self.__dense_output and self.sol is not None:
-                return (index, self.sol(index))
+                return StateTuple(t=index, y=self.sol(index))
             else:
                 nearest_idx = deutil.search_bisection(self.t, index)
-                return (self.t[nearest_idx], self.y[nearest_idx])
+                return StateTuple(t=self.t[nearest_idx], y=self.y[nearest_idx])
             
     def __len__(self):
         return self.counter + 1
