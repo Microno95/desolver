@@ -284,8 +284,8 @@ class OdeSystem(object):
             self.nfev += 1
             return equ_rhs(*args, **kwargs)
         
-        if hasattr(equ_rhs, "equRepr"):
-            self.equ_rhs     = DiffRHS(equ_rhs_wrapped, equ_rhs.equRepr)
+        if hasattr(equ_rhs, "equ_repr"):
+            self.equ_rhs     = DiffRHS(equ_rhs_wrapped, equ_rhs.equ_repr)
         else:
             self.equ_rhs     = DiffRHS(equ_rhs_wrapped)
             
