@@ -8,7 +8,10 @@ from . import utilities
 from . import integration_schemes
 from .integration_schemes import available_methods
 
-# Pytest testing
-from numpy._pytesttester import PytestTester
-test = PytestTester(__name__)
-del PytestTester
+try:
+    # Pytest testing
+    from numpy._pytesttester import PytestTester
+    test = PytestTester(__name__)
+    del PytestTester
+except:
+    pass

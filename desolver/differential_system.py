@@ -176,7 +176,7 @@ class DenseOutput(object):
             for idx, _t in enumerate(flat_t):
                 tidx = min(deutil.search_bisection(self.t_eval, _t), len(self.y_interpolants) - 1)
                 flat_y[idx] = self.y_interpolants[tidx](_t)
-            return D.reshape(flat_y, (*D.shape(t), *D.shape(flat_y)[1:]))
+            return D.reshape(flat_y, D.shape(t) + D.shape(flat_y)[1:])
         else:
             tidx = min(deutil.search_bisection(self.t_eval, t), len(self.y_interpolants) - 1)
             return self.y_interpolants[tidx](t)
@@ -352,8 +352,8 @@ class OdeSystem(object):
                 self._y = D.stack(self._y)
                 self._t = D.stack(self._t)
             else:
-                self._y  = D.concatenate([self._y, D.zeros((num_units, *D.shape(self._y[0])), dtype=self._y[0].dtype)], axis=0)
-                self._t  = D.concatenate([self._t, D.zeros((num_units, *D.shape(self._t[0])), dtype=self._y[0].dtype)], axis=0)
+                self._y  = D.concatenate([self._y, D.zeros((num_units, ) + D.shape(self._y[0]), dtype=self._y[0].dtype)], axis=0)
+                self._t  = D.concatenate([self._t, D.zeros((num_units, ) + D.shape(self._t[0]), dtype=self._y[0].dtype)], axis=0)
         else:
             if num_units != 0:
                 self._y  = self._y + [None for _ in range(num_units)]
@@ -729,7 +729,7 @@ class OdeSystem(object):
                 
                 if eta:
                     tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[-1]) / self.dt)
-                    tqdm_progress_bar.desc  = f"{self.t[-1]:>10.2f} | {tf:.2f} | {self.dt:<10.2e}"
+                    tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.t[-1], tf, self.dt)
                     tqdm_progress_bar.update()
                     
                 steps += 1
@@ -760,10 +760,10 @@ class OdeSystem(object):
     def __repr__(self):
         return "\n".join([
             """{:>10}: {:<128}""".format("message", self.integration_status()),
-            """{:>10}: {:<128}""".format("nfev", str(self.nfev)),
-            """{:>10}: {:<128}""".format("sol", str(self.sol)),
-            """{:>10}: {:<128}""".format("t", str(self.t)),
-            """{:>10}: {:<128}""".format("y", str(self.y)),
+            """{:>10}: {:<128}""".format("nfev",    str(self.nfev)),
+            """{:>10}: {:<128}""".format("sol",     str(self.sol)),
+            """{:>10}: {:<128}""".format("t",       str(self.t)),
+            """{:>10}: {:<128}""".format("y",       str(self.y)),
         ])
 
     def __str__(self):

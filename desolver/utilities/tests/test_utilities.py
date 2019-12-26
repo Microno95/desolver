@@ -5,7 +5,7 @@ import desolver.backend as D
 import numpy as np
 
 def test_convert_suffix():
-    assert(de.deutil.convert_suffix() == "0.00d:1.00h:1.00m:1.00s")
+    assert(de.utilities.convert_suffix(3661) == "0d:1h:1m1.00s")
 
 def test_bisection_search():
     l1 = [0.0, 1.0, 2.0, 3.0, 5.0, 10.0]

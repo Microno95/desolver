@@ -50,7 +50,13 @@ class ExplicitIntegrator(IntegratorTemplate):
         self.atol       = atol
         self.adaptive   = D.shape(self.final_state)[0] == 2
         self.num_stages = D.shape(self.tableau)[0]
-        self.aux        = D.zeros((self.num_stages, *self.dim))
+        self.aux        = D.zeros((self.num_stages, ) + self.dim)
+        
+        if dtype is not None:
+            if D.backend() == 'torch':
+                self.aux = self.aux.to(dtype)
+            else:
+                self.aux = self.aux.astype(dtype)
         
         if D.backend() == 'torch':
             self.aux         = self.aux.to(device)
@@ -62,16 +68,21 @@ class ExplicitIntegrator(IntegratorTemplate):
             raise NotImplementedError("In order to use the fixed step integrator, subclass this class and populate the butcher tableau")
         else:
             aux = self.aux
+            tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (aux.ndim - 1))
 
             for stage in range(self.num_stages):
-                current_state = initial_state    + D.einsum("n,n...->...", self.tableau[stage, 1:], aux)
+#                current_state = initial_state    + D.einsum("n,n...->...", self.tableau[stage, 1:], aux)
+                current_state = initial_state    + D.sum(self.tableau[stage][tableau_idx_expand] * aux, axis=0)
                 aux[stage]    = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
                 
-            self.dState = D.einsum("n,n...->...", self.final_state[0, 1:], aux)
+                           
+#            self.dState = D.einsum("n,n...->...", self.final_state[0, 1:], aux)
+            self.dState = D.sum(self.final_state[0][tableau_idx_expand] * aux, axis=0)
             self.dTime  = timestep
             
             if self.adaptive:
-                diff = self.dState - D.einsum("n,n...->...", self.final_state[1, 1:], aux)
+#                diff = self.dState - D.einsum("n,n...->...", self.final_state[1, 1:], aux)
+                diff = self.dState - D.sum(self.final_state[1][tableau_idx_expand] * aux, axis=0)
                 timestep, redo_step = self.update_timestep(diff, initial_time, timestep)
                 if redo_step:
                     timestep, (self.dTime, self.dState) = self(rhs, initial_time, initial_state, constants, timestep)
@@ -114,6 +125,7 @@ class SymplecticIntegrator(IntegratorTemplate):
         self.num_stages = D.shape(self.tableau)[0]
         self.msk  = self.staggered_mask
         self.nmsk = D.logical_not(self.staggered_mask)
+        
         if D.backend() == 'torch':
             self.tableau     = self.tableau.to(device)
             self.msk  = self.msk.to(self.tableau)
