@@ -15,9 +15,9 @@ def test_backend():
             # Default datatype test
             for i in D.available_float_fmt():
                 D.set_float_fmt(i)
-                assert(D.array(1.0).dtype  == np.dtype(D.float_fmt()))
+                assert(D.array(1.0).dtype  == D.float_fmts[D.float_fmt()])
 
-        expected_eps = {'float16': 5e-3, 'float32': 5e-7, 'float64': 5e-16}
+        expected_eps = {'float16': 5e-3, 'float32': 5e-7, 'float64': 5e-16, 'vfloat64': 5e-16}
         test_array   = np.array([1], dtype=np.int64)
         # Test Function Evals
         for i in D.available_float_fmt():
@@ -25,19 +25,21 @@ def test_backend():
             assert(D.float_fmt() == str(i))
             assert(D.epsilon() == expected_eps[str(i)])
             assert(isinstance(D.available_float_fmt(), list))
-            assert(D.cast_to_float_fmt(test_array).dtype == np.dtype(str(i)))
+            if i != 'vfloat64':
+                assert(D.cast_to_float_fmt(test_array).dtype == str(i))
             
             arr1 = D.array([[2.0, 1.0],[1.0, 0.0]])
             arr2 = D.array([[1.0, 1.0],[-1.0, 1.0]])
             
-            arr3 = D.contract_first_ndims(arr1, arr2, 1)
-            arr4 = D.contract_first_ndims(arr1, arr2, 2)
+            if D.backend() != 'pyaudi':
+                arr3 = D.contract_first_ndims(arr1, arr2, 1)
+                arr4 = D.contract_first_ndims(arr1, arr2, 2)
             
-            true_arr3 = D.array([1.0, 1.0])
-            true_arr4 = D.array(2.)
-            
-            assert(D.norm(arr3 - true_arr3) <= 2 * D.epsilon())
-            assert(D.norm(arr4 - true_arr4) <= 2 * D.epsilon())
+                true_arr3 = D.array([1.0, 1.0])
+                true_arr4 = D.array(2.)
+
+                assert(D.norm(arr3 - true_arr3) <= 2 * D.epsilon())
+                assert(D.norm(arr4 - true_arr4) <= 2 * D.epsilon())
             
             de.utilities.warning("Testing float format {}".format(D.float_fmt()))
             
@@ -78,30 +80,34 @@ def test_backend():
             assert(D.mul(pi,1)       == pi)
 
             assert(0.31830988618379067 - 2*D.epsilon() <= D.reciprocal(pi)  <= 0.31830988618379067 + 2*D.epsilon())
-            assert(0.14159265358979324 - 2*D.epsilon() <= D.remainder(pi,3) <= 0.14159265358979324 + 2*D.epsilon())
+            
+            if D.backend() != 'pyaudi':
+                assert(0.14159265358979324 - 2*D.epsilon() <= D.remainder(pi,3) <= 0.14159265358979324 + 2*D.epsilon())
+                assert(D.ceil(pi)        == 4)
+                assert(D.floor(pi)       == 3)
+                assert(D.round(pi)       == 3)
+                assert(1.1415926535897931 - 2*D.epsilon()  <= D.fmod(pi,2) <= 1.1415926535897931 + 2*D.epsilon())
 
-            assert(D.ceil(pi)        == 4)
-            assert(D.floor(pi)       == 3)
-            assert(D.round(pi)       == 3)
-            assert(1.1415926535897931 - 2*D.epsilon()  <= D.fmod(pi,2) <= 1.1415926535897931 + 2*D.epsilon())
+                assert(D.clip(pi,1,2)    == 2)
+                assert(D.sign(pi)        == 1)
+                assert(D.trunc(pi)       == 3)
 
-            assert(D.clip(pi,1,2)    == 2)
-            assert(D.sign(pi)        == 1)
-            assert(D.trunc(pi)       == 3)
-
-            assert(0.9772133079420067 - 2*D.epsilon()    <= D.digamma(pi)             <= 0.9772133079420067 + 2*D.epsilon())
+                assert(0.9772133079420067 - 2*D.epsilon()    <= D.digamma(pi)             <= 0.9772133079420067 + 2*D.epsilon())
+                assert(0.4769362762044699 - 2*D.epsilon()    <= D.erfinv(D.to_float(0.5)) <= 0.4769362762044699 + 2*D.epsilon())
+                assert(1.7891115385869942 - 2*D.epsilon()    <= D.mvlgamma(pi, 2)         <= 1.7891115385869942 + 2*D.epsilon())
+                assert(D.frac(pi)            == pi - 3)
+                
             assert(0.9999911238536324 - 2*D.epsilon()    <= D.erf(pi)                 <= 0.9999911238536324 + 2*D.epsilon())
             assert(8.8761463676416054e-6 - 2*D.epsilon() <= D.erfc(pi)                <= 8.8761463676416054e-6 + 2*D.epsilon())
-            assert(0.4769362762044699 - 2*D.epsilon()    <= D.erfinv(D.to_float(0.5)) <= 0.4769362762044699 + 2*D.epsilon())
+            
             assert(0.9585761678336372 - 2*D.epsilon()    <= D.sigmoid(pi)             <= 0.9585761678336372 + 2*D.epsilon())
 
             assert(0.5641895835477563 - 2*D.epsilon()    <= D.rsqrt(pi)               <= 0.5641895835477563 + 2*D.epsilon())
             assert(pi + 0.5 - 2*D.epsilon()              <= D.lerp(pi,pi+1,0.5)       <= pi + 0.5 + 2*D.epsilon())
-            assert(1.7891115385869942 - 2*D.epsilon()    <= D.mvlgamma(pi, 2)         <= 1.7891115385869942 + 2*D.epsilon())
+            
             
             assert(D.addcdiv(pi,1,D.to_float(3),D.to_float(2))   == pi + (1 * (3 / 2)))
             assert(D.addcmul(pi,1,D.to_float(3),D.to_float(2))   == pi + (1 * (3 * 2)))
-            assert(D.frac(pi)            == pi - 3)
     except:
         print("{} Backend Test Failed".format(os.environ['DES_BACKEND']))
         raise

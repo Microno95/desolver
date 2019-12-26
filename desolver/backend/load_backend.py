@@ -26,6 +26,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
+import numpy
 
 from .common import *
 
@@ -37,6 +38,8 @@ if backend() == 'numpy':
     from .numpy_backend import *
 elif backend() == 'torch':
     from .torch_backend import *
+elif backend() == 'pyaudi':
+    from .pyaudi_backend import *
 else:
     raise ValueError("Unable to import backend : " + str(backend()))
     

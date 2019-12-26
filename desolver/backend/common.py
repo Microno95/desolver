@@ -100,12 +100,16 @@ def epsilon():
         return 5e-7
     elif _FLOAT_FORMAT == 'float64':
         return 5e-16
+    elif _FLOAT_FORMAT == 'vfloat64':
+        return 5e-16
     
 def available_float_fmt():
     if _BACKEND == 'numpy':
         return ['float16', 'float32', 'float64']
-    else:
+    elif _BACKEND == 'torch':
         return ['float32', 'float64']
+    elif _BACKEND == 'pyaudi':
+        return ['float64', 'vfloat64']
 
 def float_fmt():
     """Returns float format as a string
@@ -171,9 +175,13 @@ def set_float_fmt(new_fmt):
             torch.set_default_dtype(torch.float32)
         elif new_fmt == 'float64':
             torch.set_default_dtype(torch.float64)
+    elif _BACKEND == 'pyaudi':
+        if new_fmt not in available_float_fmt():
+            raise ValueError("Unknown float type " + str(new_fmt) + " for backend " + str(_BACKEND))
     
     _FLOAT_FORMAT = str(new_fmt)
-    
+
+
 def cast_to_float_fmt(x):
     """Cast a Numpy array to the default DESolver float type
 
@@ -209,4 +217,4 @@ def cast_to_float_fmt(x):
     ```
     """
     
-    return numpy.asarray(x, dtype=_FLOAT_FORMAT)
+    return numpy.asarray(x, dtype=float_fmt())

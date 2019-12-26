@@ -38,11 +38,18 @@ int16   = numpy.int16
 int32   = numpy.int32
 int64   = numpy.int64
 
+
+float_fmts = {
+    'float16': float16,
+    'float32': float32,
+    'float64': float64
+}
+
 def asarray(x):
     return array(x)
 
 def to_float(x):
-    return float(x)
+    return numpy.asanyarray(x).astype(float64)
 
 def to_type(x, dtype):
     return numpy.asanyarray(x).astype(dtype)
@@ -50,7 +57,7 @@ def to_type(x, dtype):
 # Convenience Decorators
 def type_reg(f):
     def _wrapped(*args, **kwargs):
-        kwargs.setdefault("dtype", float_fmt())
+        kwargs.setdefault("dtype", float_fmts[float_fmt()])
         return f(*args, **kwargs)
     _wrapped.original_function = f
     return _wrapped

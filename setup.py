@@ -31,8 +31,8 @@ from setuptools import setup
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-setup(name='DESolver',
-      version='2.5.7',
+setup(name='desolver',
+      version='2.5.8',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',

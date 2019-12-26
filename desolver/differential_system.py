@@ -123,7 +123,7 @@ def handle_events(sol, events, consts, direction, is_terminal, t_prev, t_next):
               down   & (direction < 0) |
               either & (direction == 0))
     
-    if D.backend() == 'numpy':
+    if D.backend() in ['numpy', 'pyaudi']:
         active_events = D.nonzero(mask)[0]
     else:
         active_events = D.reshape(D.nonzero(mask)[0], (-1,))
@@ -347,7 +347,7 @@ class OdeSystem(object):
         return
         
     def __allocate_soln_space(self, num_units):
-        if D.backend() == 'numpy':
+        if D.backend() in ['numpy', 'pyaudi']:
             if num_units == 0:
                 self._y = D.stack(self._y)
                 self._t = D.stack(self._t)
