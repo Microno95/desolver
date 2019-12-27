@@ -17,7 +17,7 @@ def test_backend():
                 D.set_float_fmt(i)
                 assert(D.array(1.0).dtype  == D.float_fmts[D.float_fmt()])
 
-        expected_eps = {'float16': 5e-3, 'float32': 5e-7, 'float64': 5e-16, 'vfloat64': 5e-16}
+        expected_eps = {'float16': 5e-3, 'float32': 5e-7, 'float64': 5e-16, 'gdual_double': 5e-16, 'gdual_vdouble': 5e-16, 'gdual_real128': 5e-16}
         test_array   = np.array([1], dtype=np.int64)
         # Test Function Evals
         for i in D.available_float_fmt():
@@ -25,13 +25,13 @@ def test_backend():
             assert(D.float_fmt() == str(i))
             assert(D.epsilon() == expected_eps[str(i)])
             assert(isinstance(D.available_float_fmt(), list))
-            if i != 'vfloat64':
+            if not i.startswith('gdual'):
                 assert(D.cast_to_float_fmt(test_array).dtype == str(i))
             
             arr1 = D.array([[2.0, 1.0],[1.0, 0.0]])
             arr2 = D.array([[1.0, 1.0],[-1.0, 1.0]])
             
-            if D.backend() != 'pyaudi':
+            if not i.startswith('gdual'):
                 arr3 = D.contract_first_ndims(arr1, arr2, 1)
                 arr4 = D.contract_first_ndims(arr1, arr2, 2)
             
@@ -81,7 +81,7 @@ def test_backend():
 
             assert(0.31830988618379067 - 2*D.epsilon() <= D.reciprocal(pi)  <= 0.31830988618379067 + 2*D.epsilon())
             
-            if D.backend() != 'pyaudi':
+            if not i.startswith('gdual'):
                 assert(0.14159265358979324 - 2*D.epsilon() <= D.remainder(pi,3) <= 0.14159265358979324 + 2*D.epsilon())
                 assert(D.ceil(pi)        == 4)
                 assert(D.floor(pi)       == 3)

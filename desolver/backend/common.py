@@ -36,11 +36,14 @@ __all__ = [
     'available_float_fmt',
     'float_fmt',
     'set_float_fmt',
-    'cast_to_float_fmt'
+    'cast_to_float_fmt',
+    'float_fmts'
 ]
 
 _BACKEND      = 'numpy'
 _FLOAT_FORMAT = 'float64'
+
+float_fmts = dict()
 
 # Constants
 e           = 2.7182818284590452353602874713526624977572470936999595749669676277240766303535475945713821785251664274
@@ -98,18 +101,13 @@ def epsilon():
         return 5e-3
     elif _FLOAT_FORMAT == 'float32':
         return 5e-7
-    elif _FLOAT_FORMAT == 'float64':
+    elif _FLOAT_FORMAT in ['float64', 'gdual_double', 'gdual_vdouble']:
         return 5e-16
-    elif _FLOAT_FORMAT == 'vfloat64':
+    elif _FLOAT_FORMAT == 'gdual_real128':
         return 5e-16
     
 def available_float_fmt():
-    if _BACKEND == 'numpy':
-        return ['float16', 'float32', 'float64']
-    elif _BACKEND == 'torch':
-        return ['float32', 'float64']
-    elif _BACKEND == 'pyaudi':
-        return ['float64', 'vfloat64']
+    return sorted(float_fmts.keys())
 
 def float_fmt():
     """Returns float format as a string

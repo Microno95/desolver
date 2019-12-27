@@ -9,6 +9,7 @@ available_methods = dict()
 __integration_methods__ = [
     RK45CKSolver,
     RK5Solver,
+    RK4Solver,
     MidpointSolver,
     HeunsSolver,
     EulerSolver,

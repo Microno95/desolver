@@ -217,7 +217,7 @@ def test_event_detection():
                         print("Event detection with integrator {} succeeded with t[-1] = {}".format(a.integrator, a.t[-1]))
                     a.reset()
                 except Exception as e:
-                    print(e)
+                    raise e
                     raise RuntimeError("Test failed for integration method: {}".format(a.integrator))
             print("")
 
