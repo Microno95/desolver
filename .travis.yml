@@ -1,0 +1,34 @@
+language: python
+python:
+  - 3.5
+  - 3.6
+  - 3.7
+  - 3.8-dev
+  - nightly
+env:
+  - PYAUDI_AVAILABLE=true
+  - PYAUDI_AVAILABLE=false
+  - DES_BACKEND='numpy'
+  - DES_BACKEND='torch'
+jobs:
+  exclude:
+  - python: 3.8-dev
+    env: DES_BACKEND='torch'
+  - python: 3.8-dev
+    env: PYAUDI_AVAILABLE=true
+  - python: nightly
+    env: DES_BACKEND='torch'
+  - python: nightly
+    env: PYAUDI_AVAILABLE=true
+  
+before_install:
+  - pip install -r requirements.txt
+  - if [[ $PYAUDI_AVAILABLE == true ]]; then pip3 install pyaudi>=1.7; fi
+  - if [[ "$DES_BACKEND" == "torch" ]]; then pip3 install torch==1.3.1+cpu torchvision==0.4.2+cpu -f https://download.pytorch.org/whl/torch_stable.html; fi
+# command to install dependencies
+install:
+  - pip install .
+# command to run tests
+script:
+  - nosetests
+

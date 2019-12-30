@@ -32,6 +32,7 @@ from .integrator_types import ExplicitIntegrator, SymplecticIntegrator
 __all__ = [
     'RK45CKSolver',
     'RK5Solver',
+    'RK4Solver',
     'MidpointSolver',
     'HeunsSolver',
     'EulerSolver',
@@ -70,6 +71,17 @@ class RK5Solver(ExplicitIntegrator):
 
     final_state = numpy.array(
         [[0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ]], dtype=numpy.float64
+    )
+    
+@named_integrator("Explicit RK4",
+                   alt_names=("RK4", "Runge-Kutta 4", "RK4"),
+                   order=5.0)
+class RK4Solver(ExplicitIntegrator):
+    # The 4th order integrator from RK45 Cash-Karp
+    tableau = numpy.copy(RK45CKSolver.tableau)
+
+    final_state = numpy.array(
+        [[0., 37/378,     0, 250/621,     125/594,     0,         512/1771]], dtype=numpy.float64
     )
 
 @named_integrator("Explicit Midpoint",

@@ -27,6 +27,7 @@ from .common import *
 import numpy
 import scipy
 import scipy.special
+    
 
 # Datatypes
 bool    = numpy.bool
@@ -39,11 +40,11 @@ int32   = numpy.int32
 int64   = numpy.int64
 
 
-float_fmts = {
+float_fmts.update({
     'float16': float16,
     'float32': float32,
     'float64': float64
-}
+})
 
 def asarray(x):
     return array(x)

@@ -32,7 +32,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='desolver',
-      version='2.5.9',
+      version='3.0.0b1',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
@@ -43,12 +43,16 @@ setup(name='desolver',
       keywords=['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode'],
       url='https://github.com/Microno95/desolver',
       packages=['desolver', 'desolver.integration_schemes', 'desolver.exception_types', 'desolver.utilities', 'desolver.backend'],
+      extras_require={
+        'pyaudi':   ["pyaudi>=1.7"],
+        'pytorch':  ["torch>=1.3.1", "torchvision>=0.4.2"],
+      },
       classifiers=[
           # How mature is this project? Common values are
           #   3 - Alpha
           #   4 - Beta
           #   5 - Production/Stable
-          'Development Status :: 5 - Production/Stable',
+          'Development Status :: 4 - Beta',
 
           'Environment :: Console',
           # Indicate who your project is intended for

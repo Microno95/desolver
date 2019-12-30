@@ -35,10 +35,10 @@ int16   = torch.int16
 int32   = torch.int32
 int64   = torch.int64
 
-float_fmts = {
+float_fmts.update({
     'float32': 'float32',
     'float64': 'float64'
-}
+})
 
 def to_float(x):
     if not torch.is_tensor(x):
