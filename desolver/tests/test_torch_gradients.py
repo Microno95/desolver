@@ -42,10 +42,10 @@ def test_gradients():
                     return self.net(torch.cat([y, dy]))
 
         class SimpleODE(torch.nn.Module):
-            def __init__(self, inter_dim=2, k=1.0):
+            def __init__(self, inter_dim=10, k=1.0):
                 super().__init__()
                 self.nn_controller = NNController(in_dim=4, out_dim=1, inter_dim=inter_dim)
-                self.A = torch.tensor([[0.0, 1.0],[-k, 0.0]], requires_grad=True)
+                self.A = torch.tensor([[0.0, 1.0],[-k, -1.0]], requires_grad=True)
 
             def forward(self, t, y, params=None):
                 if not isinstance(t, torch.Tensor):
@@ -66,13 +66,16 @@ def test_gradients():
 
                 controller_effect = self.nn_controller(torch_t, torch_y, dy) if params is None else params
 
-                return dy + torch.cat([torch.tensor([0.0]), (controller_effect * 2.0 - 1.0)*0.01])
+                return dy + torch.cat([torch.tensor([0.0]), (controller_effect * 2.0 - 1.0)])
 
         with de.utilities.BlockTimer(section_label="Integrator Tests"):
             for i in sorted(set(de.available_methods.values()), key=lambda x:x.__name__):
+                if i.__name__ == "Explicit Adaptive Heun-Euler":
+                    print("found")
+                    continue
                 try:
-                    yi1 = D.array([1.0, 1.0], requires_grad=True)
-                    df  = SimpleODE(k=5.0)
+                    yi1 = D.array([1.0, 0.0], requires_grad=True)
+                    df  = SimpleODE(k=1.0)
 
                     a = de.OdeSystem(df, yi1, t=(0, 1.), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
                     a.set_method(i)
