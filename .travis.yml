@@ -10,6 +10,16 @@ env:
   - PYAUDI_AVAILABLE=false
   - DES_BACKEND='numpy'
   - DES_BACKEND='torch'
+jobs:
+  exclude:
+  - python: 3.8-dev
+    env: DES_BACKEND='torch'
+  - python: 3.8-dev
+    env: PYAUDI_AVAILABLE=true
+  - python: nightly
+    env: DES_BACKEND='torch'
+  - python: nightly
+    env: PYAUDI_AVAILABLE=true
   
 before_install:
   - pip install -r requirements.txt
