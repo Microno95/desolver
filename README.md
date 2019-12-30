@@ -7,9 +7,12 @@ Many integration routines are included ranging from fixed step to symplectic to 
 
 Implicit integrators are intended for release 3.0, but that's far off for now.
 
-# Latest Release
-**3.0.0b1** - PyAudi support has been added to the module. It is now possible to do numerical integrations using `gdual` variables such as `gdual_double`, `gdual_vdouble` and `gdual_real128`.
+# In Beta Development
+**3.0.0b3** - PyAudi support has been added to the module. It is now possible to do numerical integrations using `gdual` variables such as `gdual_double`, `gdual_vdouble` and `gdual_real128`.
  
+This version can be installed with `pip install desolver[pyaudi,pytorch]==3.0.0b3`
+
+# Latest Release
 **2.5.0** - Event detection has been added to the module. It is now possible to do numerical integration with terminal and non-terminal events.
  
 **2.2.0** - PyTorch backend is now implemented. It is now possible to numerically integrate a system of equations that use pytorch tensors and then compute gradients from these.
@@ -36,7 +39,8 @@ Just type
 4. Euler-Trapezoidal Method
 5. BABs9o7H Method  -- Based on arXiv:1501.04345v2 - BAB's9o7H
 6. ABAs5o6HA Method -- Based on arXiv:1501.04345v2 - ABAs5o6H
-7. Runge-Kutta 5 - The 5th order integrator from RK45. Very accurate with fixed step size.
+7. Runge-Kutta 5 - The 5th order integrator from RK45 with Cash-Karp Coefficients.
+8. Runge-Kutta 4 - The 4th order integrator from RK45 with Cash-Karp Coefficients.
 #### Implicit Methods
 **NOT YET IMPLEMENTED**
 
