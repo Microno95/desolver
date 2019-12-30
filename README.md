@@ -1,5 +1,6 @@
 # DESolver
 [![BCH compliance](https://bettercodehub.com/edge/badge/Microno95/desolver?branch=master)](https://bettercodehub.com/)
+[![Build Status](https://travis-ci.com/Microno95/desolver.svg?branch=master)](https://travis-ci.com/Microno95/desolver)
 
 This is a python package for solving Initial Value Problems using various numerical integrators.
 Many integration routines are included ranging from fixed step to symplectic to adaptive integrators.
@@ -7,10 +8,12 @@ Many integration routines are included ranging from fixed step to symplectic to 
 Implicit integrators are intended for release 3.0, but that's far off for now.
 
 # Latest Release
-**2.5.0** - Event detection has been added to the library. It is now possible to do numerical integration with terminal and non-terminal events.
+**3.0.0b1** - PyAudi support has been added to the module. It is now possible to do numerical integrations using `gdual` variables such as `gdual_double`, `gdual_vdouble` and `gdual_real128`.
+ 
+**2.5.0** - Event detection has been added to the module. It is now possible to do numerical integration with terminal and non-terminal events.
  
 **2.2.0** - PyTorch backend is now implemented. It is now possible to numerically integrate a system of equations that use pytorch tensors and then compute gradients from these.
-
+ 
 **Use of PyTorch backend requires installation of PyTorch from [here](https://pytorch.org/get-started/locally/).**
 
 # To Install:
