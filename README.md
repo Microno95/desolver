@@ -10,7 +10,7 @@ Implicit integrators are intended for release 3.0, but that's far off for now.
 # In Beta Development
 **3.0.0b4** - PyAudi support has been added to the module. It is now possible to do numerical integrations using `gdual` variables such as `gdual_double`, `gdual_vdouble` and `gdual_real128`.
  
-This version can be installed with `pip install desolver[pyaudi,pytorch]==3.0.0b4`
+This version can be installed with `pip install desolver[pyaudi]==3.0.0b5`
 
 # Latest Release
 **2.5.0** - Event detection has been added to the module. It is now possible to do numerical integration with terminal and non-terminal events.
