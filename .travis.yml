@@ -8,6 +8,8 @@ python:
 env:
   - PYAUDI_AVAILABLE=true
   - PYAUDI_AVAILABLE=false
+  - DES_BACKEND='numpy'
+  - DES_BACKEND='torch'
   
 before_install:
   - pip install -r requirements.txt
