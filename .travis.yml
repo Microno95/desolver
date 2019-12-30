@@ -1,0 +1,21 @@
+language: python
+python:
+  - 3.5
+  - 3.6
+  - 3.7
+  - 3.8-dev
+  - nightly
+env:
+  - PYAUDI_AVAILABLE=true
+  - PYAUDI_AVAILABLE=false
+  
+before_install:
+  - pip install -r requirements.txt
+  - if [[ $PYAUDI_AVAILABLE == true ]]; then pip install pyaudi>=1.7; fi
+# command to install dependencies
+install:
+  - pip install .
+# command to run tests
+script:
+  - pytest
+

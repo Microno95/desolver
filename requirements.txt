@@ -1,0 +1,4 @@
+scipy>=0.18.0
+numpy
+torch
+torchvision
