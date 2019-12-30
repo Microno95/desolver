@@ -13,7 +13,8 @@ env:
   
 before_install:
   - pip install -r requirements.txt
-  - if [[ $PYAUDI_AVAILABLE == true ]]; then pip install pyaudi>=1.7; fi
+  - if [[ $PYAUDI_AVAILABLE == true ]]; then pip3 install pyaudi>=1.7; fi
+  - if [[ "$DES_BACKEND" == "torch" ]]; then pip3 install torch==1.3.1+cpu torchvision==0.4.2+cpu -f https://download.pytorch.org/whl/torch_stable.html; fi
 # command to install dependencies
 install:
   - pip install .
