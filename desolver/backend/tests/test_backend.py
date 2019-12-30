@@ -1,6 +1,5 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
+import numpy as np
 
 def test_backend():
     try:
@@ -9,7 +8,8 @@ def test_backend():
         import numpy as np
         import scipy
         
-        assert(D.backend() == os.environ['DES_BACKEND'])
+        if "DES_BACKEND" in os.environ:
+            assert(D.backend() == os.environ['DES_BACKEND'])
         
         if D.backend() not in ['torch']:
             # Default datatype test
@@ -109,11 +109,14 @@ def test_backend():
             assert(D.addcdiv(pi,1,D.to_float(3),D.to_float(2))   == pi + (1 * (3 / 2)))
             assert(D.addcmul(pi,1,D.to_float(3),D.to_float(2))   == pi + (1 * (3 * 2)))
     except:
-        print("{} Backend Test Failed".format(os.environ['DES_BACKEND']))
+        print("{} Backend Test Failed".format(D.backend()))
         raise
-    print("{} Backend Test Succeeded".format(os.environ['DES_BACKEND']))
+    print("{} Backend Test Succeeded".format(D.backend()))
     
 
+if __name__ == "__main__":
+    np.testing.run_module_suite()
+    
 # # Common Array Operations
 # einsum      = numpy.einsum
 # concatenate = numpy.concatenate
