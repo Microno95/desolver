@@ -95,33 +95,15 @@ def brentsroot(f, bounds, tol=None, verbose=False):
             s = b - fb * (b - a) / (fb - fa)
             
         cond1 = not ((3 * a + b) / 4 < s < b or b < s < (3 * a + b) / 4)
-        bisect_now = cond1
-        if bisect_now:
-            mflag = True
-        else:
-            cond2 = mflag and D.abs(s - b) >= D.abs(b - c)/2
-            bisect_now = bisect_now or cond2
-        if bisect_now:
-            mflag = True
-        else:
-            cond3 = not mflag and D.abs(s - b) >= D.abs(c - d) / 2
-            bisect_now = bisect_now or cond3
-        if bisect_now:
-            mflag = True
-        else:
-            cond4 = mflag and D.abs(b - c) < tol
-            bisect_now = bisect_now or cond4
-        if bisect_now:
-            mflag = True
-        else:
-            cond5 = not mflag and D.abs(c - d) < tol
-            bisect_now = bisect_now or cond5
-        if bisect_now:
+        cond2 = D.abs(s - b) >= D.abs(b - c)/2
+        cond3 = D.abs(s - b) >= D.abs(c - d)/2
+        cond4 = D.abs(b - c) < tol
+        cond5 = D.abs(c - d) < tol
+        bisect_now = cond1 or (mflag and cond2) or (not mflag and cond3) or (mflag and cond4) or (not mflag and cond5)
+        mflag = bisect_now
+        if mflag:
             s = (a + b) / 2
-            mflag = True
-        else:
-            mflag = False
-            
+
         fs = f(s)
         numiter += 1
         d  = c
@@ -141,93 +123,6 @@ def brentsroot(f, bounds, tol=None, verbose=False):
     if verbose:
         print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}".format(**locals()))
     return b, D.abs(f(b)) <= tol
-
-# def brentsrootvec(flist, lower_bound, upper_bound, tol=None, verbose=False):
-#     """Vectorized Brent's algorithm for finding root of a bracketed function.
-
-#     Parameters
-#     ----------
-#     f : callable or list of callables
-#         function or list of functions whose roots need to be found
-#     lower_bound : float-type or list of float-types
-#         lower bound(s) of intervals(s) to find the root in
-#     upper_bound : float-type or list of float-type
-#         upper bound(s) of intervals(s) to find the root in
-#     tol : float-type
-#         numerical tolerance for the precision of the root
-#     verbose : bool
-#         set to true to print useful information
-
-#     Returns
-#     -------
-#     float-type or None
-#         returns None if a root is not found, otherwise returns the root of the function
-
-#     Examples
-#     --------
-#     ```python
-#     >>> def ft(x):
-#         return x**2 - (1 - x)**5
-#     >>> xl, xu = 0.1, 1.0
-#     >>> x0 = D.brentsroot(ft, xl, xu, verbose=True)
-#     >>> x0, ft(x0)
-#     (0.34595481584824206, 6.938893903907228e-17)
-#     ```
-#     """
-    
-#     if hasattr(flist, '__len__'):
-#         try:
-#             flen = len(flist)
-#         except:
-#             flen = 0
-#     else:
-#         flen = 0
-        
-#     if hasattr(lower_bound, '__len__'):
-#         try:
-#             lblen = len(lower_bound)
-#         except:
-#             lblen = 0
-#     else:
-#         lblen = 0
-#     if hasattr(upper_bound, '__len__'):
-#         try:
-#             ublen = len(upper_bound)
-#         except:
-#             ublen = 0
-#     else:
-#         ublen = 0
-        
-#     if flen == lblen == ublen and flen > 0:
-#         return D.stack([
-#             brentsroot(flist[i], lower_bound[i], upper_bound[i], tol=tol, verbose=verbose) for i in range(flen)
-#         ])
-#     elif flen == lblen and flen > 0 and ublen == 0:
-#         return D.stack([
-#             brentsroot(flist[i], lower_bound[i], upper_bound, tol=tol, verbose=verbose) for i in range(flen)
-#         ])
-#     elif flen == ublen and lblen == 0 and flen > 0:
-#         return D.stack([
-#             brentsroot(flist[i], lower_bound, upper_bound[i], tol=tol, verbose=verbose) for i in range(flen)
-#         ])
-#     elif lblen == ublen and lblen > 0 and flen == 0:
-#         return D.stack([
-#             brentsroot(flist, lower_bound[i], upper_bound[i], tol=tol, verbose=verbose) for i in range(lblen)
-#         ])
-#     elif flen == lblen == 0 and ublen > 0:
-#         return D.stack([
-#             brentsroot(flist, lower_bound, upper_bound[i], tol=tol, verbose=verbose) for i in range(ublen)
-#         ])
-#     elif flen == ublen == 0 and lblen > 0:
-#         return D.stack([
-#             brentsroot(flist, lower_bound[i], upper_bound, tol=tol, verbose=verbose) for i in range(lblen)
-#         ])
-#     elif lblen == ublen == 0 and flen > 0:
-#         return D.stack([
-#             brentsroot(flist[i], lower_bound, upper_bound, tol=tol, verbose=verbose) for i in range(flen)
-#         ])
-#     else:
-#         return brentsroot(flist, lower_bound, upper_bound, tol=tol, verbose=verbose)
 
 def brentsrootvec(f, bounds, tol=None, verbose=False):
     """Vectorised Brent's algorithm for finding root of bracketed functions.

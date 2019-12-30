@@ -70,7 +70,7 @@ def prepare_events(events):
 
 #####
 
-def handle_events(sol, events, consts, direction, is_terminal, t_prev, t_next):
+def handle_events(sol, events, consts, direction, is_terminal):
     """Helper function to handle events.
     Parameters
     ----------
@@ -85,8 +85,6 @@ def handle_events(sol, events, consts, direction, is_terminal, t_prev, t_next):
         Direction of event to be detected
     is_terminal : array-type, shape (n_events,)
         Which events are terminal.
-    t_prev, t_next : float
-        Previous and new values of time.
     Returns
     -------
     active_events : array-type
@@ -99,6 +97,7 @@ def handle_events(sol, events, consts, direction, is_terminal, t_prev, t_next):
         Whether a terminal event occurred.
     """
     ev_f = [(lambda event: lambda t: event(t, sol(t), **consts))(ev) for ev in events]
+    t_prev, t_next = sol.t0, sol.t1
     
     roots, success = root_finder(
         ev_f,
@@ -701,7 +700,7 @@ class OdeSystem(object):
                     tsol = self.get_step_interpolant()
 
                 if events is not None:
-                    active_events, roots, end_int = handle_events(tsol, events, self.consts, direction, is_terminal, self.t[-2], self.t[-1])
+                    active_events, roots, end_int = handle_events(tsol, events, self.consts, direction, is_terminal)
 
                     if self.counter+len(roots)+1 >= len(self._y):
                         total_steps = max(int((tf-self._t[self.counter]-dTime)/self.dt), 2) + len(roots)

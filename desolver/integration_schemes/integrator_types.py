@@ -71,17 +71,14 @@ class ExplicitIntegrator(IntegratorTemplate):
             tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (aux.ndim - 1))
 
             for stage in range(self.num_stages):
-#                current_state = initial_state    + D.einsum("n,n...->...", self.tableau[stage, 1:], aux)
                 current_state = initial_state    + D.sum(self.tableau[stage][tableau_idx_expand] * aux, axis=0)
                 aux[stage]    = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
                 
                            
-#            self.dState = D.einsum("n,n...->...", self.final_state[0, 1:], aux)
             self.dState = D.sum(self.final_state[0][tableau_idx_expand] * aux, axis=0)
             self.dTime  = timestep
             
             if self.adaptive:
-#                diff = self.dState - D.einsum("n,n...->...", self.final_state[1, 1:], aux)
                 diff = self.dState - D.sum(self.final_state[1][tableau_idx_expand] * aux, axis=0)
                 timestep, redo_step = self.update_timestep(diff, initial_time, timestep)
                 if redo_step:

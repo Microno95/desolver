@@ -108,6 +108,9 @@ def test_backend():
             
             assert(D.addcdiv(pi,1,D.to_float(3),D.to_float(2))   == pi + (1 * (3 / 2)))
             assert(D.addcmul(pi,1,D.to_float(3),D.to_float(2))   == pi + (1 * (3 * 2)))
+            
+            if not i.startswith('gdual'):
+                assert(-2*D.epsilon() <= D.einsum("nm->", D.array([[1.0, 2.0], [-2.0, -1.0]])) <= 2*D.epsilon())
     except:
         print("{} Backend Test Failed".format(D.backend()))
         raise
@@ -116,61 +119,3 @@ def test_backend():
 
 if __name__ == "__main__":
     np.testing.run_module_suite()
-    
-# # Common Array Operations
-# einsum      = numpy.einsum
-# concatenate = numpy.concatenate
-# append      = numpy.append
-# stack       = numpy.stack
-# ravel       = numpy.ravel
-# flatten     = numpy.ravel
-# arange      = type_reg(numpy.arange)
-# logspace    = type_reg(numpy.logspace)
-# linspace    = type_reg(numpy.linspace)
-# eye         = type_reg(numpy.eye)
-
-# # Reduction Ops
-# argmax    = numpy.argmax
-# argmin    = numpy.argmin
-# cumprod   = numpy.cumprod
-# cumsum    = numpy.cumsum
-# logsumexp = scipy.special.logsumexp
-# mean      = numpy.mean
-# median    = numpy.median
-# prod      = numpy.prod
-# std       = numpy.std
-# var       = numpy.var
-# sum       = numpy.sum
-# norm      = numpy.linalg.norm
-
-# def dist(x, y, ord=2):
-#     return numpy.linalg.norm(x-y, ord=ord)
-
-# # Comparison Ops
-# allclose   = numpy.allclose
-# argsort    = numpy.argsort
-
-# eq         = numpy.equal
-# ne         = numpy.not_equal
-# ge         = numpy.greater_equal
-# gt         = numpy.greater
-# le         = numpy.less_equal
-# lt         = numpy.less
-
-# def equal(*args, **kwargs):
-#     return numpy.all(eq(*args, **kwargs))
-
-# isfinite   = numpy.isfinite
-# isinf      = numpy.isinf
-# isnan      = numpy.isnan
-# max        = numpy.max
-# min        = numpy.min
-
-# array      = type_reg(numpy.array)
-# zeros      = type_reg(numpy.zeros)
-# empty      = type_reg(numpy.empty)
-# full       = type_reg(numpy.full)
-# zeros_like = type_reg(numpy.zeros_like)
-# ones_like  = type_reg(numpy.ones_like)
-# empty_like = type_reg(numpy.empty_like)
-# full_like  = type_reg(numpy.full_like)
