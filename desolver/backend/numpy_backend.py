@@ -114,6 +114,9 @@ erfc     = scipy.special.erfc
 erfinv   = scipy.special.erfinv
 sigmoid  = scipy.special.expit
 
+def softplus(x, out=None):
+    return log(1 + exp(x), out=out)
+
 # Additional Definitions
 def rsqrt(x, out=None):
     return pow(x, -0.5, out=out)

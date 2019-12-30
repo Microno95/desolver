@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from .integrator_template import *
 from .integrator_types import *
 from .integration_schemes import *

@@ -24,15 +24,13 @@ SOFTWARE.
 """
 
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from setuptools import setup
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='desolver',
-      version='3.0.0b4',
+      version='3.0.0b5',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',

@@ -127,6 +127,13 @@ erfc     = torch.erfc
 erfinv   = torch.erfinv
 sigmoid  = torch.sigmoid
 
+def softplus(x, out=None):
+    if out is not None:
+        out.data = log(1 + exp(x))
+        return out
+    else:
+        return log(1 + exp(x))
+
 # Additional Math Definitions
 def square(x, out=None):
     if out is not None:

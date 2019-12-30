@@ -47,6 +47,10 @@ gdual_double.__float__  = lambda self: self.constant_cf
 gdual_vdouble.__float__ = lambda self: self.constant_cf
 gdual_real128.__float__ = lambda self: float(repr(self.constant_cf))
 
+# gdual_double.__int__  = lambda self: int(self.constant_cf)
+# gdual_vdouble.__int__ = lambda self: int(self.constant_cf)
+# gdual_real128.__int__ = lambda self: int(float(repr(self.constant_cf)))
+
 # Fundamental Mathematical Operators
 gdual_double.__abs__  = lambda self: pyaudi.abs(self)
 gdual_vdouble.__abs__ = lambda self: pyaudi.abs(self)
@@ -82,10 +86,10 @@ gdual_vdouble.log2 = lambda self: pyaudi.log(self) / pyaudi.log(gdual_vdouble(2.
 gdual_real128.log2 = lambda self: pyaudi.log(self) / pyaudi.log(gdual_real128(2.0))
 
 def sign(x1, *args, **kwargs):
-    if numpy.asanyarray(x1).dtype == object:
-        return numpy.sign(x1.astype(float64), *args, **kwargs)
+    if asarray(x1).dtype == object:
+        return numpy.sign(asarray(x1).astype(float64), *args, **kwargs)
     else:
-        return numpy.sign(x1, *args, **kwargs)
+        return numpy.sign(asarray(x1), *args, **kwargs)
 
 # Trigonometric Functions
 gdual_double.cos  = lambda self: pyaudi.cos(self)
