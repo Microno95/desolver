@@ -5,6 +5,7 @@ import os
 os.environ['DES_BACKEND']          = 'torch'
 os.environ['CUDA_DEVICE_ORDER']    = 'PCI_BUS_ID'
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['OMP_NUM_THREADS']      = '1'
 
 import desolver as de
 import desolver.backend as D
@@ -230,15 +231,15 @@ def test_gradients():
 
                 controller_effect = self.nn_controller(torch_t, torch_y, dy) if params is None else params
 
-                return dy + torch.cat([torch.tensor([0.0]), controller_effect * 2.0 - 1.0])
+                return dy + torch.cat([torch.tensor([0.0]), (controller_effect * 2.0 - 1.0)*0.01])
 
         with de.utilities.BlockTimer(section_label="Integrator Tests"):
             for i in sorted(set(de.available_methods.values()), key=lambda x:x.__name__):
                 try:
-                    yi1 = torch.tensor([1.0, 1.0], requires_grad=True)
+                    yi1 = D.array([1.0, 1.0], requires_grad=True)
                     df  = SimpleODE(k=5.0)
 
-                    a = de.OdeSystem(df, yi1, t=(0, 10), dt=0.5, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
+                    a = de.OdeSystem(df, yi1, t=(0, 1.), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
                     a.set_method(i)
                     a.integrate(eta=True)
 
@@ -247,7 +248,7 @@ def test_gradients():
                     dyf = D.einsum("nk,k->n", dyfdyi, dyi)
                     yi2 = yi1 + dyi
 
-                    b = de.OdeSystem(df, yi2, t=(0, 10), dt=0.5, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
+                    b = de.OdeSystem(df, yi2, t=(0, 1.), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
                     b.set_method(i)
                     b.integrate(eta=True)
 

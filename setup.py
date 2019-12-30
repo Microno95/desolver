@@ -45,7 +45,7 @@ setup(name='desolver',
       packages=['desolver', 'desolver.integration_schemes', 'desolver.exception_types', 'desolver.utilities', 'desolver.backend'],
       extras_require={
         'pyaudi':  ["pyaudi>=1.7"],
-      }
+      },
       classifiers=[
           # How mature is this project? Common values are
           #   3 - Alpha
