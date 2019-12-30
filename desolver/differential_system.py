@@ -594,6 +594,7 @@ class OdeSystem(object):
         self.dt      = self.dt0
         self.nfev    = 0
         self.__move_to_device()
+        self.int_state = 0
         if self.__dense_output:
             self.sol = DenseOutput([self.t0], [])
 
@@ -653,7 +654,15 @@ class OdeSystem(object):
         total_steps = int((tf-self.t[-1])/self.dt)
         
         if eta:
-            tqdm_progress_bar = tqdm(total=total_steps)
+            tqdm_progress_bar = tqdm(total=9e9)
+            
+        try:
+            callback = list(callback)
+        except:
+            if callback is None:
+                callback = []
+            else:
+                callback = [callback]
             
         events, is_terminal, direction = prepare_events(events)
             
@@ -662,53 +671,46 @@ class OdeSystem(object):
         cState  = D.zeros_like(self.y[-1])
         cTime   = D.zeros_like(self.t[-1])
         self.__allocate_soln_space(total_steps)
-        while self.dt != 0 and D.abs(tf - self.t[-1]) > 4 * D.epsilon() and not end_int:
-            try:
+        try:
+            while self.dt != 0 and D.abs(tf - self.t[-1]) > 4 * D.epsilon() and not end_int:
                 if abs(self.dt + self.t[-1]) > D.abs(tf):
                     self.dt = (tf - self.t[-1])
-                try:
-                    self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
-                except RecursionError:
-                    self.int_status = -1
-                    raise
-                except:
-                    self.int_status = -3
-                    raise
-                
+                self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
+
                 if self.counter+1 >= len(self._y):
                     total_steps = int((tf-self._t[self.counter]-dTime)/self.dt) + 1
                     self.__allocate_soln_space(total_steps)
-                
+
                 #
                 # Compensated Summation based on 
                 # https://reference.wolfram.com/language/tutorial/NDSolveSPRK.html
                 #
-                
+
                 dState = dState + cState
                 dTime  = dTime  + cTime
-                
+
                 self._y[self.counter+1] = self._y[self.counter] + dState
                 self._t[self.counter+1] = self._t[self.counter] + dTime 
-                
+
                 cState = (self._y[self.counter] - self._y[self.counter+1]) + dState
                 cTime  = (self._t[self.counter] - self._t[self.counter+1]) + dTime
-                
+
                 self.counter += 1
-                
+
                 if events is not None or self.__dense_output:
                     tsol = self.get_step_interpolant()
-                    
+
                 if events is not None:
                     active_events, roots, end_int = handle_events(tsol, events, self.consts, direction, is_terminal, self.t[-2], self.t[-1])
 
                     if self.counter+len(roots)+1 >= len(self._y):
                         total_steps = max(int((tf-self._t[self.counter]-dTime)/self.dt), 2) + len(roots)
                         self.__allocate_soln_space(total_steps)
-                    
+
                     prev_time = self._t[self.counter - 1]
                     prev_y    = self._y[self.counter - 1]
                     self.counter -= 1
-                    
+
                     for root in roots:
                         if root != self._t[self.counter]:
                             self._t[self.counter+1] = root
@@ -723,39 +725,36 @@ class OdeSystem(object):
                         self._t[self.counter+1] = prev_time + dTime
                         self._y[self.counter+1] = prev_y    + dState
                         self.counter += 1
-                            
+
                 if self.__dense_output:
                     self.sol.add_interpolant(self.t[-1], tsol)
-                
+
                 if eta:
                     tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[-1]) / self.dt)
-                    tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.t[-1], tf, self.dt)
+                    tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.t[-1], tf, self.dt).ljust(8)
                     tqdm_progress_bar.update()
-                    
-                steps += 1
-                if callback is not None:
-                    if isinstance(callback, (list, tuple)):
-                        for i in callback:
-                            i(self)
-                    else:
-                        callback(self)
-                        
-            except KeyboardInterrupt:
-                self.int_status = -2
-                if eta:
-                    tqdm_progress_bar.close()
-                self.__trim_soln_space()
-                raise
-            except:
-                self.int_state = -3
-                if eta:
-                    tqdm_progress_bar.close()
-                self.__trim_soln_space()
-                raise
 
-        self.__trim_soln_space()
-        self.int_status = 1
-        self.success = True
+                steps += 1
+
+                for i in callback:
+                    i(self)
+                    
+        except KeyboardInterrupt:
+            self.int_status = -2
+            raise
+        except RecursionError:
+            self.int_status = -1
+            raise
+        except:
+            self.int_status = -3
+            raise
+        finally:
+            self.success    = True
+            if self.int_status != 2:
+                self.int_status = 1
+            self.__trim_soln_space()
+            if eta:
+                tqdm_progress_bar.close()
 
     def __repr__(self):
         return "\n".join([

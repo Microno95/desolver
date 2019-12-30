@@ -317,4 +317,12 @@ def test_event_detection():
         print("{} backend test passed successfully!".format(os.environ['DES_BACKEND']))
         
 if __name__ == "__main__":
+<<<<<<< Updated upstream
     np.testing.run_module_suite()
+=======
+    os.environ['DES_BACKEND']          = 'torch'
+    os.environ['CUDA_DEVICE_ORDER']    = 'PCI_BUS_ID'
+    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    os.environ['OMP_NUM_THREADS']      = '1'
+    np.testing.run_module_suite()
+>>>>>>> Stashed changes

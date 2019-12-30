@@ -224,4 +224,6 @@ def test_event_detection():
         print("{} backend test passed successfully!".format(os.environ['DES_BACKEND']))
         
 if __name__ == "__main__":
+    os.environ['DES_BACKEND']          = 'numpy'
+    os.environ['OMP_NUM_THREADS']      = '1'
     np.testing.run_module_suite()
