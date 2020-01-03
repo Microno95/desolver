@@ -82,7 +82,7 @@ def test_getter_setters():
         except Exception as e:
             raise RuntimeError("set_method failed with: {}".format(e))
 
-        assert(isinstance(a.integrator, de.available_methods["RK45CK"]))
+        assert(isinstance(a.integrator, de.available_methods(False)["RK45CK"]))
 
         try:
             a.add_constants(k=5.0)
