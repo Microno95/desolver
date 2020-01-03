@@ -40,7 +40,7 @@ setup(name='desolver',
       license='MIT',
       keywords=['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode'],
       url='https://github.com/Microno95/desolver',
-      packages=['desolver', 'desolver.integration_schemes', 'desolver.exception_types', 'desolver.utilities', 'desolver.backend'],
+      packages=['desolver', 'desolver.integrators', 'desolver.exception_types', 'desolver.utilities', 'desolver.backend'],
       extras_require={
         'pyaudi':   ["pyaudi>=1.7"],
         'pytorch':  ["torch>=1.3.1", "torchvision>=0.4.2"],
