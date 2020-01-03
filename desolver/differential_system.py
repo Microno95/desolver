@@ -28,7 +28,7 @@ import sys
 from tqdm.auto import tqdm
 
 from . import backend as D
-from . import integration_schemes as ischemes
+from . import integrators as integrators
 from . import exception_types as etypes
 from . import utilities as deutil
 
@@ -295,7 +295,7 @@ class OdeSystem(object):
         self.counter     = 0
         self.t0          = D.to_float(t[0])
         self.t1          = D.to_float(t[1])
-        self.method      = ischemes.available_methods["RK45CK"]
+        self.method      = integrators.RK45CKSolver
         self.integrator  = None
         self.dt          = D.to_float(dt)
         self.__fix_dt_dir(self.t1, self.t0)
@@ -508,15 +508,15 @@ class OdeSystem(object):
         ------
         ValueError
             If the string is not a valid integration scheme.
-        """
+        """        
         self.staggered_mask = self.__get_integrator_mask(staggered_mask)
         if self.int_status == 1:
             deutil.warning("An integration was already run, the system will be reset")
             self.reset()
-        if method in ischemes.available_methods.keys():
-            self.method = ischemes.available_methods[method]
-        elif issubclass(method, ischemes.IntegratorTemplate):
-            if method not in map(lambda x:x[1], ischemes.available_methods.items()):
+        if method in integrators.available_methods():
+            self.method = integrators.available_methods(False)[method]
+        elif issubclass(method, integrators.IntegratorTemplate):
+            if method not in map(lambda x:x[1], integrators.available_methods(False).items()):
                 deutil.warning("This is not a method implemented as part of the DESolver package. Cannot guarantee results.")
             self.method = method
         else:

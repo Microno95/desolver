@@ -78,7 +78,7 @@ class ExplicitIntegrator(IntegratorTemplate):
             
             if self.adaptive:
                 diff = self.dState - D.sum(self.final_state[1][tableau_idx_expand] * aux, axis=0)
-                timestep, redo_step = self.update_timestep(diff, initial_time, timestep)
+                timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, timestep)
                 if redo_step:
                     timestep, (self.dTime, self.dState) = self(rhs, initial_time, initial_state, constants, timestep)
             

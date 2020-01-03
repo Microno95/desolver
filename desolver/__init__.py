@@ -3,8 +3,9 @@ from . import exception_types
 
 from .differential_system import DiffRHS, rhs_prettifier, OdeSystem
 from . import utilities
-from . import integration_schemes
-from .integration_schemes import available_methods
+from . import integrators
+
+from .integrators import available_methods
 
 try:
     # Pytest testing

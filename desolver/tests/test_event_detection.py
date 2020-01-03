@@ -36,7 +36,7 @@ def test_event_detection():
         a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi/4), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
 
         with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
-            for i in sorted(set(de.available_methods.values()), key=lambda x:x.__name__):
+            for i in sorted(set(de.available_methods(False).values()), key=lambda x:x.__name__):
                 try:
                     a.set_method(i)
                     print("Testing {}".format(a.integrator))

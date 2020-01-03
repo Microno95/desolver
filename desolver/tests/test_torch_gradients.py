@@ -69,7 +69,7 @@ def test_gradients():
                 return dy + torch.cat([torch.tensor([0.0]), (controller_effect * 2.0 - 1.0)])
 
         with de.utilities.BlockTimer(section_label="Integrator Tests"):
-            for i in sorted(set(de.available_methods.values()), key=lambda x:x.__name__):
+            for i in sorted(set(de.available_methods(False).values()), key=lambda x:x.__name__):
                 if i.__name__ == "Explicit Adaptive Heun-Euler":
                     print("found")
                     continue
