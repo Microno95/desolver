@@ -2,7 +2,7 @@
 """
 The MIT License (MIT)
 
-Copyright (c) 2019 Microno95, Ekin Ozturk
+Copyright (c) 2016-2020 Microno95, Ekin Ozturk
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='desolver',
-      version='3.0.0b7',
+      version='3.0.0b8',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
