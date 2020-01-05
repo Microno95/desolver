@@ -669,11 +669,11 @@ class OdeSystem(object):
         cTime   = D.zeros_like(self.t[-1])
         self.__allocate_soln_space(total_steps)
         try:
-            while self.dt != 0 and D.abs(tf - self.t[-1]) > 4 * D.epsilon() and not end_int:
-                if abs(self.dt + self.t[-1]) > D.abs(tf):
+            while self.dt != 0 and D.abs(tf - self.t[-1]) > 4 * D.epsilon() and D.abs(self.dt + self.t[-1]) < D.abs(tf) and not end_int:
+                if D.abs(self.dt + self.t[-1]) > D.abs(tf):
                     self.dt = (tf - self.t[-1])
                 self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
-
+                
                 if self.counter+1 >= len(self._y):
                     total_steps = int((tf-self._t[self.counter]-dTime)/self.dt) + 1
                     self.__allocate_soln_space(total_steps)

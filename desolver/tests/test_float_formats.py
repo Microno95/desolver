@@ -39,13 +39,14 @@ def test_float_formats():
                     try:
                         a.integrate(callback=kbinterrupt_cb, eta=True)
                     except KeyboardInterrupt as e:
-                        print("")
-                        print(e)
-                        print(a.integration_status())
-                        print("")
-                    a.integrate(eta=True)
+                        pass
+                    try:
+                        a.integrate(eta=True)
+                    except:
+                        de.utilities.warning(f"{a.dt:.17e} | {a.t[0]:.17e} | {a.t[-1]:.17e}")
+                        raise
 
-                    max_diff = D.max(D.abs(analytic_soln(a.t[-1], a.y[0])-a.y[-1]))
+                    max_diff = D.max(D.abs(analytic_soln(a.t[-1], a.y[0]) - a.y[-1]))
                     if a.method.__adaptive__ and max_diff >= a.atol * 10 + D.epsilon():
                         print("{} Failed with max_diff from analytical solution = {}".format(a.integrator, max_diff))
                         raise RuntimeError("Failed to meet tolerances for adaptive integrator {}".format(str(i)))

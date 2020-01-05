@@ -57,7 +57,7 @@ class IntegratorTemplate(object):
         err_estimate = D.max(D.abs(D.to_float(diff)))
         relerr = D.min(D.to_float(self.atol + self.rtol * D.abs(initial_state) + self.rtol * D.abs(dState) / timestep))
         if err_estimate != 0:
-            corr = timestep * tol * (relerr / err_estimate) ** (1.0 / (self.num_stages - 1.0))
+            corr = timestep * tol * (relerr / err_estimate) ** (1.0 / (self.num_stages))
             if corr != 0:
                 timestep = corr
         if err_estimate > relerr:
