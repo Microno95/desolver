@@ -43,7 +43,6 @@ def test_float_formats():
                     try:
                         a.integrate(eta=True)
                     except:
-                        de.utilities.warning(f"{a.dt:.17e} | {a.t[0]:.17e} | {a.t[-1]:.17e}")
                         raise
 
                     max_diff = D.max(D.abs(analytic_soln(a.t[-1], a.y[0]) - a.y[-1]))
