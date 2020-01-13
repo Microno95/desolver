@@ -1,0 +1,20 @@
+[run]
+branch = True
+source = desolver
+
+[report]
+exclude_lines =
+    if self.debug:
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+ignore_errors = True
+omit =
+    tests/*
+    desolver/tests/*
+    desolver/backend/tests/*
+    desolver/utilities/tests/*
+    desolver/integrators/tests/*
+    desolver/exception_types/tests/*
+    examples/*
+    
