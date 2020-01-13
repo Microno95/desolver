@@ -20,6 +20,8 @@ jobs:
     env: DES_BACKEND='torch'
   - python: nightly
     env: PYAUDI_AVAILABLE=true
+  allow_failures:
+  - python: nightly
   
 before_install:
   - pip install -r requirements.txt
