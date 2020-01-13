@@ -31,4 +31,5 @@ install:
 # command to run tests
 script:
   - python -m nose --with-coverage --cover-package=desolver
+  - codecov
 

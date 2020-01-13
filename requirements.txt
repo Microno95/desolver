@@ -2,3 +2,4 @@ scipy>=0.18.0
 numpy
 coverage
 nose
+codecov
