@@ -42,8 +42,8 @@ setup(name='desolver',
       url='https://github.com/Microno95/desolver',
       packages=['desolver', 'desolver.integrators', 'desolver.exception_types', 'desolver.utilities', 'desolver.backend'],
       extras_require={
-        'pyaudi':   ["pyaudi>=1.7"],
-        'pytorch':  ["torch>=1.3.1", "torchvision>=0.4.2"],
+        'pyaudi':   ["pyaudi>=1.7", "numpy>=1.17"],
+        'pytorch':  ["torch>=1.3.1", "torchvision>=0.4.2", "numpy>=1.17"],
       },
       classifiers=[
           # How mature is this project? Common values are
