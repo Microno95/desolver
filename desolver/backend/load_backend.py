@@ -14,7 +14,7 @@ if backend() == 'numpy':
         from .pyaudi_backend import *
         print("PyAudi backend is available.", file=sys.stderr)
     except:
-        pass
+        raise
 elif backend() == 'torch':
     from .torch_backend import *
 else:
