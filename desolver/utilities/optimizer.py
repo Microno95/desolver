@@ -47,7 +47,7 @@ def brentsroot(f, bounds, tol=None, verbose=False):
     fb = f(b)
     
     if fa*fb >= 0:
-        return D.to_float(numpy.inf)
+        return D.to_float(numpy.inf), False
     if D.abs(fa) < D.abs(fb):
         a,b = b,a
         fa,fb = fb,fa

@@ -17,6 +17,8 @@ if backend() == 'numpy':
         pass
 elif backend() == 'torch':
     from .torch_backend import *
+    print("Default dtype set to float32 due to use of torch backend")
+    set_float_fmt("float32")
 else:
     raise ValueError("Unable to import backend : " + str(backend()))
     

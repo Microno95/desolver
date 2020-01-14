@@ -12,12 +12,18 @@ def test_bisection_search():
         assert(de.utilities.search_bisection(l1, i) == idx)
     
 def test_BlockTimer():
+    try:
+        with de.utilities.BlockTimer(start_now=False) as test:
+            assert(test.start_time is None and not test.start_now)
+    except:
+        raise
     with de.utilities.BlockTimer(start_now=False) as test:
         assert(isinstance(test.start_now, bool) and test.start_now == False)
         assert(test.start_time is None)
         assert(test.end_time is None)
         test.start()
         assert(isinstance(test.start_time, float))
+        assert(isinstance(test.elapsed(), float) and test.elapsed() > 0)
         test.end()
         assert(isinstance(test.end_time, float))
         assert(isinstance(test.elapsed(), float) and test.elapsed() > 0)
