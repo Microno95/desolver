@@ -76,7 +76,7 @@ class RK4Solver(ExplicitRungeKuttaIntegrator):
     )
 
     final_state = numpy.array(
-        [[1/6, 1/3, 1/3, 1/6]], dtype=numpy.float64
+        [[0., 1/6, 1/3, 1/3, 1/6]], dtype=numpy.float64
     )
 
 @named_integrator("Explicit Midpoint",
