@@ -28,8 +28,9 @@ Just type
 ## Implemented Integration Methods
 ### Adaptive Methods
 #### Explicit Methods
-1. Runge-Kutta 45 with Cash-Karp Coefficients
-2. Adaptive Heun-Euler Method
+1. Runge-Kutta 8(7) with Dormand-Prince Coefficients
+2. Runge-Kutta 4(5) with Cash-Karp Coefficients
+3. Adaptive Heun-Euler Method
 #### Implicit Methods
 **NOT YET IMPLEMENTED**
 ### Fixed Step Methods
@@ -41,7 +42,7 @@ Just type
 5. BABs9o7H Method  -- Based on arXiv:1501.04345v2 - BAB's9o7H
 6. ABAs5o6HA Method -- Based on arXiv:1501.04345v2 - ABAs5o6H
 7. Runge-Kutta 5 - The 5th order integrator from RK45 with Cash-Karp Coefficients.
-8. Runge-Kutta 4 - The 4th order integrator from RK45 with Cash-Karp Coefficients.
+8. Runge-Kutta 4 - The classic RK4 integrator
 #### Implicit Methods
 **NOT YET IMPLEMENTED**
 
