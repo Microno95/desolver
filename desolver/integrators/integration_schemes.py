@@ -1,7 +1,7 @@
 import numpy
 
 from .integrator_template import named_integrator
-from .integrator_types import ExplicitIntegrator, SymplecticIntegrator
+from .integrator_types import ExplicitRungeKuttaIntegrator, ExplicitSymplecticIntegrator
 
 __all__ = [
     'RK45CKSolver',
@@ -20,8 +20,15 @@ __all__ = [
 @named_integrator("Explicit RK45CK",
                        alt_names=("RK45CK", "Runge-Kutta-Cash-Karp", "RK45"),
                        order=4.0)
-class RK45CKSolver(ExplicitIntegrator):
-    # Based on RK45 Cash-Karp
+class RK45CKSolver(ExplicitRungeKuttaIntegrator):
+    """
+    The derived class that implements the Adaptive Runge-Kutta 4(5) method using
+    the coefficients defined by Cash-Karp.
+    
+    References
+    ----------
+    [1] Cash, J. R., and Alan H. Karp. ‘A Variable Order Runge-Kutta Method for Initial Value Problems with Rapidly Varying Right-Hand Sides’. ACM Transactions on Mathematical Software 16, no. 3 (1 September 1990): 201–22. https://doi.org/10.1145/79505.79507.
+    """
     tableau = numpy.array(
         [[0.0,  0.0,        0.0,     0.0,       0.0,          0.0,      0.0],
          [1/5,  1/5,        0.0,     0.0,       0.0,          0.0,      0.0],
@@ -32,36 +39,53 @@ class RK45CKSolver(ExplicitIntegrator):
     )
 
     final_state = numpy.array(
-        [[0., 37/378,     0, 250/621,     125/594,     0,         512/1771],
-         [0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ]], dtype=numpy.float64
+        [[0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ],
+         [0., 37/378,     0, 250/621,     125/594,     0,         512/1771]], dtype=numpy.float64
     )
     
 @named_integrator("Explicit RK5",
                    alt_names=("RK5", "Runge-Kutta 5", "RK5"),
                    order=5.0)
-class RK5Solver(ExplicitIntegrator):
-    # The 5th order integrator from RK45 Cash-Karp
-    tableau = numpy.copy(RK45CKSolver.tableau)
-
-    final_state = numpy.array(
-        [[0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ]], dtype=numpy.float64
-    )
+class RK5Solver(ExplicitRungeKuttaIntegrator):
+    """
+    The derived class that implements a 5th order Runge-Kutta method.
+    This is simply the fifth order method embedded in RK45CK.
     
-@named_integrator("Explicit RK4",
-                   alt_names=("RK4", "Runge-Kutta 4", "RK4"),
-                   order=5.0)
-class RK4Solver(ExplicitIntegrator):
-    # The 4th order integrator from RK45 Cash-Karp
+    References
+    ----------
+    [1] Cash, J. R., and Alan H. Karp. ‘A Variable Order Runge-Kutta Method for Initial Value Problems with Rapidly Varying Right-Hand Sides’. ACM Transactions on Mathematical Software 16, no. 3 (1 September 1990): 201–22. https://doi.org/10.1145/79505.79507.
+    """
     tableau = numpy.copy(RK45CKSolver.tableau)
 
     final_state = numpy.array(
         [[0., 37/378,     0, 250/621,     125/594,     0,         512/1771]], dtype=numpy.float64
     )
+    
+@named_integrator("Explicit RK4",
+                   alt_names=("RK4", "Runge-Kutta 4", "RK4"),
+                   order=4.0)
+class RK4Solver(ExplicitRungeKuttaIntegrator):
+    """
+    The derived class that implements the classic 4th order Runge-Kutta method.
+    """
+    tableau = numpy.array(
+        [[0,   0,   0,   0, 0],
+         [1/2, 1/2, 0,   0, 0],
+         [1/2, 0,   1/2, 0, 0],
+         [1,   0,   0,   1, 0]], dtype=numpy.float64
+    )
+
+    final_state = numpy.array(
+        [[1/6, 1/3, 1/3, 1/6]], dtype=numpy.float64
+    )
 
 @named_integrator("Explicit Midpoint",
                        alt_names=("Midpoint",),
                        order=2.0)
-class MidpointSolver(ExplicitIntegrator):
+class MidpointSolver(ExplicitRungeKuttaIntegrator):
+    """
+    The derived class that implements the midpoint method.
+    """
     tableau = numpy.array(
         [[0,    0,   0],
          [1/2,  1/2, 0]], dtype=numpy.float64
@@ -74,7 +98,10 @@ class MidpointSolver(ExplicitIntegrator):
 @named_integrator("Explicit Heun's",
                        alt_names=("Heun's",),
                        order=2.0)
-class HeunsSolver(ExplicitIntegrator):
+class HeunsSolver(ExplicitRungeKuttaIntegrator):
+    """
+    The derived class that implements Heun's method.
+    """
     tableau = numpy.array(
         [[0,    0,   0  ],
          [1,    1,   0  ]], dtype=numpy.float64
@@ -87,7 +114,10 @@ class HeunsSolver(ExplicitIntegrator):
 @named_integrator("Explicit Euler",
                        alt_names=("Forward Euler", "Euler"),
                        order=1.0)
-class EulerSolver(ExplicitIntegrator):
+class EulerSolver(ExplicitRungeKuttaIntegrator):
+    """
+    The derived class that implements the Euler method.
+    """
     tableau = numpy.array(
         [[0,    0]], dtype=numpy.float64
     )
@@ -99,7 +129,10 @@ class EulerSolver(ExplicitIntegrator):
 @named_integrator("Explicit Euler-Trapezoidal",
                        alt_names=("Euler-Trapezoidal", "Euler-Trap", "Predictor-Corrector Euler"),
                        order=3.0)
-class EulerTrapSolver(ExplicitIntegrator):
+class EulerTrapSolver(ExplicitRungeKuttaIntegrator):
+    """
+    The derived class that implements the Euler-Trapezoidal method.
+    """
     tableau = numpy.array(
         [[0,   0,   0,     0,   0  ],
          [1,   1,   0,     0,   0  ],
@@ -114,7 +147,12 @@ class EulerTrapSolver(ExplicitIntegrator):
 @named_integrator("Explicit Adaptive Heun-Euler",
                        alt_names=("Adaptive Heun-Euler", "AHE"),
                        order=1.0)
-class HeunEulerSolver(ExplicitIntegrator):
+class HeunEulerSolver(ExplicitRungeKuttaIntegrator):
+    """
+    The derived class that implements the adaptive Heun-Euler method.
+    This is a 1st order method (Euler) with an embedded 
+    2nd order method (Heun) that does adaptive timestepping.
+    """
     tableau = numpy.array(
         [[0,   0,   0],
          [1,   1,   0]], dtype=numpy.float64
@@ -128,7 +166,12 @@ class HeunEulerSolver(ExplicitIntegrator):
 @named_integrator("Explicit Symplectic Forward Euler",
                        alt_names=("Symplectic Euler",),
                        order=1.0)
-class SymplecticEulerSolver(SymplecticIntegrator):
+class SymplecticEulerSolver(ExplicitSymplecticIntegrator):
+    """
+    The derived class that implements the symplectic Euler method.
+    
+    This is the simplest symplectic integration scheme.
+    """
     tableau = numpy.array(
         [[0.5, 0,   0.5],
          [0,   1.0, 0  ],
@@ -138,7 +181,17 @@ class SymplecticEulerSolver(SymplecticIntegrator):
 @named_integrator("Explicit BABS9O7H",
                        alt_names=("BABS9O7H", "BABs9o7H"),
                        order=7.0)
-class BABs9o7HSolver(SymplecticIntegrator):
+class BABs9o7HSolver(ExplicitSymplecticIntegrator):
+    """
+    The derived class that implements the 9th order 
+    BAB's9o7H symplectic integrator. This integrator
+    is only applicable to systems that have a Hamiltonian
+    that can be split such that: `H(p,q) = T(p) + V(q)`.
+    
+    References
+    ----------
+    [1] Nielsen, Kristian Mads Egeris. ‘Efficient Fourth Order Symplectic Integrators for Near-Harmonic Separable Hamiltonian Systems’. ArXiv:1501.04345 [Physics, Physics:Quant-Ph], 9 February 2015. http://arxiv.org/abs/1501.04345.
+    """
     # Based on arXiv:1501.04345v2 - BAB's9o7H
     tableau = numpy.array(
        [[ 0.                  ,  0.                  ,  0.04649290043965892 ],
@@ -165,7 +218,17 @@ class BABs9o7HSolver(SymplecticIntegrator):
 @named_integrator("Explicit ABAS5O6H",
                        alt_names=("ABAS5O6H", "ABAs5o6H"),
                        order=6.0)
-class ABAs5o6HSolver(SymplecticIntegrator):
+class ABAs5o6HSolver(ExplicitSymplecticIntegrator):
+    """
+    The derived class that implements the 9th order 
+    ABAs5o6H symplectic integrator. This integrator
+    is only applicable to systems that have a Hamiltonian
+    that can be split such that `H(p,q) = T(p) + V(q)`.
+    
+    References
+    ----------
+    [1] Nielsen, Kristian Mads Egeris. ‘Efficient Fourth Order Symplectic Integrators for Near-Harmonic Separable Hamiltonian Systems’. ArXiv:1501.04345 [Physics, Physics:Quant-Ph], 9 February 2015. http://arxiv.org/abs/1501.04345.
+    """
     # Based on arXiv:1501.04345v2 - ABAs5o6H
     tableau = numpy.array(
       [[ 0.                  ,  0.                  ,  0.15585935917621682 ],

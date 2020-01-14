@@ -2,11 +2,40 @@ from .integrator_template import IntegratorTemplate
 from .. import backend as D
 
 __all__ = [
-    'ExplicitIntegrator',
-    'SymplecticIntegrator'
+    'ExplicitRungeKuttaIntegrator',
+    'ExplicitSymplecticIntegrator'
 ]
 
-class ExplicitIntegrator(IntegratorTemplate):
+class ExplicitRungeKuttaIntegrator(IntegratorTemplate):
+    """
+    A base class for all explicit Runge-Kutta methods with a lower triangular Butcher Tableau.
+
+    An ExplicitRungeKuttaIntegrator derived object corresponds to a
+    numerical integrator tailored to a particular dynamical system 
+    with an integration scheme defined by the Butcher tableau of the child
+    class.
+    
+    A child class that defines two sets of coefficients for final_state
+    is considered an adaptive method and uses the adaptive stepping 
+    based on the local error estimate derived from the two sets of 
+    final_state coefficients.
+    
+    Attributes
+    ----------
+    tableau : numpy array, shape (N, N+1)
+        A numpy array with N stages and N+1 entries per stage where the first column 
+        is the timestep fraction and the remaining columns are the stage coefficients.
+        
+    final_state : numpy array, shape (k, N)
+        A numpy array with N+1 coefficients defining the final stage coefficients.
+        If k == 2, then the method is considered adaptive and the first row is
+        the lower order method and the second row is the higher order method
+        whose difference gives the local error of the numerical integration.
+        
+    __symplectic__ : bool
+        True if the method is symplectic.
+    """
+    
     tableau = None
     final_state = None
     __symplectic__ = False
@@ -72,7 +101,35 @@ class ExplicitIntegrator(IntegratorTemplate):
 
     __call__ = forward
 
-class SymplecticIntegrator(IntegratorTemplate):
+class ExplicitSymplecticIntegrator(IntegratorTemplate):
+    """
+    A base class for all symplectic numerical integration methods.
+
+    A ExplicitSymplecticIntegrator derived object corresponds to a
+    numerical integrator tailored to a particular dynamical system 
+    with an integration scheme defined by the sequence of drift-kick
+    coefficients in tableau.
+    
+    An explicit symplectic integrator may be considered as a sequence of carefully
+    picked drift and kick stages that build off the previous stage which is
+    the implementation considered here. A masking array of indices indicates
+    the drift and kick variables that are updated at each stage.
+    
+    In a system defined by a Hamiltonian of q and p (generalised position and
+    generalised momentum respectively), the drift stages update q and the kick
+    stages update p. For a conservative Hamiltonian, a symplectic method will
+    minimise the drift in the Hamiltonian during the integration.
+    
+    Attributes
+    ----------
+    tableau : numpy array, shape (N, N+1)
+        A numpy array with N stages and N+1 entries per stage where the first column 
+        is the timestep fraction and the remaining columns are the stage coefficients.
+        
+    __symplectic__ : bool
+        True if the method is symplectic.
+    """
+    
     tableau = None
     __symplectic__ = True
 
