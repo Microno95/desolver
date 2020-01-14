@@ -70,23 +70,20 @@ def test_gradients():
 
         with de.utilities.BlockTimer(section_label="Integrator Tests"):
             for i in sorted(set(de.available_methods(False).values()), key=lambda x:x.__name__):
-                if i.__name__ == "Explicit Adaptive Heun-Euler":
-                    print("found")
-                    continue
                 try:
                     yi1 = D.array([1.0, 0.0], requires_grad=True)
                     df  = SimpleODE(k=1.0)
 
-                    a = de.OdeSystem(df, yi1, t=(0, 1.), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
+                    a = de.OdeSystem(df, yi1, t=(0, 1.), dt=0.0675, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
                     a.set_method(i)
                     a.integrate(eta=True)
 
                     dyfdyi = D.jacobian(a.y[-1], a.y[0])
-                    dyi = D.array([0.0, 1.0]) * 1e-5
+                    dyi = D.array([0.0, 1.0]) * D.epsilon()**0.5
                     dyf = D.einsum("nk,k->n", dyfdyi, dyi)
                     yi2 = yi1 + dyi
 
-                    b = de.OdeSystem(df, yi2, t=(0, 1.), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
+                    b = de.OdeSystem(df, yi2, t=(0, 1.), dt=0.0675, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
                     b.set_method(i)
                     b.integrate(eta=True)
 
@@ -94,7 +91,7 @@ def test_gradients():
 
                     print(D.norm(true_diff - dyf), D.epsilon()**0.5)
 
-                    assert(D.allclose(true_diff, dyf, rtol=100 * D.epsilon()**0.5, atol=D.epsilon()**0.5))
+                    assert(D.allclose(true_diff, dyf, rtol=4 * D.epsilon()**0.5, atol=4 * D.epsilon()**0.5))
                     print("{} method test succeeded!".format(a.integrator))
                 except:
                     raise RuntimeError("Test failed for integration method: {}".format(a.integrator))
