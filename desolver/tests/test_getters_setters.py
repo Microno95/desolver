@@ -51,7 +51,7 @@ def test_getter_setters():
             a.set_end_time(pval)
         except Exception as e:
             raise RuntimeError("set_end_time failed with: {}".format(e))
-
+        
         assert(a.get_end_time() == pval)
         pval = -1.0
 
@@ -97,7 +97,20 @@ def test_getter_setters():
             raise RuntimeError("remove_constants failed with: {}".format(e))
 
         assert('k' not in a.consts.keys())
+        
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
+        
+        a.integrate()
 
+        try:
+            print(str(a))
+            print(repr(a))
+            assert(D.max(D.abs(a.sol(a.t[0]) - y_init)) <= 8*D.epsilon()**0.5)
+            assert(D.max(D.abs(a.sol(a.t[-1]) - analytic_soln(a.t[-1], y_init))) <= 8*D.epsilon()**0.5)
+        except:
+            raise
+            
+        
         print("{} backend test passed successfully!".format(D.backend()))
         
         
