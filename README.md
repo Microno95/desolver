@@ -6,12 +6,12 @@
 This is a python package for solving Initial Value Problems using various numerical integrators.
 Many integration routines are included ranging from fixed step to symplectic to adaptive integrators.
 
-Implicit integrators are intended for release 3.0, but that's far off for now.
+Implicit integrators are intended for release 4.0, but that's far off for now.
 
 # In Beta Development
-**3.0.0b9** - PyAudi support has been added to the module. It is now possible to do numerical integrations using `gdual` variables such as `gdual_double`, `gdual_vdouble` and `gdual_real128`.
+**3.0.0b10** - PyAudi support has been added to the module. It is now possible to do numerical integrations using `gdual` variables such as `gdual_double`, `gdual_vdouble` and `gdual_real128` (only on select platforms, refer to [pyaudi docs](https://darioizzo.github.io/audi/) for more information).
  
-This version can be installed with `pip install desolver[pyaudi]==3.0.0b9`
+This version can be installed with `pip install desolver[pyaudi]==3.0.0b10`
 
 # Latest Release
 **2.5.0** - Event detection has been added to the module. It is now possible to do numerical integration with terminal and non-terminal events.
@@ -28,21 +28,21 @@ Just type
 ## Implemented Integration Methods
 ### Adaptive Methods
 #### Explicit Methods
-1. Runge-Kutta 8(7) with Dormand-Prince Coefficients
+1. Runge-Kutta 8(7) with Dormand-Prince Coefficients [**NEW**]
 2. Runge-Kutta 4(5) with Cash-Karp Coefficients
 3. Adaptive Heun-Euler Method
 #### Implicit Methods
 **NOT YET IMPLEMENTED**
 ### Fixed Step Methods
 #### Explicit Methods
-1. Midpoint Method
-2. Heun's Method
-3. Euler's Method
-4. Euler-Trapezoidal Method
-5. BABs9o7H Method  -- Based on arXiv:1501.04345v2 - BAB's9o7H
-6. ABAs5o6HA Method -- Based on arXiv:1501.04345v2 - ABAs5o6H
-7. Runge-Kutta 5 - The 5th order integrator from RK45 with Cash-Karp Coefficients.
-8. Runge-Kutta 4 - The classic RK4 integrator
+1. Runge-Kutta 4 - The classic RK4 integrator
+2. Runge-Kutta 5 - The 5th order integrator from RK45 with Cash-Karp Coefficients.
+3. BABs9o7H Method  -- Based on arXiv:1501.04345v2 - BAB's9o7H
+4. ABAs5o6HA Method -- Based on arXiv:1501.04345v2 - ABAs5o6H
+5. Midpoint Method
+6. Heun's Method
+7. Euler's Method
+8. Euler-Trapezoidal Method
 #### Implicit Methods
 **NOT YET IMPLEMENTED**
 
