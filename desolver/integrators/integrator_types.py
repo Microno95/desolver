@@ -18,7 +18,7 @@ class ExplicitRungeKuttaIntegrator(IntegratorTemplate):
     A child class that defines two sets of coefficients for final_state
     is considered an adaptive method and uses the adaptive stepping 
     based on the local error estimate derived from the two sets of 
-    final_state coefficients.
+    final_state coefficients. Furthermore, local extrapolation is used.
     
     Attributes
     ----------
@@ -38,6 +38,7 @@ class ExplicitRungeKuttaIntegrator(IntegratorTemplate):
     
     tableau = None
     final_state = None
+    order = 1
     __symplectic__ = False
 
     def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):

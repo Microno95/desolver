@@ -9,7 +9,10 @@ def named_integrator(name, alt_names=tuple(), order=1.0):
     def wrap(f):
         f.__name__ = str(name)
         f.__alt_names__ = alt_names
-        f.__order__ = order
+        if hasattr(f, 'order'):
+            f.__order__ = f.order
+        else:
+            f.__order__ = order
         if hasattr(f, "final_state"):
             f.__adaptive__ = D.shape(f.final_state)[0] == 2
         else:
@@ -33,7 +36,7 @@ class IntegratorTemplate(object):
         err_estimate = D.max(D.abs(D.to_float(diff)))
         relerr = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state) + self.rtol * D.abs(dState) / timestep))
         if err_estimate != 0:
-            corr = timestep * tol * (relerr / err_estimate) ** (1.0 / self.num_stages)
+            corr = timestep * tol * (relerr / err_estimate) ** (1.0 / self.order)
             if corr != 0:
                 timestep = corr
         if err_estimate > relerr:

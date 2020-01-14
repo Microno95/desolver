@@ -18,8 +18,7 @@ __all__ = [
 ]
 
 @named_integrator("Explicit RK45CK",
-                       alt_names=("RK45CK", "Runge-Kutta-Cash-Karp", "RK45"),
-                       order=4.0)
+                       alt_names=("RK45CK", "Runge-Kutta-Cash-Karp", "RK45"))
 class RK45CKSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the Adaptive Runge-Kutta 4(5) method using
@@ -39,13 +38,14 @@ class RK45CKSolver(ExplicitRungeKuttaIntegrator):
     )
 
     final_state = numpy.array(
-        [[0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ],
-         [0., 37/378,     0, 250/621,     125/594,     0,         512/1771]], dtype=numpy.float64
+        [[0., 37/378,     0, 250/621,     125/594,     0,         512/1771],
+         [0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ]], dtype=numpy.float64
     )
     
+    order = 5.0
+    
 @named_integrator("Explicit RK5",
-                   alt_names=("RK5", "Runge-Kutta 5", "RK5"),
-                   order=5.0)
+                   alt_names=("RK5", "Runge-Kutta 5", "RK5"))
 class RK5Solver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements a 5th order Runge-Kutta method.
@@ -61,9 +61,10 @@ class RK5Solver(ExplicitRungeKuttaIntegrator):
         [[0., 37/378,     0, 250/621,     125/594,     0,         512/1771]], dtype=numpy.float64
     )
     
+    order = 5.0
+    
 @named_integrator("Explicit RK4",
-                   alt_names=("RK4", "Runge-Kutta 4", "RK4"),
-                   order=4.0)
+                   alt_names=("RK4", "Runge-Kutta 4", "RK4"))
 class RK4Solver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the classic 4th order Runge-Kutta method.
@@ -78,10 +79,11 @@ class RK4Solver(ExplicitRungeKuttaIntegrator):
     final_state = numpy.array(
         [[0., 1/6, 1/3, 1/3, 1/6]], dtype=numpy.float64
     )
+    
+    order = 4.0
 
 @named_integrator("Explicit Midpoint",
-                       alt_names=("Midpoint",),
-                       order=2.0)
+                       alt_names=("Midpoint",))
 class MidpointSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the midpoint method.
@@ -94,10 +96,11 @@ class MidpointSolver(ExplicitRungeKuttaIntegrator):
     final_state = numpy.array(
         [[0,    0,   1]], dtype=numpy.float64
     )
+    
+    order = 2.0
 
 @named_integrator("Explicit Heun's",
-                       alt_names=("Heun's",),
-                       order=2.0)
+                       alt_names=("Heun's",))
 class HeunsSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements Heun's method.
@@ -110,10 +113,11 @@ class HeunsSolver(ExplicitRungeKuttaIntegrator):
     final_state = numpy.array(
         [[0,    1/4, 3/4]], dtype=numpy.float64
     )
+    
+    order = 2.0
 
 @named_integrator("Explicit Euler",
-                       alt_names=("Forward Euler", "Euler"),
-                       order=1.0)
+                       alt_names=("Forward Euler", "Euler"))
 class EulerSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the Euler method.
@@ -125,10 +129,11 @@ class EulerSolver(ExplicitRungeKuttaIntegrator):
     final_state = numpy.array(
         [[0,    1]], dtype=numpy.float64
     )
+    
+    order = 1.0
 
 @named_integrator("Explicit Euler-Trapezoidal",
-                       alt_names=("Euler-Trapezoidal", "Euler-Trap", "Predictor-Corrector Euler"),
-                       order=3.0)
+                       alt_names=("Euler-Trapezoidal", "Euler-Trap", "Predictor-Corrector Euler"))
 class EulerTrapSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the Euler-Trapezoidal method.
@@ -143,10 +148,11 @@ class EulerTrapSolver(ExplicitRungeKuttaIntegrator):
     final_state = numpy.array(
         [[0,   1/2, 0,    0,   1/2]], dtype=numpy.float64
     )
+    
+    order = 2.0
 
 @named_integrator("Explicit Adaptive Heun-Euler",
-                       alt_names=("Adaptive Heun-Euler", "AHE"),
-                       order=1.0)
+                       alt_names=("Adaptive Heun-Euler", "AHE"))
 class HeunEulerSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the adaptive Heun-Euler method.
@@ -160,8 +166,10 @@ class HeunEulerSolver(ExplicitRungeKuttaIntegrator):
 
     final_state = numpy.array(
         [[0,    1/2, 1/2],
-         [0,    1,   0]], dtype=numpy.float64
+         [0,    1,   0   ]], dtype=numpy.float64
     )
+    
+    order = 2.0
 
 @named_integrator("Explicit Symplectic Forward Euler",
                        alt_names=("Symplectic Euler",),
@@ -183,7 +191,7 @@ class SymplecticEulerSolver(ExplicitSymplecticIntegrator):
                        order=7.0)
 class BABs9o7HSolver(ExplicitSymplecticIntegrator):
     """
-    The derived class that implements the 9th order 
+    The derived class that implements the 7th order 
     BAB's9o7H symplectic integrator. This integrator
     is only applicable to systems that have a Hamiltonian
     that can be split such that: `H(p,q) = T(p) + V(q)`.
@@ -220,7 +228,7 @@ class BABs9o7HSolver(ExplicitSymplecticIntegrator):
                        order=6.0)
 class ABAs5o6HSolver(ExplicitSymplecticIntegrator):
     """
-    The derived class that implements the 9th order 
+    The derived class that implements the 6th order 
     ABAs5o6H symplectic integrator. This integrator
     is only applicable to systems that have a Hamiltonian
     that can be split such that `H(p,q) = T(p) + V(q)`.
