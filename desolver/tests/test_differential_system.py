@@ -116,8 +116,8 @@ def test_integration_and_representation():
             c2 = initial_conditions[1] - 1
             
             return D.stack([
-                c2 * D.sin(D.to_float(t)) + c1 * D.cos(D.to_float(t)) + t,
-                c2 * D.cos(D.to_float(t)) - c1 * D.sin(D.to_float(t)) + 1
+                c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
+                c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
             ])
 
         def kbinterrupt_cb(ode_sys):

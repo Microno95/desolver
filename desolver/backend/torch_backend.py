@@ -249,7 +249,10 @@ def reshape(x, new_dims):
     return torch.reshape(x, new_dims)
 
 def shape(x):
-    return x.shape
+    if hasattr(x, 'shape'):
+        return x.shape
+    else:
+        return shape(asarray(x))
 
 def logical_not(a, out=None, where=None):
     if where is None:

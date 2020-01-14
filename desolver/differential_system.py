@@ -142,8 +142,8 @@ class DenseOutput(object):
         
     def __call__(self, t):
         if len(D.shape(t)) > 0:
-            ret_vals = D.zeros_like(t)
-            flat_t   = D.reshape(t, (-1,))
+            ret_vals = D.zeros_like(D.asarray(t))
+            flat_t   = D.reshape(D.asarray(t), (-1,))
             _y_test  = self.y_interpolants[0](self.t_eval[0])
             flat_y   = D.stack([D.empty_like(_y_test) for _ in range(len(flat_t))])
             for idx, _t in enumerate(flat_t):
