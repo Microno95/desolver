@@ -30,7 +30,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='desolver',
-      version='3.0.0b11',
+      version='3.0.0b12',
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
