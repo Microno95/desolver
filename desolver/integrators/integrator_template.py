@@ -34,7 +34,7 @@ class IntegratorTemplate(object):
 
     def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.8):
         err_estimate = D.max(D.abs(D.to_float(diff)))
-        relerr = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state) + self.rtol * D.abs(dState) / timestep))
+        relerr = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state) + self.rtol * D.abs(dState / timestep)))
         if err_estimate != 0:
             corr = timestep * tol * (relerr / err_estimate) ** (1.0 / self.order)
             if corr != 0:
