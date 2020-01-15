@@ -181,7 +181,7 @@ class DiffRHS(object):
     equ_repr : str
         String representation of the right-hand side.
     """
-    def __init__(self, rhs, equ_repr=None):
+    def __init__(self, rhs, equ_repr=None, md_repr=None):
         """Initialises the equation class possibly with a human-readable equation representation.
         
         Parameters
@@ -194,21 +194,38 @@ class DiffRHS(object):
         self.rhs     = rhs
         if equ_repr is not None:
             self.equ_repr = str(equ_repr)
+            if md_repr is not None:
+                self.md_repr = md_repr
+            else:
+                self.md_repr = equ_repr
         else:
+            if md_repr is not None:
+                self.md_repr = md_repr
+            else:
+                try:
+                    self.md_repr = self.rhs._repr_markdown_()
+                except:
+                    self.md_repr = str(self.rhs)
             self.equ_repr = str(self.rhs)
+        self.nfev = 0
         
-    def __call__(self, t, y, **kwargs):
-        return self.rhs(t, y, **kwargs)
+    def __call__(self, t, y, *args, **kwargs):
+        called_val = self.rhs(t, y, *args, **kwargs)
+        self.nfev += 1
+        return called_val
 
     def __str__(self):
         return self.equ_repr
+    
+    def _repr_markdown_(self):
+        return self.md_repr
 
     def __repr__(self):
-        return "<DiffRHS({},{})>".format(repr(self.rhs), self.equ_repr)
+        return "<DiffRHS({},{},{})>".format(repr(self.rhs), self.equ_repr, self.md_repr)
 
-def rhs_prettifier(equRepr):
+def rhs_prettifier(equ_repr=None, md_repr=None):
     def rhs_wrapper(rhs):
-        return DiffRHS(rhs, equRepr)
+        return DiffRHS(rhs, equ_repr, md_repr)
     return rhs_wrapper
 
 class OdeSystem(object):
@@ -251,16 +268,10 @@ class OdeSystem(object):
         if not callable(equ_rhs):
             raise TypeError("equ_rhs is not callable, please pass a callable object for the right hand side.")
             
-        self.nfev = 0
-        
-        def equ_rhs_wrapped(*args, **kwargs):
-            self.nfev += 1
-            return equ_rhs(*args, **kwargs)
-        
         if hasattr(equ_rhs, "equ_repr"):
-            self.equ_rhs     = DiffRHS(equ_rhs_wrapped, equ_rhs.equ_repr)
+            self.equ_rhs     = DiffRHS(equ_rhs.rhs, equ_rhs.equ_repr, equ_rhs.md_repr)
         else:
-            self.equ_rhs     = DiffRHS(equ_rhs_wrapped)
+            self.equ_rhs     = DiffRHS(equ_rhs)
             
         self.rtol        = rtol
         self.atol        = atol
@@ -302,6 +313,10 @@ class OdeSystem(object):
     @property
     def t(self):
         return self._t[:self.counter + 1]
+    
+    @property
+    def nfev(self):
+        return self.equ_rhs.nfev
         
     def __fix_dt_dir(self, t1, t0):
         if D.sign(self.dt) != D.sign(t1 - t0):
@@ -565,7 +580,7 @@ class OdeSystem(object):
         self.__trim_soln_space()
         self.sol     = None
         self.dt      = self.dt0
-        self.nfev    = 0
+        self.equ_rhs.nfev    = 0
         self.__move_to_device()
         self.int_state = 0
         if self.__dense_output:
@@ -640,7 +655,7 @@ class OdeSystem(object):
         events, is_terminal, direction = prepare_events(events)
             
         end_int = False
-        self.nfev = 0 if self.int_status == 1 else self.nfev
+        self.equ_rhs.nfev = 0 if self.int_status == 1 else self.equ_rhs.nfev
         cState  = D.zeros_like(self.y[-1])
         cTime   = D.zeros_like(self.t[-1])
         self.__allocate_soln_space(total_steps)
@@ -731,12 +746,25 @@ class OdeSystem(object):
 
     def __repr__(self):
         return "\n".join([
-            """{:>10}: {:<128}""".format("message", self.integration_status()),
-            """{:>10}: {:<128}""".format("nfev",    str(self.nfev)),
-            """{:>10}: {:<128}""".format("sol",     str(self.sol)),
-            """{:>10}: {:<128}""".format("t",       str(self.t)),
-            """{:>10}: {:<128}""".format("y",       str(self.y)),
+            """{:>10}: {:<128}""".format("message",   self.integration_status()),
+            """{:>10}: {:<128}""".format("nfev",      str(self.nfev)),
+            """{:>10}: {:<128}""".format("sol",       str(self.sol)),
+            """{:>10}: {:<128}""".format("t",         str(self.t)),
+            """{:>10}: {:<128}""".format("y",         str(self.y)),
+            """{:>10}: {}     """.format("Equations", repr(self.equ_rhs)),
         ])
+    
+    def _repr_markdown_(self):
+        return """```
+{:>10}: {:<128}  
+{:>10}: {:<128}  
+{:>10}: {:<128}  
+{:>10}: {:<128}  
+{:>10}: {:<128}  
+{:>10}: 
+```  
+
+""".format("message", self.integration_status(), "nfev", str(self.nfev), "sol", str(self.sol), "t", str(self.t), "y", str(self.y), "Equations") + self.equ_rhs._repr_markdown_()
 
     def __str__(self):
         """Prints the equations, initial conditions, final states, time limits and defined constants in the system."""
