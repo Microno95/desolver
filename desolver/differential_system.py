@@ -677,7 +677,7 @@ class OdeSystem(object):
                     active_events, roots, end_int = handle_events(tsol, events, self.consts, direction, is_terminal)
 
                     if self.counter+len(roots)+1 >= len(self._y):
-                        total_steps = max(int((tf-self._t[self.counter]-dTime)/self.dt), 2) + len(roots)
+                        total_steps = max(int(abs((tf-self._t[self.counter]-dTime)/self.dt)), 2) + len(roots)
                         self.__allocate_soln_space(total_steps)
 
                     prev_time = self._t[self.counter - 1]
@@ -703,7 +703,7 @@ class OdeSystem(object):
                     self.sol.add_interpolant(self.t[-1], tsol)
 
                 if eta:
-                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs(tf - self.t[-1]) / self.dt)
+                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs((tf - self.t[-1]) / self.dt))
                     tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.t[-1], tf, self.dt).ljust(8)
                     tqdm_progress_bar.update()
 
