@@ -6,6 +6,7 @@ __available_methods = dict()
 
 __integration_methods__ = [
     RK1412Solver,
+    RK108Solver,
     RK8713MSolver,
     RK45CKSolver,
     RK5Solver,
