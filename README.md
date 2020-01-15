@@ -9,9 +9,9 @@ Many integration routines are included ranging from fixed step to symplectic to 
 Implicit integrators are intended for release 4.0, but that's far off for now.
 
 # In Beta Development
-**3.0.0b10** - PyAudi support has been added to the module. It is now possible to do numerical integrations using `gdual` variables such as `gdual_double`, `gdual_vdouble` and `gdual_real128` (only on select platforms, refer to [pyaudi docs](https://darioizzo.github.io/audi/) for more information).
+**3.0.0b11** - PyAudi support has been added to the module. It is now possible to do numerical integrations using `gdual` variables such as `gdual_double`, `gdual_vdouble` and `gdual_real128` (only on select platforms, refer to [pyaudi docs](https://darioizzo.github.io/audi/) for more information).
  
-This version can be installed with `pip install desolver[pyaudi]==3.0.0b10`
+This version can be installed with `pip install desolver[pyaudi]==3.0.0b11`
 
 # Latest Release
 **2.5.0** - Event detection has been added to the module. It is now possible to do numerical integration with terminal and non-terminal events.
@@ -28,9 +28,10 @@ Just type
 ## Implemented Integration Methods
 ### Adaptive Methods
 #### Explicit Methods
-1. Runge-Kutta 8(7) with Dormand-Prince Coefficients [**NEW**]
-2. Runge-Kutta 4(5) with Cash-Karp Coefficients
-3. Adaptive Heun-Euler Method
+1. Runge-Kutta 14(12) with Feagin Coefficients [**NEW**]
+2. Runge-Kutta 8(7) with Dormand-Prince Coefficients [**NEW**]
+3. Runge-Kutta 4(5) with Cash-Karp Coefficients
+4. Adaptive Heun-Euler Method
 #### Implicit Methods
 **NOT YET IMPLEMENTED**
 ### Fixed Step Methods

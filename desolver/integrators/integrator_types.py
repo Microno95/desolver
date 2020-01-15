@@ -83,12 +83,15 @@ class ExplicitRungeKuttaIntegrator(IntegratorTemplate):
             self.dTime  = timestep
             
             if self.adaptive:
-                diff = self.dState - D.sum(self.final_state[1][tableau_idx_expand] * aux, axis=0)
+                diff = self.get_error_estimate(self.dState, self.dTime, aux, tableau_idx_expand)
                 timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, timestep)
                 if redo_step:
                     timestep, (self.dTime, self.dState) = self(rhs, initial_time, initial_state, constants, timestep)
             
             return timestep, (self.dTime, self.dState)
+        
+    def get_error_estimate(self, dState, dTime, aux, tableau_idx_expand):
+        return dState - D.sum(self.final_state[1][tableau_idx_expand] * aux, axis=0)
         
     def dense_output(self, rhs, initial_time, initial_state):
         return CubicHermiteInterp(

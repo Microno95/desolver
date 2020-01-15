@@ -33,6 +33,9 @@ def test_float_formats():
 
         with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
             for i in sorted(set(de.available_methods(False).values()), key=lambda x:x.__name__):
+                if "Heun-Euler" in i.__name__ and D.float_fmt() == "gdual_real128":
+                    print("skipping {} due to ridiculous timestep requirements.".format(i))
+                    continue
                 try:
                     a.set_method(i)
                     print("Testing {}".format(a.integrator))
