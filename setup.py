@@ -28,7 +28,7 @@ from setuptools import setup
 
 setup_py_path = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
-with open(os.path.join(setup_py_path, "README.md"), "r") as fh:
+with open(os.path.join(setup_py_path, "README.rst"), "r") as fh:
     long_description = fh.read()
 
 name    = 'desolver'
