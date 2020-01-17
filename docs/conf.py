@@ -34,7 +34,6 @@ release = '3.0.0b12'
 extensions = [
     "sphinx.ext.autosectionlabel",
     "nbsphinx",
-    "sphinx_rtd_theme",
     "sphinx.ext.napoleon"
 ]
 
@@ -52,7 +51,9 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'setup.py', '**/*backend
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
+import stanford_theme
+html_theme = "stanford_theme"
+html_theme_path = [stanford_theme.get_html_theme_path()]
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
