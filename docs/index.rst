@@ -7,19 +7,19 @@ desolver
 ====================================
 
 .. toctree::
-   :maxdepth: 2
-   :caption: desolver Documentation
-   
-   installation
-   quickstart
-   documentation
+    :maxdepth: 2
+    :caption: desolver Documentation
+
+    installation
+    quickstart
+    documentation
 
 -----------------------------------------------
 
 .. toctree::
     :maxdepth: 2
     :caption: Example Uses of desolver
-    
+
     numpy
     pyaudi
     pytorch
