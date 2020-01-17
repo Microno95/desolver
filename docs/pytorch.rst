@@ -5,7 +5,8 @@ desolver and pytorch
 
 .. toctree::
    :maxdepth: 1
-   :caption: Contents:
+   :numbered:
+   :caption: Using pytorch with desolver:
    :glob:
    
    examples/pytorch/*

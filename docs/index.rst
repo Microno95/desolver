@@ -3,17 +3,26 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to desolver's Documentation!
+desolver
 ====================================
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: desolver Documentation
    
    installation
    quickstart
    documentation
-   examples
+
+-----------------------------------------------
+
+.. toctree::
+    :maxdepth: 2
+    :caption: Example Uses of desolver
+    
+    numpy
+    pyaudi
+    pytorch
 
 Indices and tables
 ==================

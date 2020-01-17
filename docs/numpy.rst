@@ -5,7 +5,8 @@ desolver and numpy
 
 .. toctree::
    :maxdepth: 1
-   :caption: Contents:
+   :numbered:
+   :caption: Using numpy with desolver:
    :glob:
    
    examples/numpy/*

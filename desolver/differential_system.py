@@ -594,8 +594,7 @@ class OdeSystem(object):
         t : float
             If t is specified, then the system will be integrated to time t. Otherwise the system will 
             integrate to the specified final time. 
-            NOTE: t can be negative in order to integrate backwards in time, but use this with caution as this
-                  functionality is slightly unstable.
+            NOTE: t can be negative in order to integrate backwards in time, but use this with caution as this functionality is slightly unstable.
                   
         callback : callable or list of callables
             A callable object or list of callable objects that are invoked as callback(self) at each time step.
@@ -605,25 +604,26 @@ class OdeSystem(object):
             Specifies whether or not the integration process should return an eta, current progress 
             and simple information regarding step-size and current time. Will be deprecated
             in the future in favour of verbosity argument that prints once every n-steps.
-            NOTE: This may slow the integration process down as the process of outputting
-                  these values create overhead.
+            NOTE: This may slow the integration process down as the process of outputting these values create overhead.
                   
         events : callable or list of callables
-            Events to track, defaults to None. Each function must have the signature ```event(t, y, **kwargs)```
-            and the solver will find the time t such that ```event(t, y, **kwargs) == 0```. The **kwargs argument
+            Events to track, defaults to None. Each function must have the signature ``event(t, y, **kwargs)``
+            and the solver will find the time t such that ``event(t, y, **kwargs) == 0``. The ``**kwargs`` argument
             allows the solver to pass the system constants to the function.
             Additionally, each event function can possess the following two attributes:
-                `direction`   : -1, 0, 1
+            
+                direction: bool, optional
                     Indicates the direction of the event crossing that will register an event.
-                `is_terminal` : bool
+                is_terminal: bool, optional
                     Indicates whether the detection of the event terminates the numerical integration.
                   
         Raises
         ------
-        RecursionError
-            Raised if an adaptive integrator recurses when attempting to compute a forward step.
+        RecursionError : 
+            Raised if an adaptive integrator recurses beyond the recursion limit when attempting to compute a forward step.
             This usually means that the numerical integration did not converge and that the 
             behaviour of the system is highly unreliable. This could be due to numerical issues.
+            
         """
         if t:
             tf = t
