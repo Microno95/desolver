@@ -1,7 +1,7 @@
 .. desolver and pytorch
 
-desolver and pytorch
-====================
+Using pytorch
+=============
 
 .. toctree::
    :maxdepth: 1

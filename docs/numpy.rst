@@ -1,7 +1,7 @@
 .. desolver and numpy
 
-desolver and numpy
-==================
+Using numpy
+===========
 
 .. toctree::
    :maxdepth: 1

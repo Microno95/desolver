@@ -1,7 +1,7 @@
 .. desolver and pyaudi
 
-desolver and pyaudi
-===================
+Using pyaudi
+============
 
 .. toctree::
    :maxdepth: 1
