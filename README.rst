@@ -3,19 +3,21 @@ DESolver
 ========
 
 
-.. image:: https://bettercodehub.com/edge/badge/Microno95/desolver?branch=master
-   :target: https://bettercodehub.com/
-   :alt: BCH compliance
-
-
 .. image:: https://travis-ci.com/Microno95/desolver.svg?branch=master
    :target: https://travis-ci.com/Microno95/desolver
    :alt: Build Status
 
+.. image:: https://readthedocs.org/projects/desolver/badge/?version=latest
+    :target: https://desolver.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
 
 .. image:: https://codecov.io/gh/Microno95/desolver/branch/master/graph/badge.svg
    :target: https://codecov.io/gh/Microno95/desolver
    :alt: codecov
+
+.. image:: https://bettercodehub.com/edge/badge/Microno95/desolver?branch=master
+   :target: https://bettercodehub.com/
+   :alt: BCH compliance
 
 
 This is a python package for solving Initial Value Problems using various numerical integrators.
@@ -37,7 +39,7 @@ Latest Release
 
 **2.2.0** - PyTorch backend is now implemented. It is now possible to numerically integrate a system of equations that use pytorch tensors and then compute gradients from these.
 
-**Use of PyTorch backend requires installation of PyTorch from `here <https://pytorch.org/get-started/locally/>`_.**
+Use of PyTorch backend requires installation of PyTorch from `here <https://pytorch.org/get-started/locally/>`_.
 
 To Install:
 ===========
@@ -87,17 +89,6 @@ This example shows the integration of a harmonic oscillator using DESolver.
    import desolver as de
    import desolver.backend as D
 
-   @de.rhs_prettifier(
-       equ_repr="[vx, -k*x/m]",
-       md_repr=r"""
-   $$
-   \frac{dx}{dt} = \begin{bmatrix}
-      0            & 1 \\
-      -\frac{k}{m} & 0
-      \end{bmatrix} \cdot \begin{bmatrix}x \\ v_x\end{bmatrix}
-   $$
-   """
-   )
    def rhs(t, state, k, m, **kwargs):
        return D.array([[0.0, 1.0], [-k/m,  0.0]])@state
 
