@@ -329,7 +329,7 @@ class HeunEulerSolver(ExplicitRungeKuttaIntegrator):
     order = 2.0
     
     __alt_names__ = ("Explicit Adaptive Heun-Euler", "Adaptive Heun-Euler", "AHE")
-    __adaptive__  = False
+    __adaptive__  = True
     __order__     = order
     
     tableau = numpy.array(
