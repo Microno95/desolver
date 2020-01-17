@@ -1,4 +1,4 @@
+stanford_theme
 nbsphinx
 tqdm
 numpy
-stanford_theme
