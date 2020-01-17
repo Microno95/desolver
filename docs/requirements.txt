@@ -2,3 +2,4 @@ stanford_theme
 nbsphinx
 tqdm
 numpy
+ipython
