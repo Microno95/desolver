@@ -27,14 +27,14 @@ def brentsroot(f, bounds, tol=None, verbose=False):
 
     Examples
     --------
-    ```python
+    
     >>> def ft(x):
         return x**2 - (1 - x)**5
     >>> xl, xu = 0.1, 1.0
     >>> x0, success = brentsroot(ft, xl, xu, verbose=True)
     >>> success, x0, ft(x0)
     (True, 0.34595481584824206, 6.938893903907228e-17)
-    ```
+    
     """
     lower_bound, upper_bound = bounds
     if tol is None:
@@ -121,14 +121,14 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
 
     Examples
     --------
-    ```python
+    
     >>> f = lambda x: lambda y: x * y - y**2 + x
     >>> xl, xu = 0.1, 1.0
     >>> funcs = [f(i*0.5) for i in range(3)]
     >>> x0, success = brentsrootvec(funcs, xl, xu, verbose=True)
     >>> success, x0, [funcs[i](x0[i]) for i in range(len(funcs))]
     (array([ True,  True,  True]), array([0.        , 1.        , 1.61803399]), [0.0, 0.0, 0.0])
-    ```
+    
     """
     lower_bound, upper_bound = bounds
     if tol is None:

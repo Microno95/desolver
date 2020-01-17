@@ -1,6 +1,5 @@
 import numpy
 
-from .integrator_template import named_integrator
 from .integrator_types import ExplicitRungeKuttaIntegrator, ExplicitSymplecticIntegrator
 from .. import backend as D
 
@@ -21,8 +20,6 @@ __all__ = [
     'ABAs5o6HSolver'
 ]
 
-@named_integrator("Explicit RK1412",
-                       alt_names=("RK1412", "Runge-Kutta 14(12)", "RK1412Feag"))
 class RK1412Solver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the Adaptive Runge-Kutta 14(12) method using
@@ -32,6 +29,13 @@ class RK1412Solver(ExplicitRungeKuttaIntegrator):
     ----------
     [1] Feagin, Terry. "HIGH-ORDER EXPLICIT RUNGE-KUTTA METHODS USING W-SYMMETRY." Neural, Parallel & Scientific Computations 20, no. 3-4 (2012): 437-458.
     """
+    
+    order = 14.0
+    
+    __alt_names__ = ("Explicit RK1412", "RK1412", "Runge-Kutta 14(12)", "RK1412Feag")
+    __adaptive__  = True
+    __order__     = order
+    
     tableau = numpy.array(
         [[0.,                                     0.,                                         0.,                                      0.,                                     0.,                                   0.,                                    0.,                                    0.,                                     0.,                                     0.,                                      0.,                                      0.,                                       0.,                                     0.,                                         0.,                                         0.,                                       0.,                                        0.,                                      0.,                                        0.,                                       0.,                                      0.,                                      0.,                                      0.,                                    0.,                                       0.,                                      0.,                                       0.,                                      0.,                                       0.,                                     0.,                                      0.,                                     0.,        0.,                                    0.,                                      0., ],
     [11111111111111111./100000000000000000., 11111111111111111./100000000000000000.,     0.,                                      0.,                                     0.,                                   0.,                                    0.,                                    0.,                                     0.,                                     0.,                                      0.,                                      0.,                                       0.,                                     0.,                                         0.,                                         0.,                                       0.,                                        0.,                                      0.,                                        0.,                                       0.,                                      0.,                                      0.,                                      0.,                                    0.,                                       0.,                                      0.,                                       0.,                                      0.,                                       0.,                                     0.,                                      0.,                                     0.,        0.,                                    0.,                                      0., ],
@@ -74,15 +78,11 @@ class RK1412Solver(ExplicitRungeKuttaIntegrator):
         [[0., 892857142857143./50000000000000000., 3./512., 3./256., 0., 9./512., 0., 3./128., 15./512., 0., 9./256., 21./512., 3./64., 0., 27./512., 15./256., 33./512., 0., 5267605678587651./50000000000000000., 8528067312087609./50000000000000000., 10311469866467597./50000000000000000., 10311469866467597./50000000000000000., 8528067312087609./50000000000000000., 5267605678587651./50000000000000000., -33./512., -15./256., -27./512., -3./64., -21./512., -9./256., -15./512., -3./128., -9./512., -3./256., -3./512., 892857142857143./50000000000000000.],
          [0., 892857142857143./50000000000000000., 242968749999999999./50000000000000000000., 3./256., 0., 9./512., 0., 3./128., 15./512., 0., 9./256., 21./512., 3./64., 0., 27./512., 15./256., 33./512., 0., 5267605678587651./50000000000000000., 8528067312087609./50000000000000000., 10311469866467597./50000000000000000., 10311469866467597./50000000000000000., 8528067312087609./50000000000000000., 5267605678587651./50000000000000000., -33./512., -15./256., -27./512., -3./64., -21./512., -9./256., -15./512., -3./128., -9./512., -3./256., -242968749999999999./50000000000000000000., 892857142857143./50000000000000000.]], dtype=numpy.float64
     )
-    
-    order = 14.0
         
 #     def get_error_estimate(self, dState, dTime, aux, tableau_idx_expand):
 #         return (aux[0] - aux[-1]) / 1000 + (dState - aux[-1]) / dTime # D.sum(self.final_state[1][tableau_idx_expand] * aux, axis=0) * dTime / 1000 # 
 
 
-@named_integrator("Explicit RK108",
-                       alt_names=("RK108", "Runge-Kutta 10(8)", "RK108Feag"))
 class RK108Solver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the Adaptive Runge-Kutta 10(8) method using
@@ -92,6 +92,13 @@ class RK108Solver(ExplicitRungeKuttaIntegrator):
     ----------
     [1] Feagin, Terry. "HIGH-ORDER EXPLICIT RUNGE-KUTTA METHODS USING W-SYMMETRY." Neural, Parallel & Scientific Computations 20, no. 3-4 (2012): 437-458.
     """
+    
+    order = 10.0
+    
+    __alt_names__ = ("Explicit RK108", "RK108", "Runge-Kutta 10(8)", "RK108Feag")
+    __adaptive__  = True
+    __order__     = order
+    
     tableau = numpy.array(
         [[0.,                                           0.,                                           0.,                                          0.,                                            0.,                                          0.,                                           0.,                                            0.,                                            0.,                                            0.,                                           0.,                                             0.,                                             0.,                                            0.,                                           0.,                                            0.,                                           0.,       0., ],
     [1./10.,                                       1./10.,                                       0.,                                          0.,                                            0.,                                          0.,                                           0.,                                            0.,                                            0.,                                            0.,                                           0.,                                             0.,                                             0.,                                            0.,                                           0.,                                            0.,                                           0.,       0., ],
@@ -116,14 +123,10 @@ class RK108Solver(ExplicitRungeKuttaIntegrator):
         [[0., 3333333333333333333./100000000000000000000., 1./40., 3333333333333333333./100000000000000000000., 0., 1./20., 0., 1./25., 0., 2365468476861543627./12500000000000000000., 27742918851774317651./100000000000000000000., 27742918851774317651./100000000000000000000., 2365468476861543627./12500000000000000000., -1./25., -1./20., -3333333333333333333./100000000000000000000., -1./40., 3333333333333333333./100000000000000000000.],
          [0., 3333333333333333333./100000000000000000000., 1./36., 3333333333333333333./100000000000000000000., 0., 1./20., 0., 1./25., 0., 2365468476861543627./12500000000000000000., 27742918851774317651./100000000000000000000., 27742918851774317651./100000000000000000000., 2365468476861543627./12500000000000000000., -1./25., -1./20., -3333333333333333333./100000000000000000000., -1./36., 3333333333333333333./100000000000000000000.]], dtype=numpy.float64
     )
-    
-    order = 10.0
         
 #     def get_error_estimate(self, dState, dTime, aux, tableau_idx_expand):
 #         return (aux[0] - aux[-1]) / 360 + (dState - aux[-1]) / dTime # D.sum(self.final_state[1][tableau_idx_expand] * aux, axis=0) * dTime / 1000 # 
 
-@named_integrator("Explicit RK8713M",
-                       alt_names=("RK87", "Runge-Kutta 8(7)", "RK8713M"))
 class RK8713MSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the Adaptive Runge-Kutta 8(7) method using
@@ -131,8 +134,15 @@ class RK8713MSolver(ExplicitRungeKuttaIntegrator):
     
     References
     ----------
-    [1] Prince, P.J., and J.R. Dormand. ‘High Order Embedded Runge-Kutta Formulae’. Journal of Computational and Applied Mathematics 7, no. 1 (March 1981): 67–75. https://doi.org/10.1016/0771-050X(81)90010-3.
+    [1] Prince, P.J., and J.R. Dormand. ‘High Order Embedded Runge-Kutta Formulae’. Journal of Computational and Applied Mathematics 7, no. 1 (March 1981): 67–75. https://doi.org/10.1016/0771-050X(81)90010-3 .
     """
+    
+    order = 8.0
+    
+    __alt_names__ = ("Explicit RK8713M", "RK87", "Runge-Kutta 8(7)", "RK8713M")
+    __adaptive__  = True
+    __order__     = order
+    
     tableau = numpy.array(
         [[0.0,                    0.0,                  0.0,      0.0,       0.0,                      0.0,                    0.0,                     0.0,                     0.0,                     0.0,                     0.0,                   0.0,                  0.0, 0.0],
          [1/18,                   1/18,                 0.0,      0.0,       0.0,                      0.0,                    0.0,                     0.0,                     0.0,                     0.0,                     0.0,                   0.0,                  0.0, 0.0],
@@ -154,10 +164,6 @@ class RK8713MSolver(ExplicitRungeKuttaIntegrator):
          [0., 14005451/335480064, 0.0, 0.0, 0.0, 0.0, -59238493/1068277825, 181606767/758867731,   561292985/797845732, -1041891430/1371343529, 760417239/1151165299, 118820643/751138087, -528747749/2220607170, 1/4]], dtype=numpy.float64
     )
     
-    order = 8.0
-
-@named_integrator("Explicit RK45CK",
-                       alt_names=("RK45CK", "Runge-Kutta-Cash-Karp", "RK45"))
 class RK45CKSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the Adaptive Runge-Kutta 4(5) method using
@@ -165,8 +171,15 @@ class RK45CKSolver(ExplicitRungeKuttaIntegrator):
     
     References
     ----------
-    [1] Cash, J. R., and Alan H. Karp. ‘A Variable Order Runge-Kutta Method for Initial Value Problems with Rapidly Varying Right-Hand Sides’. ACM Transactions on Mathematical Software 16, no. 3 (1 September 1990): 201–22. https://doi.org/10.1145/79505.79507.
+    [1] Cash, J. R., and Alan H. Karp. ‘A Variable Order Runge-Kutta Method for Initial Value Problems with Rapidly Varying Right-Hand Sides’. ACM Transactions on Mathematical Software 16, no. 3 (1 September 1990): 201–22. https://doi.org/10.1145/79505.79507 .
     """
+    
+    order = 5.0
+    
+    __alt_names__ = ("Explicit RK45CK", "RK45CK", "Runge-Kutta-Cash-Karp", "RK45")
+    __adaptive__  = True
+    __order__     = order
+    
     tableau = numpy.array(
         [[0.0,  0.0,        0.0,     0.0,       0.0,          0.0,      0.0],
          [1/5,  1/5,        0.0,     0.0,       0.0,          0.0,      0.0],
@@ -181,10 +194,6 @@ class RK45CKSolver(ExplicitRungeKuttaIntegrator):
          [0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ]], dtype=numpy.float64
     )
     
-    order = 5.0
-    
-@named_integrator("Explicit RK5",
-                   alt_names=("RK5", "Runge-Kutta 5", "RK5"))
 class RK5Solver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements a 5th order Runge-Kutta method.
@@ -192,22 +201,32 @@ class RK5Solver(ExplicitRungeKuttaIntegrator):
     
     References
     ----------
-    [1] Cash, J. R., and Alan H. Karp. ‘A Variable Order Runge-Kutta Method for Initial Value Problems with Rapidly Varying Right-Hand Sides’. ACM Transactions on Mathematical Software 16, no. 3 (1 September 1990): 201–22. https://doi.org/10.1145/79505.79507.
+    [1] Cash, J. R., and Alan H. Karp. ‘A Variable Order Runge-Kutta Method for Initial Value Problems with Rapidly Varying Right-Hand Sides’. ACM Transactions on Mathematical Software 16, no. 3 (1 September 1990): 201–22. https://doi.org/10.1145/79505.79507 .
     """
+    
+    order = 5.0
+    
+    __alt_names__ = ("Explicit RK5", "RK5", "Runge-Kutta 5")
+    __adaptive__  = False
+    __order__     = order
+    
     tableau = numpy.copy(RK45CKSolver.tableau)
 
     final_state = numpy.array(
         [[0., 37/378,     0, 250/621,     125/594,     0,         512/1771]], dtype=numpy.float64
     )
     
-    order = 5.0
-    
-@named_integrator("Explicit RK4",
-                   alt_names=("RK4", "Runge-Kutta 4", "RK4"))
 class RK4Solver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the classic 4th order Runge-Kutta method.
     """
+    
+    order = 4.0
+    
+    __alt_names__ = ("Explicit RK4", "RK4", "Runge-Kutta 4")
+    __adaptive__  = False
+    __order__     = order
+    
     tableau = numpy.array(
         [[0,   0,   0,   0, 0],
          [1/2, 1/2, 0,   0, 0],
@@ -218,15 +237,18 @@ class RK4Solver(ExplicitRungeKuttaIntegrator):
     final_state = numpy.array(
         [[0., 1/6, 1/3, 1/3, 1/6]], dtype=numpy.float64
     )
-    
-    order = 4.0
 
-@named_integrator("Explicit Midpoint",
-                       alt_names=("Midpoint",))
 class MidpointSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the midpoint method.
     """
+    
+    order = 2.0
+    
+    __alt_names__ = ("Explicit Midpoint", "Midpoint")
+    __adaptive__  = False
+    __order__     = order
+    
     tableau = numpy.array(
         [[0,    0,   0],
          [1/2,  1/2, 0]], dtype=numpy.float64
@@ -235,15 +257,18 @@ class MidpointSolver(ExplicitRungeKuttaIntegrator):
     final_state = numpy.array(
         [[0,    0,   1]], dtype=numpy.float64
     )
-    
-    order = 2.0
 
-@named_integrator("Explicit Heun's",
-                       alt_names=("Heun's",))
 class HeunsSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements Heun's method.
     """
+    
+    order = 2.0
+    
+    __alt_names__ = ("Explicit Heun's", "Heun's")
+    __adaptive__  = False
+    __order__     = order
+    
     tableau = numpy.array(
         [[0,    0,   0  ],
          [1,    1,   0  ]], dtype=numpy.float64
@@ -252,15 +277,18 @@ class HeunsSolver(ExplicitRungeKuttaIntegrator):
     final_state = numpy.array(
         [[0,    1/4, 3/4]], dtype=numpy.float64
     )
-    
-    order = 2.0
 
-@named_integrator("Explicit Euler",
-                       alt_names=("Forward Euler", "Euler"))
 class EulerSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the Euler method.
     """
+    
+    order = 1.0
+    
+    __alt_names__ = ("Explicit Euler", "Euler")
+    __adaptive__  = False
+    __order__     = order
+    
     tableau = numpy.array(
         [[0,    0]], dtype=numpy.float64
     )
@@ -268,15 +296,18 @@ class EulerSolver(ExplicitRungeKuttaIntegrator):
     final_state = numpy.array(
         [[0,    1]], dtype=numpy.float64
     )
-    
-    order = 1.0
 
-@named_integrator("Explicit Euler-Trapezoidal",
-                       alt_names=("Euler-Trapezoidal", "Euler-Trap", "Predictor-Corrector Euler"))
 class EulerTrapSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the Euler-Trapezoidal method.
     """
+    
+    order = 2.0
+    
+    __alt_names__ = ("Explicit Euler-Trapezoidal", "Euler-Trapezoidal", "Euler-Trap", "Predictor-Corrector Euler")
+    __adaptive__  = False
+    __order__     = order
+    
     tableau = numpy.array(
         [[0,   0,   0,     0,   0  ],
          [1,   1,   0,     0,   0  ],
@@ -287,17 +318,20 @@ class EulerTrapSolver(ExplicitRungeKuttaIntegrator):
     final_state = numpy.array(
         [[0,   1/2, 0,    0,   1/2]], dtype=numpy.float64
     )
-    
-    order = 2.0
 
-@named_integrator("Explicit Adaptive Heun-Euler",
-                       alt_names=("Adaptive Heun-Euler", "AHE"))
 class HeunEulerSolver(ExplicitRungeKuttaIntegrator):
     """
     The derived class that implements the adaptive Heun-Euler method.
     This is a 1st order method (Euler) with an embedded 
     2nd order method (Heun) that does adaptive timestepping.
     """
+    
+    order = 2.0
+    
+    __alt_names__ = ("Explicit Adaptive Heun-Euler", "Adaptive Heun-Euler", "AHE")
+    __adaptive__  = False
+    __order__     = order
+    
     tableau = numpy.array(
         [[0,   0,   0],
          [1,   1,   0]], dtype=numpy.float64
@@ -308,26 +342,25 @@ class HeunEulerSolver(ExplicitRungeKuttaIntegrator):
          [0,    1,   0   ]], dtype=numpy.float64
     )
     
-    order = 2.0
-
-@named_integrator("Explicit Symplectic Forward Euler",
-                       alt_names=("Symplectic Euler",),
-                       order=1.0)
 class SymplecticEulerSolver(ExplicitSymplecticIntegrator):
     """
     The derived class that implements the symplectic Euler method.
     
     This is the simplest symplectic integration scheme.
     """
+    
+    order = 1.0
+    
+    __alt_names__ = ("Explicit Symplectic Forward Euler", "Symplectic Forward Euler")
+    __adaptive__  = False
+    __order__     = order
+    
     tableau = numpy.array(
         [[0.5, 0,   0.5],
          [0,   1.0, 0  ],
          [0.5, 0,   0.5]], dtype=numpy.float64
     )
 
-@named_integrator("Explicit BABS9O7H",
-                       alt_names=("BABS9O7H", "BABs9o7H"),
-                       order=7.0)
 class BABs9o7HSolver(ExplicitSymplecticIntegrator):
     """
     The derived class that implements the 7th order 
@@ -337,8 +370,15 @@ class BABs9o7HSolver(ExplicitSymplecticIntegrator):
     
     References
     ----------
-    [1] Nielsen, Kristian Mads Egeris. ‘Efficient Fourth Order Symplectic Integrators for Near-Harmonic Separable Hamiltonian Systems’. ArXiv:1501.04345 [Physics, Physics:Quant-Ph], 9 February 2015. http://arxiv.org/abs/1501.04345.
+    [1] Nielsen, Kristian Mads Egeris. ‘Efficient Fourth Order Symplectic Integrators for Near-Harmonic Separable Hamiltonian Systems’. ArXiv:1501.04345 [Physics, Physics:Quant-Ph], 9 February 2015. http://arxiv.org/abs/1501.04345 .
     """
+    
+    order = 7.0
+    
+    __alt_names__ = ("Explicit BABS9O7H", "BABS9O7H")
+    __adaptive__  = False
+    __order__     = order
+    
     # Based on arXiv:1501.04345v2 - BAB's9o7H
     tableau = numpy.array(
        [[ 0.                  ,  0.                  ,  0.04649290043965892 ],
@@ -362,9 +402,6 @@ class BABs9o7HSolver(ExplicitSymplecticIntegrator):
         [ 1.                  ,  0.                  ,  0.04649290043965892 ]], dtype=numpy.float64
     )
 
-@named_integrator("Explicit ABAS5O6H",
-                       alt_names=("ABAS5O6H", "ABAs5o6H"),
-                       order=6.0)
 class ABAs5o6HSolver(ExplicitSymplecticIntegrator):
     """
     The derived class that implements the 6th order 
@@ -374,8 +411,15 @@ class ABAs5o6HSolver(ExplicitSymplecticIntegrator):
     
     References
     ----------
-    [1] Nielsen, Kristian Mads Egeris. ‘Efficient Fourth Order Symplectic Integrators for Near-Harmonic Separable Hamiltonian Systems’. ArXiv:1501.04345 [Physics, Physics:Quant-Ph], 9 February 2015. http://arxiv.org/abs/1501.04345.
+    [1] Nielsen, Kristian Mads Egeris. ‘Efficient Fourth Order Symplectic Integrators for Near-Harmonic Separable Hamiltonian Systems’. ArXiv:1501.04345 [Physics, Physics:Quant-Ph], 9 February 2015. http://arxiv.org/abs/1501.04345 .
     """
+    
+    order = 6.0
+    
+    __alt_names__ = ("Explicit ABAS5O6H", "ABAS5O6H")
+    __adaptive__  = False
+    __order__     = order
+    
     # Based on arXiv:1501.04345v2 - ABAs5o6H
     tableau = numpy.array(
       [[ 0.                  ,  0.                  ,  0.15585935917621682 ],

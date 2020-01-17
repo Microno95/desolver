@@ -23,14 +23,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-
+import os
 from setuptools import setup
 
-with open("README.md", "r") as fh:
+setup_py_path = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+
+with open(os.path.join(setup_py_path, "README.md"), "r") as fh:
     long_description = fh.read()
 
-setup(name='desolver',
-      version='3.0.0b12',
+name    = 'desolver'
+release = '3.0.0b12'
+version = ".".join(release.split(".")[:2])
+    
+setup(name=name,
+      version=release,
       description='Differential Equation System Solver',
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
@@ -69,4 +75,11 @@ setup(name='desolver',
           'Programming Language :: Python :: 3.6',
           'Programming Language :: Python :: 3.7'
       ],
-      )
+      # these are optional and override conf.py settings
+      command_options={
+          'build_sphinx': {
+              'project': ('setup.py', name),
+              'version': ('setup.py', version),
+              'release': ('setup.py', release),
+              'source_dir': ('setup.py', 'docs')}}
+    )

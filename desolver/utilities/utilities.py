@@ -30,10 +30,10 @@ def convert_suffix(value, suffixes=('d', 'h', 'm', 's'), ratios=(24, 60, 60), de
 
     Examples
     --------
-    ```python
+    
     >>> convert_suffix(3661, suffixes=['d', 'h', 'm', 's'], ratios=[24, 60, 60], delimiter=':')
     '0d:1h:1m1.00s'
-    ```
+    
     """
     tValue = value
     outputValues = []
@@ -57,10 +57,10 @@ def warning(*args, **kwargs):
         
     Examples
     --------
-    ```python
+    
     >>> warning("Things have failed...")
     Things have failed...
-    ```
+    
     """
     print(*args, file=sys.stderr, **kwargs)
 
@@ -81,13 +81,13 @@ def search_bisection(array, val):
 
     Examples
     --------
-    ```python
+    
     >>> list_to_search = [1,2,3,4,5]
     >>> val_to_find    = 2.5
     >>> idx = search_bisection(list_to_search, val_to_find)
     >>> idx, list_to_search[idx]
     (1, 2)
-    ```
+    
     """
     
     jlower = 0

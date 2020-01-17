@@ -2,23 +2,23 @@ from .. import backend as D
 
 __all__ = [
     'IntegratorTemplate',
-    'named_integrator',
+#     'named_integrator',
 ]
 
-def named_integrator(name, alt_names=tuple(), order=1.0):
-    def wrap(f):
-        f.__name__ = str(name)
-        f.__alt_names__ = alt_names
-        if hasattr(f, 'order'):
-            f.__order__ = f.order
-        else:
-            f.__order__ = order
-        if hasattr(f, "final_state"):
-            f.__adaptive__ = D.shape(f.final_state)[0] == 2
-        else:
-            f.__adaptive__ = False
-        return f
-    return wrap
+# def named_integrator(name, alt_names=tuple(), order=1.0):
+#     def wrap(f):
+#         f.__name__ = str(name)
+#         f.__alt_names__ = alt_names
+#         if hasattr(f, 'order'):
+#             f.__order__ = f.order
+#         else:
+#             f.__order__ = order
+#         if hasattr(f, "final_state"):
+#             f.__adaptive__ = D.shape(f.final_state)[0] == 2
+#         else:
+#             f.__adaptive__ = False
+#         return f
+#     return wrap
 
 class IntegratorTemplate(object):
     def __init__(self):
