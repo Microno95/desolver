@@ -1,0 +1,118 @@
+
+DESolver
+========
+
+
+.. image:: https://bettercodehub.com/edge/badge/Microno95/desolver?branch=master
+   :target: https://bettercodehub.com/
+   :alt: BCH compliance
+
+
+.. image:: https://travis-ci.com/Microno95/desolver.svg?branch=master
+   :target: https://travis-ci.com/Microno95/desolver
+   :alt: Build Status
+
+
+.. image:: https://codecov.io/gh/Microno95/desolver/branch/master/graph/badge.svg
+   :target: https://codecov.io/gh/Microno95/desolver
+   :alt: codecov
+
+
+This is a python package for solving Initial Value Problems using various numerical integrators.
+Many integration routines are included ranging from fixed step to symplectic to adaptive integrators.
+
+Implicit integrators are intended for release 4.0, but that's far off for now.
+
+In Beta Development
+===================
+
+**3.0.0b12** - PyAudi support has been added to the module. It is now possible to do numerical integrations using ``gdual`` variables such as ``gdual_double``\ , ``gdual_vdouble`` and ``gdual_real128`` (only on select platforms, refer to `pyaudi docs <https://darioizzo.github.io/audi/>`_ for more information).
+
+This version can be installed with ``pip install desolver[pyaudi]==3.0.0b12``
+
+Latest Release
+==============
+
+**2.5.0** - Event detection has been added to the module. It is now possible to do numerical integration with terminal and non-terminal events.
+
+**2.2.0** - PyTorch backend is now implemented. It is now possible to numerically integrate a system of equations that use pytorch tensors and then compute gradients from these.
+
+**Use of PyTorch backend requires installation of PyTorch from `here <https://pytorch.org/get-started/locally/>`_.**
+
+To Install:
+===========
+
+Just type
+
+``pip install desolver``
+
+Implemented Integration Methods
+-------------------------------
+
+Explicit Methods
+~~~~~~~~~~~~~~~~
+
+Adaptive Methods
+^^^^^^^^^^^^^^^^
+
+#. Runge-Kutta 14(12) with Feagin Coefficients [\ **NEW**\ ]
+#. Runge-Kutta 10(8) with Feagin Coefficients [\ **NEW**\ ]
+#. Runge-Kutta 8(7) with Dormand-Prince Coefficients [\ **NEW**\ ]
+#. Runge-Kutta 4(5) with Cash-Karp Coefficients
+#. Adaptive Heun-Euler Method
+
+Fixed Step Methods
+^^^^^^^^^^^^^^^^^^
+
+#. Runge-Kutta 4 - The classic RK4 integrator
+#. Runge-Kutta 5 - The 5th order integrator from RK45 with Cash-Karp Coefficients.
+#. BABs9o7H Method  -- Based on arXiv:1501.04345v2 - BAB's9o7H
+#. ABAs5o6HA Method -- Based on arXiv:1501.04345v2 - ABAs5o6H
+#. Midpoint Method
+#. Heun's Method
+#. Euler's Method
+#. Euler-Trapezoidal Method
+
+Implicit Methods
+~~~~~~~~~~~~~~~~
+**NOT YET IMPLEMENTED**
+
+Minimal Working Example
+=======================
+
+This example shows the integration of a harmonic oscillator using DESolver.
+
+.. code-block:: python
+
+   import desolver as de
+   import desolver.backend as D
+
+   @de.rhs_prettifier(
+       equ_repr="[vx, -k*x/m]",
+       md_repr=r"""
+   $$
+   \frac{dx}{dt} = \begin{bmatrix}
+      0            & 1 \\
+      -\frac{k}{m} & 0
+      \end{bmatrix} \cdot \begin{bmatrix}x \\ v_x\end{bmatrix}
+   $$
+   """
+   )
+   def rhs(t, state, k, m, **kwargs):
+       return D.array([[0.0, 1.0], [-k/m,  0.0]])@state
+
+   y_init = D.array([1., 0.])
+
+   a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi), dt=0.01, rtol=1e-9, atol=1e-9, constants=dict(k=1.0, m=1.0))
+
+   print(a)
+
+   a.integrate()
+
+   print(a)
+
+   print("If the integration was successful and correct, a[0].y and a[-1].y should be near identical.")
+   print("a[0].y  = {}".format(a[0].y))
+   print("a[-1].y = {}".format(a[-1].y))
+
+   print("Maximum difference from initial state after one oscillation cycle: {}".format(D.max(D.abs(a[0].y-a[-1].y))))
