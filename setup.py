@@ -32,7 +32,7 @@ with open(os.path.join(setup_py_path, "README.rst"), "r") as fh:
     long_description = fh.read()
 
 name    = 'desolver'
-release = '3.0.0b12'
+release = '3.0.0'
 version = ".".join(release.split(".")[:2])
     
 setup(name=name,
@@ -56,7 +56,7 @@ setup(name=name,
           #   3 - Alpha
           #   4 - Beta
           #   5 - Production/Stable
-          'Development Status :: 4 - Beta',
+          'Development Status :: 5 - Production/Stable',
 
           'Environment :: Console',
           # Indicate who your project is intended for

@@ -25,15 +25,10 @@ Many integration routines are included ranging from fixed step to symplectic to 
 
 Implicit integrators are intended for release 4.0, but that's far off for now.
 
-In Beta Development
-===================
-
-**3.0.0b12** - PyAudi support has been added to the module. It is now possible to do numerical integrations using ``gdual`` variables such as ``gdual_double``\ , ``gdual_vdouble`` and ``gdual_real128`` (only on select platforms, refer to `pyaudi docs <https://darioizzo.github.io/audi/>`_ for more information).
-
-This version can be installed with ``pip install desolver[pyaudi]==3.0.0b12``
-
 Latest Release
 ==============
+
+**3.0.0** - PyAudi support has been finalised. It is now possible to do numerical integrations using ``gdual`` variables such as ``gdual_double``\ , ``gdual_vdouble`` and ``gdual_real128`` (only on select platforms, refer to `pyaudi docs <https://darioizzo.github.io/audi/>`_ for more information). Install desolver with pyaudi support using ``pip install desolver[pyaudi]``. Documentation has also been added and is available at `https://desolver.readthedocs.io/`_.
 
 **2.5.0** - Event detection has been added to the module. It is now possible to do numerical integration with terminal and non-terminal events.
 
