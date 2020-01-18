@@ -32,7 +32,7 @@ with open(os.path.join(setup_py_path, "README.rst"), "r") as fh:
     long_description = fh.read()
 
 name    = 'desolver'
-release = '3.0.0'
+release = '3.0.1'
 version = ".".join(release.split(".")[:2])
     
 setup(name=name,
@@ -41,7 +41,7 @@ setup(name=name,
       author='Ekin Ozturk',
       author_email='ekin.ozturk@mail.utoronto.ca',
       long_description=long_description,
-      long_description_content_type="text/markdown",
+      long_description_content_type="text/x-rst",
       install_requires=['numpy', 'tqdm', 'scipy>=0.18.0'],
       license='MIT',
       keywords=['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode'],
