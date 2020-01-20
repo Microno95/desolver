@@ -31,70 +31,46 @@ def test_getter_setters():
 
         a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
 
-        assert(a.get_end_time() == 2 * D.pi)
-        assert(a.get_start_time() == 0)
+        assert(a.t0 == 0)
+        assert(a.tf == 2 * D.pi)
         assert(a.dt == 0.01)
         assert(a.rtol == D.epsilon()**0.5)
         assert(a.atol == D.epsilon()**0.5)
         assert(D.norm(a.y[0]  - y_init) <= 2 * D.epsilon())
         assert(D.norm(a.y[-1] - y_init) <= 2 * D.epsilon())
 
-        try:
-            a.set_kick_vars([True, False])
-        except Exception as e:
-            raise RuntimeError("set_kick_vars failed with: {}".format(e))
+        a.set_kick_vars([True, False])
 
         assert(a.staggered_mask == [True, False])
         pval = 3 * D.pi
 
-        try:
-            a.set_end_time(pval)
-        except Exception as e:
-            raise RuntimeError("set_end_time failed with: {}".format(e))
-        
-        assert(a.get_end_time() == pval)
+        a.tf = pval
+    
+        assert(a.tf == pval)
         pval = -1.0
 
-        try:
-            a.set_start_time(pval)
-        except Exception as e:
-            raise RuntimeError("set_start_time failed with: {}".format(e))
+        a.t0 = pval
 
-        assert(a.get_start_time() == pval)
-        assert(a.get_step_size() == 0.01)
+        assert(a.t0 == pval)
+        assert(a.dt == 0.01)
 
-        try:
-            a.set_rtol(1e-3)
-        except Exception as e:
-            raise RuntimeError("set_rtol failed with: {}".format(e))
+        a.rtol = 1e-3
 
-        assert(a.get_rtol() == 1e-3)
+        assert(a.rtol == 1e-3)
 
-        try:
-            a.set_atol(1e-3)
-        except Exception as e:
-            raise RuntimeError("set_atol failed with: {}".format(e))
+        a.atol = 1e-3
 
-        assert(a.get_atol() == 1e-3)
+        assert(a.atol == 1e-3)
 
-        try:
-            a.set_method("RK45CK")
-        except Exception as e:
-            raise RuntimeError("set_method failed with: {}".format(e))
+        a.set_method("RK45CK")
 
         assert(isinstance(a.integrator, de.available_methods(False)["RK45CK"]))
 
-        try:
-            a.add_constants(k=5.0)
-        except Exception as e:
-            raise RuntimeError("add_constants failed with: {}".format(e))
+        a.add_constants(k=5.0)
 
         assert(a.consts['k'] == 5.0)
 
-        try:
-            a.remove_constants('k')
-        except Exception as e:
-            raise RuntimeError("remove_constants failed with: {}".format(e))
+        a.remove_constants('k')
 
         assert('k' not in a.consts.keys())
         
@@ -120,15 +96,15 @@ def test_integration_and_representation():
                 c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
             ])
 
-        def kbinterrupt_cb(ode_sys):
-            if ode_sys[-1][0] > D.pi:
-                raise KeyboardInterrupt("Test Interruption and Catching")
-
         y_init = D.array([1., 0.])
 
         a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=dict(k=1.0))
         
+        assert(a.integration_status() == "Integration has not been run.")
+        
         a.integrate()
+        
+        assert(a.integration_status() == "Integration completed successfully.")
 
         try:
             print(str(a))
@@ -138,6 +114,12 @@ def test_integration_and_representation():
             assert(D.max(D.abs(a.sol(a.t).T - analytic_soln(a.t, y_init))) <= 8*D.epsilon()**0.5)
         except:
             raise
+            
+        for i in a:
+            assert(D.max(D.abs(i.y - analytic_soln(i.t, y_init))) <= 8*D.epsilon()**0.5)
+            
+        assert(len(a.y) == len(a))
+        assert(len(a.t) == len(a))
         
 if __name__ == "__main__":
     np.testing.run_module_suite()

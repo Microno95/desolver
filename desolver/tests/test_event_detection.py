@@ -40,7 +40,11 @@ def test_event_detection():
                 try:
                     a.set_method(i)
                     print("Testing {}".format(a.integrator))
+                    assert(a.integration_status() == "Integration has not been run.")
+
                     a.integrate(eta=True, events=time_event)
+                    
+                    assert(a.integration_status() == "Integration terminated upon finding a triggered event.")
 
                     if D.abs(a.t[-1] - D.pi/8) > 10*D.epsilon():
                         print("Event detection with integrator {} failed with t[-1] = {}".format(a.integrator, a.t[-1]))
