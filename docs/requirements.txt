@@ -1,5 +1,6 @@
 stanford_theme
 nbsphinx
 tqdm
-numpy
+numpy>=1.17
 ipython
+scipy>=0.18.0
