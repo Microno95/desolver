@@ -23,8 +23,6 @@ DESolver
 This is a python package for solving Initial Value Problems using various numerical integrators.
 Many integration routines are included ranging from fixed step to symplectic to adaptive integrators.
 
-Implicit integrators are intended for release 4.0, but that's far off for now.
-
 Documentation
 =============
 
