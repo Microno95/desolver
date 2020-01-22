@@ -29,9 +29,14 @@ def test_event_detection():
 
         def time_event(t, y, **kwargs):
             return t - D.pi/8
+
+        def second_time_event(t, y, **kwargs):
+            return t - D.pi/16
         
         time_event.is_terminal = True
         time_event.direction   = 0
+        second_time_event.is_terminal = False
+        second_time_event.direction   = 0
 
         a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi/4), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
 
@@ -42,11 +47,15 @@ def test_event_detection():
                     print("Testing {}".format(a.integrator))
                     assert(a.integration_status() == "Integration has not been run.")
 
-                    a.integrate(eta=True, events=time_event)
+                    a.integrate(eta=True, events=[time_event, second_time_event])
                     
                     assert(a.integration_status() == "Integration terminated upon finding a triggered event.")
 
-                    if D.abs(a.t[-1] - D.pi/8) > 10*D.epsilon():
+                    try:
+                        assert(D.abs(a.t[-1] - D.pi/8) <= 10*D.epsilon())
+                        assert(D.abs(a.events[0].t - D.pi/16) <= 10*D.epsilon())
+                        assert(len(a.events) == 2)
+                    except:
                         print("Event detection with integrator {} failed with t[-1] = {}".format(a.integrator, a.t[-1]))
                         raise RuntimeError("Failed to detect event for integrator {}".format(str(i)))
                     else:

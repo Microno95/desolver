@@ -109,7 +109,7 @@ def handle_events(sol, events, consts, direction, is_terminal):
         active_events = active_events[order]
         roots         = roots[order]
         
-        if D.any(is_terminal):
+        if D.any(is_terminal[active_events]):
             t             = D.nonzero(is_terminal[active_events])[0][0]
             active_events = active_events[:t + 1]
             roots         = roots[:t + 1]
@@ -301,11 +301,30 @@ class OdeSystem(object):
         self.__move_to_device()
         self.__allocate_soln_space(10)
         self.__fix_dt_dir(self.tf, self.t0)
+        self.__events       = []
         self.initialise_integrator()
         
         if self.__dense_output:
             self.sol = DenseOutput([self.t0], [])
 
+    @property
+    def events(self):
+        """A tuple of (time, state) tuples at which each event occurs.
+        
+        Examples
+        --------
+
+        >>> ode_system = desolver.OdeSystem(...)
+        >>> ode_system.integrate(events=[...])
+        >>> ode_system.events
+        (StateTuple(t=..., y=...), StateTuple(t=..., y=...), StateTuple(t=..., y=...), ...)
+        
+        """
+        if self.__events:
+            return tuple(self.__events)
+        else:
+            return
+    
     @property
     def y(self):
         """The states at which the system has been evaluated.
@@ -361,7 +380,7 @@ class OdeSystem(object):
     @dt.setter
     def dt(self, new_dt):
         self.__dt  = D.to_float(new_dt)
-        self.__dt0 = self.dt
+#         self.__dt0 = self.dt
         self.__move_to_device()
         self.__fix_dt_dir(self.tf, self.t0)
         return self.__dt
@@ -613,6 +632,8 @@ class OdeSystem(object):
         self.int_status   = 0
         if self.__dense_output:
             self.sol = DenseOutput([self.t0], [])
+        if self.__events:
+            self.__events = []
 
     def integrate(self, t=None, callback=None, eta=False, events=None):
         """Integrates the system to a specified time.
@@ -731,10 +752,11 @@ class OdeSystem(object):
                         if root != self.__t[self.counter]:
                             self.__t[self.counter+1] = root
                             self.__y[self.counter+1] = tsol(root)
+                            self.__events.append(StateTuple(t=self.__t[self.counter+1], y=self.__y[self.counter+1]))
                             self.counter += 1
 
                     if end_int:
-                        tsol = self.get_step_interpolant()
+                        tsol            = self.get_step_interpolant()
                         self.int_status = 2
                         self.success    = True
                     else:
