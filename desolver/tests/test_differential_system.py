@@ -75,7 +75,6 @@ def test_getter_setters():
         assert('k' not in a.consts.keys())
         
 def test_integration_and_representation():
-    
     for ffmt in D.available_float_fmt():
         D.set_float_fmt(ffmt)
 

@@ -866,9 +866,9 @@ class OdeSystem(object):
             else:
                 start_idx = 0
             if index.stop is not None:
-                end_idx   = deutil.search_bisection(self.t, index.stop)
+                end_idx   = deutil.search_bisection(self.t, index.stop) + 1
             else:
-                end_idx   = -1
+                end_idx   = self.counter + 1
             if index.step is not None:
                 step      = index.step
             else:
