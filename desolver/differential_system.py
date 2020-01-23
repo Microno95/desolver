@@ -329,13 +329,13 @@ class OdeSystem(object):
     def y(self):
         """The states at which the system has been evaluated.
         """
-        return D.stack(self.__y[:self.counter + 1])
+        return self.__y[:self.counter + 1]
     
     @property
     def t(self):
         """The times at which the system has been evaluated.
         """
-        return D.stack(self.__t[:self.counter + 1])
+        return self.__t[:self.counter + 1]
     
     @property
     def nfev(self):
