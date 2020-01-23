@@ -13,6 +13,10 @@ env:
   - DES_BACKEND='torch'
 jobs:
   exclude:
+  - python: 3.8
+    env: DES_BACKEND='torch'
+  - python: 3.8
+    env: PYAUDI_AVAILABLE=true
   - python: 3.8-dev
     env: DES_BACKEND='torch'
   - python: 3.8-dev
