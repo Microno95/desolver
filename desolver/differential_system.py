@@ -329,13 +329,13 @@ class OdeSystem(object):
     def y(self):
         """The states at which the system has been evaluated.
         """
-        return self.__y[:self.counter + 1]
+        return D.stack(self.__y[:self.counter + 1])
     
     @property
     def t(self):
         """The times at which the system has been evaluated.
         """
-        return self.__t[:self.counter + 1]
+        return D.stack(self.__t[:self.counter + 1])
     
     @property
     def nfev(self):
@@ -854,12 +854,6 @@ class OdeSystem(object):
     def __getitem__(self, index):
         if isinstance(index, int):
             return StateTuple(t=self.t[index], y=self.y[index])
-        elif isinstance(index, float):
-            if self.__dense_output and self.sol is not None:
-                return StateTuple(t=index, y=self.sol(index))
-            else:
-                nearest_idx = deutil.search_bisection(self.t, index)
-                return StateTuple(t=self.t[nearest_idx], y=self.y[nearest_idx])
         elif isinstance(index, slice):
             if index.start is not None:
                 start_idx = deutil.search_bisection(self.t, index.start)
@@ -874,6 +868,12 @@ class OdeSystem(object):
             else:
                 step      = 1
             return StateTuple(t=self.t[start_idx:end_idx:step], y=self.y[start_idx:end_idx:step])
+        else:
+            if self.__dense_output and self.sol is not None:
+                return StateTuple(t=index, y=self.sol(index))
+            else:
+                nearest_idx = deutil.search_bisection(self.t, index)
+                return StateTuple(t=self.t[nearest_idx], y=self.y[nearest_idx])
             
     def __len__(self):
         return self.counter + 1
