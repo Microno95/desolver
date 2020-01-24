@@ -634,6 +634,7 @@ class OdeSystem(object):
             self.sol = DenseOutput([self.t0], [])
         if self.__events:
             self.__events = []
+        self.initialise_integrator()
 
     def integrate(self, t=None, callback=None, eta=False, events=None):
         """Integrates the system to a specified time.
