@@ -456,6 +456,12 @@ class OdeSystem(object):
             self.__tf   = self.__tf.to(self.device)
             self.__dt   = self.__dt.to(self.device)
             self.__dt0  = self.__dt0.to(self.device)
+            try:
+                self.equ_rhs.rhs = self.equ_rhs.rhs.to(self.device)
+            except AttributeError:
+                pass
+            except:
+                raise
         return
         
     def __allocate_soln_space(self, num_units):

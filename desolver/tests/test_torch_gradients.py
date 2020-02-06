@@ -14,6 +14,8 @@ def test_gradients():
         torch.set_printoptions(precision=17)
         torch.set_num_threads(1)
 
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         torch.autograd.set_detect_anomaly(True)
 
         class NNController(torch.nn.Module):
@@ -45,7 +47,7 @@ def test_gradients():
             def __init__(self, inter_dim=10, k=1.0):
                 super().__init__()
                 self.nn_controller = NNController(in_dim=4, out_dim=1, inter_dim=inter_dim)
-                self.A = torch.tensor([[0.0, 1.0],[-k, -1.0]], requires_grad=True)
+                self.A = torch.nn.Parameter(torch.tensor([[0.0, 1.0],[-k, -1.0]], requires_grad=False))
 
             def forward(self, t, y, params=None):
                 if not isinstance(t, torch.Tensor):
@@ -66,12 +68,12 @@ def test_gradients():
 
                 controller_effect = self.nn_controller(torch_t, torch_y, dy) if params is None else params
 
-                return dy + torch.cat([torch.tensor([0.0]), (controller_effect * 2.0 - 1.0)])
+                return dy + torch.cat([torch.tensor([0.0]).to(dy), (controller_effect * 2.0 - 1.0)])
 
         with de.utilities.BlockTimer(section_label="Integrator Tests"):
             for i in sorted(set(de.available_methods(False).values()), key=lambda x:x.__name__):
                 try:
-                    yi1 = D.array([1.0, 0.0], requires_grad=True)
+                    yi1 = D.array([1.0, 0.0], requires_grad=True).to(device)
                     df  = SimpleODE(k=1.0)
 
                     a = de.OdeSystem(df, yi1, t=(0, 1.), dt=0.0675, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
@@ -79,9 +81,11 @@ def test_gradients():
                     a.integrate(eta=True)
 
                     dyfdyi = D.jacobian(a.y[-1], a.y[0])
-                    dyi = D.array([0.0, 1.0]) * D.epsilon()**0.5
+                    dyi = D.array([0.0, 1.0]).to(device) * D.epsilon()**0.5
                     dyf = D.einsum("nk,k->n", dyfdyi, dyi)
                     yi2 = yi1 + dyi
+                    
+                    print(a.y[-1].device)
 
                     b = de.OdeSystem(df, yi2, t=(0, 1.), dt=0.0675, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
                     b.set_method(i)
@@ -94,7 +98,8 @@ def test_gradients():
                     assert(D.allclose(true_diff, dyf, rtol=4 * D.epsilon()**0.5, atol=4 * D.epsilon()**0.5))
                     print("{} method test succeeded!".format(a.integrator))
                 except:
-                    raise RuntimeError("Test failed for integration method: {}".format(a.integrator))
+                    raise
+                    #raise RuntimeError("Test failed for integration method: {}".format(a.integrator))
             print("")
 
         print("{} backend test passed successfully!".format(D.backend()))
