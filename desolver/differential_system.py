@@ -751,7 +751,7 @@ class OdeSystem(object):
                     self.counter -= 1
 
                     for root in roots:
-                        if root != self.__t[self.counter]:
+                        if root != self._t[self.counter]:
                             self._t[self.counter+1] = root
                             self._y[self.counter+1] = tsol(root)
                             self._events.append(StateTuple(t=self._t[self.counter+1], y=self._y[self.counter+1]))
@@ -1050,7 +1050,7 @@ class PdeSystem(OdeSystem):
                     self.counter -= 1
 
                     for root in roots:
-                        if root != self.__t[self.counter]:
+                        if root != self._t[self.counter]:
                             self._t[self.counter+1] = root
                             self._y[self.counter+1] = tsol(root)
                             self._events.append(StateTuple(t=self._t[self.counter+1], y=self._y[self.counter+1]))
