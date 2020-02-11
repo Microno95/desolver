@@ -407,9 +407,8 @@ class OdeSystem(object):
             has been run (successfully or unsuccessfully).
         """
         new_t0 = D.to_float(new_t0)
-        if D.abs(self.tf - new_t0) <= D.epsilon() and self.int_status != 0:
-            raise ValueError("The start time of the integration cannot be greater "
-                             "than or equal to {}!".format(self.tf))
+        if D.abs(self.tf - new_t0) <= D.epsilon():
+            raise ValueError("The start time of the integration cannot be greater than or equal to {}!".format(self.tf))
         self.__t0 = new_t0
         self.__move_to_device()
         self.__fix_dt_dir(self.tf, self.t0)
@@ -436,7 +435,7 @@ class OdeSystem(object):
             has been run (successfully or unsuccessfully).
         """
         new_tf = D.to_float(new_tf)
-        if D.abs(self.t0 - new_tf) <= D.epsilon() and self.int_status != 0:
+        if D.abs(self.t0 - new_tf) <= D.epsilon():
             raise ValueError("The end time of the integration cannot be equal to the start time: {}!".format(self.t0))
         self.__tf = new_tf
         self.__move_to_device()
@@ -465,15 +464,11 @@ class OdeSystem(object):
         return
         
     def __allocate_soln_space(self, num_units):
-        if D.backend() in ['numpy', 'pyaudi']:
-            if num_units == 0:
-                self.__y = D.stack(self.__y)
-                self.__t = D.stack(self.__t)
-            else:
+        if num_units != 0:
+            if D.backend() in ['numpy', 'pyaudi']:
                 self.__y  = D.concatenate([self.__y, D.zeros((num_units, ) + D.shape(self.__y[0]), dtype=self.__y[0].dtype)], axis=0)
                 self.__t  = D.concatenate([self.__t, D.zeros((num_units, ) + D.shape(self.__t[0]), dtype=self.__y[0].dtype)], axis=0)
-        else:
-            if num_units != 0:
+            else:
                 self.__y  = self.__y + [None for _ in range(num_units)]
                 self.__t  = self.__t + [None for _ in range(num_units)]
     

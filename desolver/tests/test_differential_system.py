@@ -1,6 +1,7 @@
 import desolver as de
 import desolver.backend as D
 import numpy as np
+from nose.tools import *
 
 def test_getter_setters():
     for ffmt in D.available_float_fmt():
@@ -34,6 +35,7 @@ def test_getter_setters():
         assert(a.t0 == 0)
         assert(a.tf == 2 * D.pi)
         assert(a.dt == 0.01)
+        assert(a.get_current_time() == a.t0)
         assert(a.rtol == D.epsilon()**0.5)
         assert(a.atol == D.epsilon()**0.5)
         assert(D.norm(a.y[0]  - y_init) <= 2 * D.epsilon())
@@ -61,10 +63,14 @@ def test_getter_setters():
         a.atol = 1e-3
 
         assert(a.atol == 1e-3)
+        
+        for method in de.available_methods():
+            a.set_method(method)
+            assert(isinstance(a.integrator, de.available_methods(False)[method]))
 
-        a.set_method("RK45CK")
-
-        assert(isinstance(a.integrator, de.available_methods(False)["RK45CK"]))
+        for method in de.available_methods():
+            a.method = method
+            assert(isinstance(a.integrator, de.available_methods(False)[method]))
 
         a.add_constants(k=5.0)
 
@@ -152,6 +158,116 @@ def test_integration_and_nearestfloat_no_dense_output():
         assert(a.integration_status() == "Integration completed successfully.")
         
         assert(D.abs(a.t[-2] - a[2*D.pi].t) <= D.abs(a.dt))
+        
+def test_no_events():
+    for ffmt in D.available_float_fmt():
+        D.set_float_fmt(ffmt)
+
+        print("Testing {} float format".format(D.float_fmt()))
+
+        de_mat = D.array([[0.0, 1.0],[-1.0, 0.0]])
+
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            return de_mat @ state + D.array([0.0, t])
+
+        def analytic_soln(t, initial_conditions):
+            c1 = initial_conditions[0]
+            c2 = initial_conditions[1] - 1
+            
+            return D.stack([
+                c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
+                c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
+            ])
+
+        y_init = D.array([1., 0.])
+
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=dict(k=1.0))
+        
+        a.integrate()
+        
+        assert(a.events is None)
+
+@raises(ValueError)
+def test_wrong_t0():
+    for ffmt in D.available_float_fmt():
+        D.set_float_fmt(ffmt)
+
+        print("Testing {} float format".format(D.float_fmt()))
+
+        de_mat = D.array([[0.0, 1.0],[-1.0, 0.0]])
+
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            return de_mat @ state + D.array([0.0, t])
+
+        def analytic_soln(t, initial_conditions):
+            c1 = initial_conditions[0]
+            c2 = initial_conditions[1] - 1
+            
+            return D.stack([
+                c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
+                c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
+            ])
+
+        y_init = D.array([1., 0.])
+
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=dict(k=1.0))
+        
+        a.t0 = 2*D.pi
+
+@raises(ValueError)
+def test_wrong_tf():
+    for ffmt in D.available_float_fmt():
+        D.set_float_fmt(ffmt)
+
+        print("Testing {} float format".format(D.float_fmt()))
+
+        de_mat = D.array([[0.0, 1.0],[-1.0, 0.0]])
+
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            return de_mat @ state + D.array([0.0, t])
+
+        def analytic_soln(t, initial_conditions):
+            c1 = initial_conditions[0]
+            c2 = initial_conditions[1] - 1
+            
+            return D.stack([
+                c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
+                c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
+            ])
+
+        y_init = D.array([1., 0.])
+
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=dict(k=1.0))
+        
+        a.tf = 0.0
+
+def test_dt_dir_fix():
+    for ffmt in D.available_float_fmt():
+        D.set_float_fmt(ffmt)
+
+        print("Testing {} float format".format(D.float_fmt()))
+
+        de_mat = D.array([[0.0, 1.0],[-1.0, 0.0]])
+
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            return de_mat @ state + D.array([0.0, t])
+
+        def analytic_soln(t, initial_conditions):
+            c1 = initial_conditions[0]
+            c2 = initial_conditions[1] - 1
+            
+            return D.stack([
+                c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
+                c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
+            ])
+
+        y_init = D.array([1., 0.])
+
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=dict(k=1.0))
         
 if __name__ == "__main__":
     np.testing.run_module_suite()
