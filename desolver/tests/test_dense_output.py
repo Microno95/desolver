@@ -1,5 +1,6 @@
 import desolver as de
 from desolver.differential_system import DenseOutput
+from desolver.utilities.interpolation import CubicHermiteInterp
 import desolver.backend as D
 import numpy as np
 
@@ -10,6 +11,43 @@ def test_dense_init_and_call():
     assert(denseoutput.t_eval == [0.0])
     assert(denseoutput.y_interpolants == [])
     
+def test_dense_init_add_postfix():
+    denseoutput = DenseOutput(None, None)
+    interpolator = CubicHermiteInterp(0, 1, 0, 1, 1, 1)
+    denseoutput.add_interpolant(1, interpolator)
+    
+def test_dense_init_add_prefix():
+    denseoutput = DenseOutput(None, None)
+    interpolator = CubicHermiteInterp(-1, 0, 0, 1, 1, 1)
+    denseoutput.add_interpolant(-1, interpolator)
+    
+@raises(TypeError)
+def test_dense_add_noncallable():
+    interpolator = CubicHermiteInterp(0, 1, 0, 1, 1, 1)
+    denseoutput = DenseOutput([0, 1], [interpolator])
+    denseoutput.add_interpolant(2, None)
+    
+@raises(ValueError)
+def test_dense_add_outofbounds():
+    interpolator = CubicHermiteInterp(0, 1, 0, 1, 1, 1)
+    denseoutput = DenseOutput([0, 1], [interpolator])
+    def new_interp(t):
+        if t < 2:
+            raise ValueError("Out of bounds")
+        else:
+            return t
+    denseoutput.add_interpolant(2, new_interp)
+    
+@raises(ValueError)
+def test_dense_add_timemismatch_oob():
+    interpolator = CubicHermiteInterp(0, 1, 0, 1, 1, 1)
+    denseoutput = DenseOutput([0, 1], [interpolator])
+    def new_interp(t):
+        if t > 2:
+            raise ValueError("Out of bounds")
+        else:
+            return t
+    denseoutput.add_interpolant(3, new_interp)
     
 @raises(ValueError)
 def test_dense_init_no_t():
