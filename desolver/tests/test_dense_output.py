@@ -13,23 +13,27 @@ def test_dense_init_and_call():
     
 def test_dense_init_add_postfix():
     denseoutput = DenseOutput(None, None)
-    interpolator = CubicHermiteInterp(0, 1, 0, 1, 1, 1)
+    inputs = D.array([0, 1, 0, 1, 1, 1])
+    interpolator = CubicHermiteInterp(*inputs)
     denseoutput.add_interpolant(1, interpolator)
     
 def test_dense_init_add_prefix():
     denseoutput = DenseOutput(None, None)
-    interpolator = CubicHermiteInterp(-1, 0, 0, 1, 1, 1)
+    inputs = D.array([-1, 0, 0, 1, 1, 1])
+    interpolator = CubicHermiteInterp(*inputs)
     denseoutput.add_interpolant(-1, interpolator)
     
 @raises(TypeError)
 def test_dense_add_noncallable():
-    interpolator = CubicHermiteInterp(0, 1, 0, 1, 1, 1)
+    inputs = D.array([0, 1, 0, 1, 1, 1])
+    interpolator = CubicHermiteInterp(*inputs)
     denseoutput = DenseOutput([0, 1], [interpolator])
     denseoutput.add_interpolant(2, None)
     
 @raises(ValueError)
 def test_dense_add_outofbounds():
-    interpolator = CubicHermiteInterp(0, 1, 0, 1, 1, 1)
+    inputs = D.array([0, 1, 0, 1, 1, 1])
+    interpolator = CubicHermiteInterp(*inputs)
     denseoutput = DenseOutput([0, 1], [interpolator])
     def new_interp(t):
         if t < 2:
@@ -40,7 +44,8 @@ def test_dense_add_outofbounds():
     
 @raises(ValueError)
 def test_dense_add_timemismatch_oob():
-    interpolator = CubicHermiteInterp(0, 1, 0, 1, 1, 1)
+    inputs = D.array([0, 1, 0, 1, 1, 1])
+    interpolator = CubicHermiteInterp(*inputs)
     denseoutput = DenseOutput([0, 1], [interpolator])
     def new_interp(t):
         if t > 2:

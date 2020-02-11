@@ -120,6 +120,39 @@ def test_integration_and_representation():
         assert(len(a.y) == len(a))
         assert(len(a.t) == len(a))
         
+def test_integration_and_nearestfloat_no_dense_output():
+    for ffmt in D.available_float_fmt():
+        D.set_float_fmt(ffmt)
+
+        print("Testing {} float format".format(D.float_fmt()))
+
+        de_mat = D.array([[0.0, 1.0],[-1.0, 0.0]])
+
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            return de_mat @ state + D.array([0.0, t])
+
+        def analytic_soln(t, initial_conditions):
+            c1 = initial_conditions[0]
+            c2 = initial_conditions[1] - 1
+            
+            return D.stack([
+                c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
+                c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
+            ])
+
+        y_init = D.array([1., 0.])
+
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=dict(k=1.0))
+        
+        assert(a.integration_status() == "Integration has not been run.")
+        
+        a.integrate()
+        
+        assert(a.integration_status() == "Integration completed successfully.")
+        
+        assert(D.abs(a.t[-2] - a[2*D.pi].t) <= D.abs(a.dt))
+        
 if __name__ == "__main__":
     np.testing.run_module_suite()
         
