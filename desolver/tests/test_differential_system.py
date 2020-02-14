@@ -72,13 +72,13 @@ def test_getter_setters():
             a.method = method
             assert(isinstance(a.integrator, de.available_methods(False)[method]))
 
-        a.add_constants(k=5.0)
+        a.constants['k'] = 5.0
 
-        assert(a.consts['k'] == 5.0)
+        assert(a.constants['k'] == 5.0)
 
-        a.remove_constants('k')
+        a.constants.pop('k')
 
-        assert('k' not in a.consts.keys())
+        assert('k' not in a.constants.keys())
         
 def test_integration_and_representation():
     for ffmt in D.available_float_fmt():

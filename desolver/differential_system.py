@@ -275,7 +275,7 @@ class OdeSystem(object):
             
         self.__rtol      = rtol
         self.__atol      = atol
-        self.consts      = constants if constants is not None else dict()
+        self.__consts    = constants if constants is not None else dict()
         self.__y         = [D.copy(y0)]
         self.__t         = [D.to_float(t[0])]
         self.dim         = D.shape(self.__y[0])
@@ -342,6 +342,22 @@ class OdeSystem(object):
         """The number of function evaluations used during the numerical integration
         """
         return self.equ_rhs.nfev
+
+    @property
+    def constants(self):
+        """A dictionary of constants for the differential system.
+        """
+        return self.__consts
+    
+    @constants.setter
+    def constants(self, new_constants):
+        """Sets the constants in the differential system
+        """
+        self.__consts = new_constants
+    
+    @constants.deleter
+    def constants(self):
+        self.__consts = dict()
     
     @property
     def rtol(self):
@@ -562,30 +578,6 @@ class OdeSystem(object):
             raise ValueError("The method you selected does not exist in the list of available methods, \
                               call desolver.available_methods() to see what these are")
         self.initialise_integrator()
-
-    def add_constants(self, **additional_constants):
-        """Takes an arbitrary list of keyword arguments to add to the list of available constants.
-
-        Parameters
-        ----------
-        additional_constants : keyword arguments, variable-length
-            Keyword arguments of constants should be added/updated in the constants associated with the system.
-        """
-        self.consts.update(additional_constants)
-
-    def remove_constants(self, *constants_removal):
-        """Takes an arbitrary list of keyword arguments to add to the list of available constants.
-
-        Parameters
-        ----------
-        constants_removal : string, list, tuple or dict arguments, variable-length
-            Keys of constants that should be removed from the constants list.
-        """
-        for i in constants_removal:
-            if isinstance(i, (list, tuple, dict)):
-                self.constants_removal(*list(i))
-            elif i in self.consts.keys():
-                del self.consts[i]
                 
     def get_step_interpolant(self):
         "Computes the 3rd order Hermite polynomial interpolant over one step."
@@ -594,8 +586,8 @@ class OdeSystem(object):
                     self.t[-1], 
                     self.y[-2], 
                     self.y[-1],
-                    self.equ_rhs(self.t[-2], self.y[-2], **self.consts),
-                    self.equ_rhs(self.t[-1], self.y[-1], **self.consts)
+                    self.equ_rhs(self.t[-2], self.y[-2], **self.constants),
+                    self.equ_rhs(self.t[-1], self.y[-1], **self.constants)
                 )
 
     def integration_status(self):
@@ -714,7 +706,7 @@ class OdeSystem(object):
             while self.dt != 0 and D.abs(tf - self.t[-1]) > 4 * D.epsilon() and not end_int:
                 if D.abs(self.dt + self.t[-1]) > D.abs(tf):
                     self.dt = (tf - self.t[-1])
-                self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.consts, timestep=self.dt)
+                self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.constants, timestep=self.dt)
                 
                 if self.counter+1 >= len(self.__y):
                     total_steps = int((tf-self.__t[self.counter]-dTime)/self.dt) + 1
@@ -740,7 +732,7 @@ class OdeSystem(object):
                     tsol = self.get_step_interpolant()
 
                 if events is not None:
-                    active_events, roots, end_int = handle_events(tsol, events, self.consts, direction, is_terminal)
+                    active_events, roots, end_int = handle_events(tsol, events, self.constants, direction, is_terminal)
 
                     if self.counter+len(roots)+1 >= len(self.__y):
                         total_steps = max(int(abs((tf-self.__t[self.counter]-dTime)/self.dt)), 2) + len(roots)
@@ -844,9 +836,9 @@ class OdeSystem(object):
                                      equation=str(self.equ_rhs), 
                                      t=self.t[-1],
                                      cur_val=self.y[-1])
-        if self.consts:
+        if self.constants:
             print_str += "\nThe constants that have been defined for this system are: "
-            print_str += "\n" + str(self.consts)
+            print_str += "\n" + str(self.constants)
         
         print_str += "The time limits for this system are:\n"
         print_str += "t0 = {}, tf = {}, t_current = {}, step_size = {}".format(self.t0, self.tf, self.t[-1], self.dt)
