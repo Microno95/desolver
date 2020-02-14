@@ -269,6 +269,30 @@ def test_dt_dir_fix():
 
         a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=dict(k=1.0))
         
+def test_DiffRHS():
+    def rhs(t, state, k, **kwargs):
+        return None
+    
+    wrapped_rhs_no_repr = de.DiffRHS(rhs)
+    
+    assert(str(wrapped_rhs_no_repr) == str(rhs))
+    assert(wrapped_rhs_no_repr._repr_markdown_() == str(rhs))
+    
+    wrapped_rhs_no_equ_repr = de.DiffRHS(rhs, equ_repr=None, md_repr="1")
+    
+    assert(str(wrapped_rhs_no_equ_repr) == str(rhs))
+    assert(wrapped_rhs_no_equ_repr._repr_markdown_() == "1")
+    
+    wrapped_rhs_no_md_repr = de.DiffRHS(rhs, equ_repr="1", md_repr=None)
+    
+    assert(str(wrapped_rhs_no_md_repr) == "1")
+    assert(wrapped_rhs_no_md_repr._repr_markdown_() == "1")
+    
+    wrapped_rhs_both_repr = de.DiffRHS(rhs, equ_repr="1", md_repr="2")
+    
+    assert(str(wrapped_rhs_both_repr) == "1")
+    assert(wrapped_rhs_both_repr._repr_markdown_() == "2")
+        
 if __name__ == "__main__":
     np.testing.run_module_suite()
         
