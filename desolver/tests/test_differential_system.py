@@ -80,6 +80,16 @@ def test_getter_setters():
 
         assert('k' not in a.constants.keys())
         
+        new_constants = dict(k=10.0)
+        
+        a.constants = new_constants
+
+        assert(a.constants['k'] == 10.0)
+        
+        del a.constants
+        
+        assert(not bool(a.constants))
+        
 def test_integration_and_representation():
     for ffmt in D.available_float_fmt():
         D.set_float_fmt(ffmt)
@@ -244,6 +254,34 @@ def test_wrong_tf():
         
         a.tf = 0.0
 
+@raises(ValueError)
+def test_not_enough_time_values():
+    for ffmt in D.available_float_fmt():
+        D.set_float_fmt(ffmt)
+
+        print("Testing {} float format".format(D.float_fmt()))
+
+        de_mat = D.array([[0.0, 1.0],[-1.0, 0.0]])
+
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            return de_mat @ state + D.array([0.0, t])
+
+        def analytic_soln(t, initial_conditions):
+            c1 = initial_conditions[0]
+            c2 = initial_conditions[1] - 1
+            
+            return D.stack([
+                c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
+                c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
+            ])
+
+        y_init = D.array([1., 0.])
+
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0,), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=dict(k=1.0))
+        
+        a.tf = 0.0
+
 def test_dt_dir_fix():
     for ffmt in D.available_float_fmt():
         D.set_float_fmt(ffmt)
@@ -268,6 +306,34 @@ def test_dt_dir_fix():
         y_init = D.array([1., 0.])
 
         a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=dict(k=1.0))
+
+@raises(TypeError)
+def test_non_callable_rhs():
+    for ffmt in D.available_float_fmt():
+        D.set_float_fmt(ffmt)
+
+        print("Testing {} float format".format(D.float_fmt()))
+
+        de_mat = D.array([[0.0, 1.0],[-1.0, 0.0]])
+
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            return de_mat @ state + D.array([0.0, t])
+
+        def analytic_soln(t, initial_conditions):
+            c1 = initial_conditions[0]
+            c2 = initial_conditions[1] - 1
+            
+            return D.stack([
+                c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
+                c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
+            ])
+
+        y_init = D.array([1., 0.])
+
+        a = de.OdeSystem(de_mat, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=dict(k=1.0))
+        
+        a.tf = 0.0
         
 def test_DiffRHS():
     def rhs(t, state, k, **kwargs):

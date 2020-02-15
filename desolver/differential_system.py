@@ -264,7 +264,7 @@ class OdeSystem(object):
         """
 
         if len(t) != 2:
-            raise etypes.LengthError("Two time bounds are required, only {} were given.".format(len(t)))
+            raise ValueError("Two time bounds are required, only {} were given.".format(len(t)))
         if not callable(equ_rhs):
             raise TypeError("equ_rhs is not callable, please pass a callable object for the right hand side.")
             
