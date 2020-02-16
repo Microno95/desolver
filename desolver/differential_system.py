@@ -472,6 +472,18 @@ class OdeSystem(object):
             self.__dt   = self.__dt.to(self.device)
             self.__dt0  = self.__dt0.to(self.device)
             try:
+                self.__atol = self.__atol.to(self.device)
+            except AttributeError:
+                pass
+            except:
+                raise
+            try:
+                self.__rtol = self.__rtol.to(self.device)
+            except AttributeError:
+                pass
+            except:
+                raise
+            try:
                 self.equ_rhs.rhs = self.equ_rhs.rhs.to(self.device)
             except AttributeError:
                 pass
