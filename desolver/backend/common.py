@@ -147,9 +147,6 @@ def set_float_fmt(new_fmt):
             torch.set_default_dtype(torch.float32)
         elif new_fmt == 'float64':
             torch.set_default_dtype(torch.float64)
-    elif _BACKEND == 'pyaudi':
-        if new_fmt not in available_float_fmt():
-            raise ValueError("Unknown float type " + str(new_fmt) + " for backend " + str(_BACKEND))
     
     _FLOAT_FORMAT = str(new_fmt)
 
