@@ -329,13 +329,19 @@ class OdeSystem(object):
     def y(self):
         """The states at which the system has been evaluated.
         """
-        return self.__y[:self.counter + 1]
+        if D.backend() == 'torch':
+            return D.stack(self.__y[:self.counter + 1])
+        else:
+            return self.__y[:self.counter + 1]
     
     @property
     def t(self):
         """The times at which the system has been evaluated.
         """
-        return self.__t[:self.counter + 1]
+        if D.backend() == 'torch':
+            return D.stack(self.__t[:self.counter + 1])
+        else:
+            return self.__t[:self.counter + 1]
     
     @property
     def nfev(self):
@@ -594,12 +600,12 @@ class OdeSystem(object):
     def get_step_interpolant(self):
         "Computes the 3rd order Hermite polynomial interpolant over one step."
         return CubicHermiteInterp(
-                    self.t[-2], 
-                    self.t[-1], 
-                    self.y[-2], 
-                    self.y[-1],
-                    self.equ_rhs(self.t[-2], self.y[-2], **self.constants),
-                    self.equ_rhs(self.t[-1], self.y[-1], **self.constants)
+                    self.__t[self.counter-1], 
+                    self.__t[self.counter], 
+                    self.__y[self.counter-1], 
+                    self.__y[self.counter],
+                    self.equ_rhs(self.__t[self.counter-1], self.__y[self.counter-1], **self.constants),
+                    self.equ_rhs(self.__t[self.counter], self.__y[self.counter], **self.constants)
                 )
 
     def integration_status(self):
@@ -711,14 +717,14 @@ class OdeSystem(object):
             
         end_int = False
         self.equ_rhs.nfev = 0 if self.int_status == 1 else self.equ_rhs.nfev
-        cState  = D.zeros_like(self.y[-1])
-        cTime   = D.zeros_like(self.t[-1])
+        cState  = D.zeros_like(self.__y[self.counter])
+        cTime   = D.zeros_like(self.__t[self.counter])
         self.__allocate_soln_space(total_steps)
         try:
-            while self.dt != 0 and D.abs(tf - self.t[-1]) > 4 * D.epsilon() and not end_int:
-                if D.abs(self.dt + self.t[-1]) > D.abs(tf):
-                    self.dt = (tf - self.t[-1])
-                self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.t[-1], self.y[-1], self.constants, timestep=self.dt)
+            while self.dt != 0 and D.abs(tf - self.__t[self.counter]) > 4 * D.epsilon() and not end_int:
+                if D.abs(self.dt + self.__t[self.counter]) > D.abs(tf):
+                    self.dt = (tf - self.__t[self.counter])
+                self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter], self.constants, timestep=self.dt)
                 
                 if self.counter+1 >= len(self.__y):
                     total_steps = int((tf-self.__t[self.counter]-dTime)/self.dt) + 1
@@ -771,11 +777,11 @@ class OdeSystem(object):
                         self.counter += 1
 
                 if self.__dense_output:
-                    self.sol.add_interpolant(self.t[-1], tsol)
+                    self.sol.add_interpolant(self.__t[self.counter], tsol)
 
                 if eta:
-                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs((tf - self.t[-1]) / self.dt))
-                    tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.t[-1], tf, self.dt).ljust(8)
+                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs((tf - self.__t[self.counter]) / self.dt))
+                    tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.__t[self.counter], tf, self.dt).ljust(8)
                     tqdm_progress_bar.update()
 
                 steps += 1
@@ -859,27 +865,30 @@ class OdeSystem(object):
     
     def __getitem__(self, index):
         if isinstance(index, int):
-            return StateTuple(t=self.t[index], y=self.y[index])
+            if index > self.counter:
+                raise IndexError("index {} out of bounds for integrations with {} steps".format(index, self.counter+1))
+            else:
+                return StateTuple(t=self.__t[index], y=self.__y[index])
         elif isinstance(index, slice):
             if index.start is not None:
-                start_idx = deutil.search_bisection(self.t, index.start)
+                start_idx = deutil.search_bisection(self.__t[:self.counter+1], index.start)
             else:
                 start_idx = 0
             if index.stop is not None:
-                end_idx   = deutil.search_bisection(self.t, index.stop) + 1
+                end_idx   = deutil.search_bisection(self.__t[:self.counter+1], index.stop) + 1
             else:
                 end_idx   = self.counter + 1
             if index.step is not None:
                 step      = index.step
             else:
                 step      = 1
-            return StateTuple(t=self.t[start_idx:end_idx:step], y=self.y[start_idx:end_idx:step])
+            return StateTuple(t=self.__t[start_idx:end_idx:step], y=self.__y[start_idx:end_idx:step])
         else:
             if self.__dense_output and self.sol is not None:
                 return StateTuple(t=index, y=self.sol(index))
             else:
-                nearest_idx = deutil.search_bisection(self.t, index)
-                return StateTuple(t=self.t[nearest_idx], y=self.y[nearest_idx])
+                nearest_idx = deutil.search_bisection(self.__t, index)
+                return StateTuple(t=self.__t[nearest_idx], y=self.__y[nearest_idx])
             
     def __len__(self):
         return self.counter + 1
