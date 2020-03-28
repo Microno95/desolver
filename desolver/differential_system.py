@@ -868,27 +868,27 @@ class OdeSystem(object):
             if index > self.counter:
                 raise IndexError("index {} out of bounds for integrations with {} steps".format(index, self.counter+1))
             else:
-                return StateTuple(t=self.__t[index], y=self.__y[index])
+                return StateTuple(t=self.t[index], y=self.y[index])
         elif isinstance(index, slice):
             if index.start is not None:
-                start_idx = deutil.search_bisection(self.__t[:self.counter+1], index.start)
+                start_idx = deutil.search_bisection(self.t[:self.counter+1], index.start)
             else:
                 start_idx = 0
             if index.stop is not None:
-                end_idx   = deutil.search_bisection(self.__t[:self.counter+1], index.stop) + 1
+                end_idx   = deutil.search_bisection(self.t[:self.counter+1], index.stop) + 1
             else:
                 end_idx   = self.counter + 1
             if index.step is not None:
                 step      = index.step
             else:
                 step      = 1
-            return StateTuple(t=self.__t[start_idx:end_idx:step], y=self.__y[start_idx:end_idx:step])
+            return StateTuple(t=self.t[start_idx:end_idx:step], y=self.y[start_idx:end_idx:step])
         else:
             if self.__dense_output and self.sol is not None:
                 return StateTuple(t=index, y=self.sol(index))
             else:
                 nearest_idx = deutil.search_bisection(self.__t, index)
-                return StateTuple(t=self.__t[nearest_idx], y=self.__y[nearest_idx])
+                return StateTuple(t=self.t[nearest_idx], y=self.y[nearest_idx])
             
     def __len__(self):
         return self.counter + 1

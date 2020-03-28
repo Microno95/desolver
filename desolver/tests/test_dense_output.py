@@ -105,12 +105,12 @@ def test_dense_output():
         assert(D.max(D.abs(a[a[0].t].t)) <= 4*D.epsilon())
         assert(D.max(D.abs(a[a[-1].t].y - analytic_soln(a[-1].t, y_init))) <= 10*D.epsilon()**0.5)
         
-        assert(D.max(D.abs(D.stack(a[a[0].t:a[-1].t].y) - D.stack(a.y))) <= 4*D.epsilon())
-        assert(D.max(D.abs(D.stack(a[:a[-1].t].y) - D.stack(a.y))) <= 4*D.epsilon())
+        assert(D.max(D.abs(a[a[0].t:a[-1].t].y - a.y)) <= 4*D.epsilon())
+        assert(D.max(D.abs(a[:a[-1].t].y - a.y)) <= 4*D.epsilon())
         
-        assert(D.max(D.abs(D.stack(a[a[0].t:a[-1].t:2].y) - D.stack(a.y[::2]))) <= 4*D.epsilon())
-        assert(D.max(D.abs(D.stack(a[a[0].t::2].y) - D.stack(a.y[::2]))) <= 4*D.epsilon())
-        assert(D.max(D.abs(D.stack(a[:a[-1].t:2].y) - D.stack(a.y[::2]))) <= 4*D.epsilon())
+        assert(D.max(D.abs(a[a[0].t:a[-1].t:2].y - a.y[::2])) <= 4*D.epsilon())
+        assert(D.max(D.abs(a[a[0].t::2].y - a.y[::2])) <= 4*D.epsilon())
+        assert(D.max(D.abs(a[:a[-1].t:2].y - a.y[::2])) <= 4*D.epsilon())
     
 if __name__ == "__main__":
     np.testing.run_module_suite()
