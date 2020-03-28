@@ -16,7 +16,8 @@ root_finder        = deutil.optimizer.brentsrootvec
 __all__ = [
     'DiffRHS',
     'rhs_prettifier',
-    'OdeSystem'
+    'OdeSystem',
+    'PdeSystem'
 ]
 
 StateTuple = collections.namedtuple('StateTuple', ['t', 'y'])
@@ -273,19 +274,19 @@ class OdeSystem(object):
         else:
             self.equ_rhs     = DiffRHS(equ_rhs)
             
-        self.__rtol      = rtol
-        self.__atol      = atol
-        self.__consts    = constants if constants is not None else dict()
-        self.__y         = [D.copy(y0)]
-        self.__t         = [D.to_float(t[0])]
-        self.dim         = D.shape(self.__y[0])
-        self.counter     = 0
-        self.__t0        = D.to_float(t[0])
-        self.__tf        = D.to_float(t[1])
-        self.__method    = integrators.RK45CKSolver
-        self.integrator  = None
-        self.__dt        = D.to_float(dt)
-        self.__dt0       = self.dt
+        self._rtol      = rtol
+        self._atol      = atol
+        self.consts     = constants if constants is not None else dict()
+        self._y         = [D.copy(y0)]
+        self._t         = [D.to_float(t[0])]
+        self.dim        = D.shape(self._y[0])
+        self.counter    = 0
+        self._t0        = D.to_float(t[0])
+        self._tf        = D.to_float(t[1])
+        self._method    = integrators.RK45CKSolver
+        self.integrator = None
+        self._dt        = D.to_float(dt)
+        self._dt0       = self.dt
         
         if D.backend() == 'torch':
             self.device = y0.device
@@ -293,18 +294,18 @@ class OdeSystem(object):
             self.device = None
             
         self.staggered_mask = None
-        self.__dense_output = dense_output
+        self._dense_output = dense_output
         self.int_status     = 0
         self.success        = False
         self.sol            = None
             
-        self.__move_to_device()
-        self.__allocate_soln_space(10)
-        self.__fix_dt_dir(self.tf, self.t0)
-        self.__events       = []
+        self._move_to_device()
+        self._allocate_soln_space(10)
+        self._fix_dt_dir(self.tf, self.t0)
+        self._events       = []
         self.initialise_integrator()
         
-        if self.__dense_output:
+        if self._dense_output:
             self.sol = DenseOutput([self.t0], [])
 
     @property
@@ -320,8 +321,8 @@ class OdeSystem(object):
         (StateTuple(t=..., y=...), StateTuple(t=..., y=...), StateTuple(t=..., y=...), ...)
         
         """
-        if self.__events:
-            return tuple(self.__events)
+        if self._events:
+            return tuple(self._events)
         else:
             return
     
@@ -329,19 +330,13 @@ class OdeSystem(object):
     def y(self):
         """The states at which the system has been evaluated.
         """
-        if D.backend() == 'torch':
-            return D.stack(self.__y[:self.counter + 1])
-        else:
-            return self.__y[:self.counter + 1]
+        return self._y[:self.counter + 1]
     
     @property
     def t(self):
         """The times at which the system has been evaluated.
         """
-        if D.backend() == 'torch':
-            return D.stack(self.__t[:self.counter + 1])
-        else:
-            return self.__t[:self.counter + 1]
+        return self._t[:self.counter + 1]
     
     @property
     def nfev(self):
@@ -369,49 +364,49 @@ class OdeSystem(object):
     def rtol(self):
         """The relative tolerance of the adaptive integration schemes
         """
-        return self.__rtol
+        return self._rtol
     
     @rtol.setter
     def rtol(self, new_rtol):
         """Sets the target relative error used by the timestep autocalculator and the adaptive integration methods.
         Has no effect when the integration method is non-adaptive.
         """
-        self.__rtol = new_rtol
+        self._rtol = new_rtol
         self.initialise_integrator()
     
     @property
     def atol(self):
         """The absolute tolerance of the adaptive integration schemes
         """
-        return self.__atol
+        return self._atol
     
     @atol.setter
     def atol(self, new_atol):
         """Sets the target absolute error used by the timestep autocalculator and the adaptive integration methods.
         Has no effect when the integration method is non-adaptive.
         """
-        self.__atol = new_atol
+        self._atol = new_atol
         self.initialise_integrator()
     
     @property
     def dt(self):
         """The timestep of the numerical integration
         """
-        return self.__dt
+        return self._dt
     
     @dt.setter
     def dt(self, new_dt):
-        self.__dt  = D.to_float(new_dt)
-#         self.__dt0 = self.dt
-        self.__move_to_device()
-        self.__fix_dt_dir(self.tf, self.t0)
-        return self.__dt
+        self._dt  = D.to_float(new_dt)
+#         self._dt0 = self.dt
+        self._move_to_device()
+        self._fix_dt_dir(self.tf, self.t0)
+        return self._dt
     
     @property
     def t0(self):
         """The initial integration time
         """
-        return self.__t0
+        return self._t0
     
     @t0.setter
     def t0(self, new_t0):
@@ -429,17 +424,18 @@ class OdeSystem(object):
             has been run (successfully or unsuccessfully).
         """
         new_t0 = D.to_float(new_t0)
-        if D.abs(self.tf - new_t0) <= D.epsilon():
-            raise ValueError("The start time of the integration cannot be greater than or equal to {}!".format(self.tf))
-        self.__t0 = new_t0
-        self.__move_to_device()
-        self.__fix_dt_dir(self.tf, self.t0)
+        if D.abs(self.tf - new_t0) <= D.epsilon() and self.int_status != 0:
+            raise ValueError("The start time of the integration cannot be greater "
+                             "than or equal to {}!".format(self.tf))
+        self._t0 = new_t0
+        self._move_to_device()
+        self._fix_dt_dir(self.tf, self.t0)
     
     @property
     def tf(self):
         """The final integration time
         """
-        return self.__tf
+        return self._tf
     
     @tf.setter
     def tf(self, new_tf):
@@ -459,56 +455,42 @@ class OdeSystem(object):
         new_tf = D.to_float(new_tf)
         if D.abs(self.t0 - new_tf) <= D.epsilon():
             raise ValueError("The end time of the integration cannot be equal to the start time: {}!".format(self.t0))
-        self.__tf = new_tf
-        self.__move_to_device()
-        self.__fix_dt_dir(self.tf, self.t0)
+        self._tf = new_tf
+        self._move_to_device()
+        self._fix_dt_dir(self.tf, self.t0)
         
-    def __fix_dt_dir(self, t1, t0):
-        if D.sign(self.__dt) != D.sign(t1 - t0):
-            self.__dt      = -self.__dt
+    def _fix_dt_dir(self, t1, t0):
+        if D.sign(self._dt) != D.sign(t1 - t0):
+            self._dt      = -self._dt
         else:
-            self.__dt      =  self.__dt
+            self._dt      =  self._dt
         
-    def __move_to_device(self):
+    def _move_to_device(self):
         if self.device is not None and D.backend() == 'torch':
-            self.__y[0] = self.__y[0].to(self.device)
-            self.__t[0] = self.__t[0].to(self.device)
-            self.__t0   = self.__t0.to(self.device)
-            self.__tf   = self.__tf.to(self.device)
-            self.__dt   = self.__dt.to(self.device)
-            self.__dt0  = self.__dt0.to(self.device)
-            try:
-                self.__atol = self.__atol.to(self.device)
-            except AttributeError:
-                pass
-            except:
-                raise
-            try:
-                self.__rtol = self.__rtol.to(self.device)
-            except AttributeError:
-                pass
-            except:
-                raise
-            try:
-                self.equ_rhs.rhs = self.equ_rhs.rhs.to(self.device)
-            except AttributeError:
-                pass
-            except:
-                raise
+            self._y[0] = self._y[0].to(self.device)
+            self._t[0] = self._t[0].to(self.device)
+            self._t0   = self._t0.to(self.device)
+            self._tf   = self._tf.to(self.device)
+            self._dt   = self._dt.to(self.device)
+            self._dt0  = self._dt0.to(self.device)
         return
         
-    def __allocate_soln_space(self, num_units):
-        if num_units != 0:
-            if D.backend() in ['numpy', 'pyaudi']:
-                self.__y  = D.concatenate([self.__y, D.zeros((num_units, ) + D.shape(self.__y[0]), dtype=self.__y[0].dtype)], axis=0)
-                self.__t  = D.concatenate([self.__t, D.zeros((num_units, ) + D.shape(self.__t[0]), dtype=self.__y[0].dtype)], axis=0)
+    def _allocate_soln_space(self, num_units):
+        if D.backend() in ['numpy', 'pyaudi']:
+            if num_units == 0:
+                self._y = D.stack(self._y)
+                self._t = D.stack(self._t)
             else:
-                self.__y  = self.__y + [None for _ in range(num_units)]
-                self.__t  = self.__t + [None for _ in range(num_units)]
+                self._y  = D.concatenate([self._y, D.zeros((num_units, ) + D.shape(self._y[0]), dtype=self._y[0].dtype)], axis=0)
+                self._t  = D.concatenate([self._t, D.zeros((num_units, ) + D.shape(self._t[0]), dtype=self._y[0].dtype)], axis=0)
+        else:
+            if num_units != 0:
+                self._y  = self._y + [None for _ in range(num_units)]
+                self._t  = self._t + [None for _ in range(num_units)]
     
-    def __trim_soln_space(self):
-        self.__y = self.__y[:self.counter+1]
-        self.__t = self.__t[:self.counter+1]
+    def _trim_soln_space(self):
+        self._y = self._y[:self.counter+1]
+        self._t = self._t[:self.counter+1]
         
     def set_kick_vars(self, staggered_mask):
         """Sets the variable mask for the symplectic integrators. 
@@ -547,7 +529,7 @@ class OdeSystem(object):
             
         self.integrator = self.method(self.dim, **integrator_kwargs)
         
-    def __get_integrator_mask(self, staggered_mask):
+    def _get_integrator_mask(self, staggered_mask):
         if staggered_mask is None and hasattr(self.integrator, "staggered_mask"):
             return self.integrator.staggered_mask
         return staggered_mask
@@ -556,7 +538,7 @@ class OdeSystem(object):
     def method(self):
         """The numerical integration scheme
         """
-        return self.__method
+        return self._method
     
     @method.setter
     def method(self, new_method):
@@ -582,16 +564,16 @@ class OdeSystem(object):
         ValueError
             If the string is not a valid integration scheme.
         """        
-        self.staggered_mask = self.__get_integrator_mask(staggered_mask)
+        self.staggered_mask = self._get_integrator_mask(staggered_mask)
         if self.int_status == 1:
             deutil.warning("An integration was already run, the system will be reset")
             self.reset()
         if new_method in integrators.available_methods():
-            self.__method = integrators.available_methods(False)[new_method]
+            self._method = integrators.available_methods(False)[new_method]
         elif issubclass(new_method, integrators.IntegratorTemplate):
             if new_method not in map(lambda x:x[1], integrators.available_methods(False).items()):
                 deutil.warning("This is not a method implemented as part of the DESolver package. Cannot guarantee results.")
-            self.__method = new_method
+            self._method = new_method
         else:
             raise ValueError("The method you selected does not exist in the list of available methods, \
                               call desolver.available_methods() to see what these are")
@@ -635,16 +617,16 @@ class OdeSystem(object):
     def reset(self):
         """Resets the system to the initial time."""
         self.counter      = 0
-        self.__trim_soln_space()
+        self._trim_soln_space()
         self.sol          = None
-        self.dt           = self.__dt0
+        self.dt           = self._dt0
         self.equ_rhs.nfev = 0
-        self.__move_to_device()
+        self._move_to_device()
         self.int_status   = 0
-        if self.__dense_output:
+        if self._dense_output:
             self.sol = DenseOutput([self.t0], [])
-        if self.__events:
-            self.__events = []
+        if self._events:
+            self._events = []
         self.initialise_integrator()
 
     def integrate(self, t=None, callback=None, eta=False, events=None):
@@ -695,7 +677,7 @@ class OdeSystem(object):
             return
         steps  = 0
         
-        self.__fix_dt_dir(tf, self.t[-1])
+        self._fix_dt_dir(tf, self.t[-1])
 
         if D.abs(self.dt) > D.abs(tf - self.t[-1]):
             self.dt = D.abs(tf - self.t[-1])*0.5
@@ -717,18 +699,18 @@ class OdeSystem(object):
             
         end_int = False
         self.equ_rhs.nfev = 0 if self.int_status == 1 else self.equ_rhs.nfev
-        cState  = D.zeros_like(self.__y[self.counter])
-        cTime   = D.zeros_like(self.__t[self.counter])
-        self.__allocate_soln_space(total_steps)
+        cState  = D.zeros_like(self.y[-1])
+        cTime   = D.zeros_like(self.t[-1])
+        self._allocate_soln_space(min(total_steps, 100))
         try:
             while self.dt != 0 and D.abs(tf - self.__t[self.counter]) > 4 * D.epsilon() and not end_int:
                 if D.abs(self.dt + self.__t[self.counter]) > D.abs(tf):
                     self.dt = (tf - self.__t[self.counter])
                 self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter], self.constants, timestep=self.dt)
                 
-                if self.counter+1 >= len(self.__y):
-                    total_steps = int((tf-self.__t[self.counter]-dTime)/self.dt) + 1
-                    self.__allocate_soln_space(total_steps)
+                if self.counter+1 >= len(self._y):
+                    total_steps = int((tf-self._t[self.counter]-dTime)/self.dt) + 1
+                    self._allocate_soln_space(min(total_steps, 100))
 
                 #
                 # Compensated Summation based on 
@@ -738,33 +720,33 @@ class OdeSystem(object):
                 dState = dState + cState
                 dTime  = dTime  + cTime
 
-                self.__y[self.counter+1] = self.__y[self.counter] + dState
-                self.__t[self.counter+1] = self.__t[self.counter] + dTime 
+                self._y[self.counter+1] = self._y[self.counter] + dState
+                self._t[self.counter+1] = self._t[self.counter] + dTime 
 
-                cState = (self.__y[self.counter] - self.__y[self.counter+1]) + dState
-                cTime  = (self.__t[self.counter] - self.__t[self.counter+1]) + dTime
+                cState = (self._y[self.counter] - self._y[self.counter+1]) + dState
+                cTime  = (self._t[self.counter] - self._t[self.counter+1]) + dTime
 
                 self.counter += 1
 
-                if events is not None or self.__dense_output:
+                if events is not None or self._dense_output:
                     tsol = self.get_step_interpolant()
 
                 if events is not None:
                     active_events, roots, end_int = handle_events(tsol, events, self.constants, direction, is_terminal)
 
-                    if self.counter+len(roots)+1 >= len(self.__y):
-                        total_steps = max(int(abs((tf-self.__t[self.counter]-dTime)/self.dt)), 2) + len(roots)
-                        self.__allocate_soln_space(total_steps)
+                    if self.counter+len(roots)+1 >= len(self._y):
+                        total_steps = max(int(abs((tf-self._t[self.counter]-dTime)/self.dt)), 2) + len(roots)
+                        self._allocate_soln_space(min(total_steps, 100))
 
-                    prev_time = self.__t[self.counter - 1]
-                    prev_y    = self.__y[self.counter - 1]
+                    prev_time = self._t[self.counter - 1]
+                    prev_y    = self._y[self.counter - 1]
                     self.counter -= 1
 
                     for root in roots:
-                        if root != self.__t[self.counter]:
-                            self.__t[self.counter+1] = root
-                            self.__y[self.counter+1] = tsol(root)
-                            self.__events.append(StateTuple(t=self.__t[self.counter+1], y=self.__y[self.counter+1]))
+                        if root != self._t[self.counter]:
+                            self._t[self.counter+1] = root
+                            self._y[self.counter+1] = tsol(root)
+                            self._events.append(StateTuple(t=self._t[self.counter+1], y=self._y[self.counter+1]))
                             self.counter += 1
 
                     if end_int:
@@ -772,16 +754,16 @@ class OdeSystem(object):
                         self.int_status = 2
                         self.success    = True
                     else:
-                        self.__t[self.counter+1] = prev_time + dTime
-                        self.__y[self.counter+1] = prev_y    + dState
+                        self._t[self.counter+1] = prev_time + dTime
+                        self._y[self.counter+1] = prev_y    + dState
                         self.counter += 1
 
-                if self.__dense_output:
-                    self.sol.add_interpolant(self.__t[self.counter], tsol)
+                if self._dense_output:
+                    self.sol.add_interpolant(self.t[-1], tsol)
 
                 if eta:
-                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs((tf - self.__t[self.counter]) / self.dt))
-                    tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.__t[self.counter], tf, self.dt).ljust(8)
+                    tqdm_progress_bar.total = int(0.2*tqdm_progress_bar.total + 0.8*(tqdm_progress_bar.n + abs((tf - self.t[-1]) / self.dt)))
+                    tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.t[-1], tf, self.dt).ljust(8)
                     tqdm_progress_bar.update()
 
                 steps += 1
@@ -802,7 +784,7 @@ class OdeSystem(object):
             self.success    = True
             if self.int_status != 2:
                 self.int_status = 1
-            self.__trim_soln_space()
+            self._trim_soln_space()
             if eta:
                 tqdm_progress_bar.close()
 
@@ -884,7 +866,7 @@ class OdeSystem(object):
                 step      = 1
             return StateTuple(t=self.__t[start_idx:end_idx:step], y=self.__y[start_idx:end_idx:step])
         else:
-            if self.__dense_output and self.sol is not None:
+            if self._dense_output and self.sol is not None:
                 return StateTuple(t=index, y=self.sol(index))
             else:
                 nearest_idx = deutil.search_bisection(self.__t, index)
