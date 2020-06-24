@@ -1,10 +1,11 @@
 import os
 import numpy as np
+import nose
+import desolver as de
+import desolver.backend as D
 
 def test_backend():
     try:
-        import desolver as de
-        import desolver.backend as D
         import numpy as np
         import scipy
         
@@ -114,8 +115,136 @@ def test_backend():
     except:
         print("{} Backend Test Failed".format(D.backend()))
         raise
-    print("{} Backend Test Succeeded".format(D.backend()))
+    print("{} Backend Test Succeeded".format(D.backend())) 
     
+@np.testing.dec.skipif(D.backend() != 'torch', "PyTorch Unavailable")
+def test_subtraction():
+    a = D.array([1.0])
+    assert(D.all(D.sub(a, a) == D.array([0.0])))
+    
+@np.testing.dec.skipif(D.backend() != 'torch', "PyTorch Unavailable")
+def test_subtraction_with_out():
+    a = D.array([1.0])
+    out = D.zeros((1,))
+    D.sub(a, a, out=out)
+    assert(D.all(out == D.array([0.0])))
+    
+@np.testing.dec.skipif(D.backend() != 'torch', "PyTorch Unavailable")
+def test_logspace():
+    assert(np.all(np.abs(np.logspace(-10.0, 10.0) - D.logspace(-10.0, 10.0).cpu().numpy()) <= 2*D.epsilon()))
+
+@np.testing.dec.skipif(D.backend() != 'torch', "PyTorch Unavailable")
+@nose.tools.raises(ValueError)
+def test_gradients_wrong_nu():
+    a = D.array([1.0,1.0], requires_grad=True)
+    D.jacobian(a, a, nu=-1)
+    
+@np.testing.dec.skipif(D.backend() != 'torch', "PyTorch Unavailable")
+def test_gradients_nu_zero():
+    a = D.array([1.0,1.0], requires_grad=True)
+    assert(D.all(a == D.jacobian(a, a, nu=0)))
+    
+@np.testing.dec.skipif(D.backend() != 'torch', "PyTorch Unavailable")
+def test_gradients_no_grad():
+    a = D.array([1.0,1.0], requires_grad=False)
+    assert(D.all(D.jacobian(a, a) == D.array([[0.0,0.0],[0.0,0.0]])))
+    
+@np.testing.dec.skipif(D.backend() != 'torch', "PyTorch Unavailable")
+def test_gradients_no_grad_batched():
+    a = D.array([[1.0,1.0], [1.0,1.0]], requires_grad=False)
+    assert(D.all(D.jacobian(a, a, batch_mode=True) == D.array([[[0.0,0.0],[0.0,0.0]],[[0.0,0.0],[0.0,0.0]]])))
+    
+@np.testing.dec.skipif(D.backend() != 'torch', "PyTorch Unavailable")
+def test_gradients_batched():
+    a = D.array([[1.0,1.0], [1.0,1.0]], requires_grad=True)
+    b = a * D.array([[1.0,1.0], [2.0,2.0]])
+    assert(D.all(D.jacobian(b, a, batch_mode=True) == D.array([[[1.0,0.0],[2.0,0.0]],[[0.0,1.0],[0.0,2.0]]])))
+    
+@np.testing.dec.skipif(D.backend() != 'torch', "PyTorch Unavailable")
+def test_gradients_unbatched():
+    a = D.array([1.0,1.0], requires_grad=True)
+    assert(D.all(D.jacobian(a, a, batch_mode=False) == D.array([[1.0,0.0],[0.0,1.0]])))
+    
+@np.testing.dec.skipif(D.backend() != 'torch', "PyTorch Unavailable")
+def test_gradients_higher_nu():
+    a = D.array([1.0], requires_grad=True)
+    b = a*a
+    assert(D.all(D.jacobian(b, a, nu=2, batch_mode=False) == D.array([2.0])))
+
+@np.testing.dec.skipif(D.backend() == 'numpy', "Numpy is Reference")
+def test_torch_ravel():
+    a = np.array([[1.0, 2.0, 3.0]])
+    a_torch = D.array(a)
+    assert(np.all(np.ravel(a) == D.ravel(a_torch).cpu().numpy()))
+
+@np.testing.dec.skipif(D.backend() == 'numpy', "Numpy is Reference")
+def test_torch_append():
+    a = np.array([1.0, 2.0, 3.0])
+    b = np.array([1.0])
+    a_torch = D.array(a)
+    b_torch = D.array(b)
+    assert(np.all(np.append(a, b) == D.append(a_torch, b_torch).cpu().numpy()))
+    
+@np.testing.dec.skipif(D.backend() == 'numpy', "Numpy is Reference")
+def test_torch_append_axis_none():
+    a = np.array([[1.0, 2.0, 3.0]])
+    b = np.array([[1.0]])
+    a_torch = D.array(a)
+    b_torch = D.array(b)
+    assert(np.all(np.append(a, b, axis=None) == D.append(a_torch, b_torch, axis=None).cpu().numpy()))
+
+@np.testing.dec.skipif(D.backend() == 'numpy', "Numpy is Reference")
+def test_torch_concatenate():
+    a = np.array([1.0, 2.0, 3.0])
+    b = np.array([1.0])
+    a_torch = D.array(a)
+    b_torch = D.array(b)
+    assert(np.all(np.concatenate([a, b, a, b]) == D.concatenate([a_torch, b_torch, a_torch, b_torch]).cpu().numpy()))
+
+@np.testing.dec.skipif(D.backend() == 'numpy', "Numpy is Reference")
+def test_torch_concatenate_with_axis():
+    a = np.array([[1.0, 2.0, 3.0]])
+    b = np.array([[1.0]])
+    a_torch = D.array(a)
+    b_torch = D.array(b)
+    assert(np.all(np.concatenate([a, b, a, b], axis=1) == D.concatenate([a_torch, b_torch, a_torch, b_torch], axis=1).cpu().numpy()))
+    
+@np.testing.dec.skipif(D.backend() == 'numpy', "Numpy is Reference")
+def test_eye():
+    assert(np.all(np.eye(5) == D.eye(5).cpu().numpy()))
+    
+@np.testing.dec.skipif(D.backend() == 'numpy', "Numpy is Reference")
+def test_eye_asymm():
+    assert(np.all(np.eye(5,2) == D.eye(5,2).cpu().numpy()))
+    assert(np.all(np.eye(5,20) == D.eye(5,20).cpu().numpy()))
+    
+@np.testing.dec.skipif(D.backend() == 'numpy', "Numpy is Reference")
+def test_eye_with_out():
+    out = D.zeros((5,5))
+    D.eye(5, out=out)
+    assert(np.all(np.eye(5) == out.cpu().numpy()))
+    
+@np.testing.dec.skipif(D.backend() == 'numpy', "Numpy is Reference")
+def test_eye_asymm_with_out():
+    out = D.zeros((5,2))
+    D.eye(5,2, out=out)
+    assert(np.all(np.eye(5,2) == out.cpu().numpy()))
 
 if __name__ == "__main__":
     np.testing.run_module_suite()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

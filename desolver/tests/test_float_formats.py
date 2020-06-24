@@ -2,16 +2,17 @@ import desolver as de
 import desolver.backend as D
 import numpy as np
 
+
 def test_float_formats():
     for ffmt in D.available_float_fmt():
         D.set_float_fmt(ffmt)
 
         print("Testing {} float format".format(D.float_fmt()))
 
-        de_mat = D.array([[0.0, 1.0],[-1.0, 0.0]])
+        de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
 
         @de.rhs_prettifier("""[vx, -x+t]""")
-        def rhs(t, state, **kwargs):    
+        def rhs(t, state, **kwargs):
             return de_mat @ state + D.array([0.0, t])
 
         def analytic_soln(t, initial_conditions):
@@ -29,10 +30,11 @@ def test_float_formats():
 
         y_init = D.array([1., 0.])
 
-        a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2*D.pi), dt=0.01, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
+                         atol=D.epsilon() ** 0.5)
 
         with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
-            for i in sorted(set(de.available_methods(False).values()), key=lambda x:x.__name__):
+            for i in sorted(set(de.available_methods(False).values()), key=lambda x: x.__name__):
                 if "Heun-Euler" in i.__name__ and D.float_fmt() == "gdual_real128":
                     print("skipping {} due to ridiculous timestep requirements.".format(i))
                     continue
@@ -61,8 +63,7 @@ def test_float_formats():
             print("")
 
         print("{} backend test passed successfully!".format(D.backend()))
-        
-        
+
+
 if __name__ == "__main__":
     np.testing.run_module_suite()
-        

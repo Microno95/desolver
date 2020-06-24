@@ -6,6 +6,9 @@ from . import utilities
 from . import integrators
 
 from .integrators import available_methods
+from . import tests
+from .utilities import tests
+from .exception_types import tests
 
 try:
     # Pytest testing

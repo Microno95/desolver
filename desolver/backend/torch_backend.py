@@ -152,11 +152,11 @@ def stack(arrs, axis=0, out=None):
     return torch.stack(arrs, dim=axis, out=out)
 
 @type_reg
-def linspace(start, end, num=100, out=None, dtype=None):
+def linspace(start, end, num=50, out=None, dtype=None):
     return torch.linspace(start, end, steps=num, dtype=dtype, out=out)
 
 @type_reg
-def logspace(start, end, num=100, out=None, dtype=None):
+def logspace(start, end, num=50, out=None, dtype=None):
     return torch.logspace(start, end, steps=num, dtype=dtype, out=out)
 
 @type_reg
