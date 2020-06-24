@@ -704,6 +704,8 @@ class OdeSystem(object):
         
         if eta:
             tqdm_progress_bar = tqdm(total=9e9)
+        else:
+            tqdm_progress_bar = None
             
         try:
             callback = list(callback)
@@ -749,37 +751,37 @@ class OdeSystem(object):
                 if events is not None or self.__dense_output:
                     tsol = self.get_step_interpolant()
 
-                if events is not None:
-                    active_events, roots, end_int = handle_events(tsol, events, self.constants, direction, is_terminal)
+                    if events is not None:
+                        active_events, roots, end_int = handle_events(tsol, events, self.constants, direction, is_terminal)
 
-                    if self.counter+len(roots)+1 >= len(self.__y):
-                        total_steps = max(int(abs((tf-self.__t[self.counter]-dTime)/self.dt)), 2) + len(roots)
-                        self.__allocate_soln_space(total_steps)
+                        if self.counter+len(roots)+1 >= len(self.__y):
+                            total_steps = max(int(abs((tf-self.__t[self.counter]-dTime)/self.dt)), 2) + len(roots)
+                            self.__allocate_soln_space(total_steps)
 
-                    prev_time = self.__t[self.counter - 1]
-                    prev_y    = self.__y[self.counter - 1]
-                    self.counter -= 1
+                        prev_time = self.__t[self.counter - 1]
+                        prev_y    = self.__y[self.counter - 1]
+                        self.counter -= 1
 
-                    for root in roots:
-                        if root != self.__t[self.counter]:
-                            self.__t[self.counter+1] = root
-                            self.__y[self.counter+1] = tsol(root)
-                            self.__events.append(StateTuple(t=self.__t[self.counter+1], y=self.__y[self.counter+1]))
+                        for root in roots:
+                            if root != self.__t[self.counter]:
+                                self.__t[self.counter+1] = root
+                                self.__y[self.counter+1] = tsol(root)
+                                self.__events.append(StateTuple(t=self.__t[self.counter+1], y=self.__y[self.counter+1]))
+                                self.counter += 1
+
+                        if end_int:
+                            tsol            = self.get_step_interpolant()
+                            self.int_status = 2
+                            self.success    = True
+                        else:
+                            self.__t[self.counter+1] = prev_time + dTime
+                            self.__y[self.counter+1] = prev_y    + dState
                             self.counter += 1
 
-                    if end_int:
-                        tsol            = self.get_step_interpolant()
-                        self.int_status = 2
-                        self.success    = True
-                    else:
-                        self.__t[self.counter+1] = prev_time + dTime
-                        self.__y[self.counter+1] = prev_y    + dState
-                        self.counter += 1
+                    if self.__dense_output:
+                        self.sol.add_interpolant(self.__t[self.counter], tsol)
 
-                if self.__dense_output:
-                    self.sol.add_interpolant(self.__t[self.counter], tsol)
-
-                if eta:
+                if tqdm_progress_bar is not None:
                     tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs((tf - self.__t[self.counter]) / self.dt))
                     tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.__t[self.counter], tf, self.dt).ljust(8)
                     tqdm_progress_bar.update()
