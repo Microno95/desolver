@@ -111,7 +111,7 @@ def test_backend():
             assert (0.5641895835477563 - 2 * D.epsilon() <= D.rsqrt(pi) <= 0.5641895835477563 + 2 * D.epsilon())
             assert (pi + 0.5 - 2 * D.epsilon() <= D.lerp(pi, pi + 1, 0.5) <= pi + 0.5 + 2 * D.epsilon())
 
-            assert (D.addcdiv(pi, D.to_float(3), D.to_float(2), value=1) == pi + (1 * (3 / 2)))
+            assert (D.addcdiv(pi, 1, D.to_float(3), D.to_float(2)) == pi + (1 * (3 / 2)))
             assert (D.addcmul(pi, 1, D.to_float(3), D.to_float(2)) == pi + (1 * (3 * 2)))
 
             if not i.startswith('gdual'):
