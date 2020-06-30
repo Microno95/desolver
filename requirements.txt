@@ -1,6 +1,7 @@
 scipy>=0.18.0
 numpy>=1.17
 coverage
-nose
+pytest
+pytest-cov
 codecov
 tqdm
