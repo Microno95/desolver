@@ -121,29 +121,28 @@ def test_tan_within_tolerance(ffmt):
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_acos_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
-    pi = D.to_float(D.pi)
     assert (D.acos(D.to_float(1)) == 0)
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_asin_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
-    pi = D.to_float(D.pi)
-    assert (D.asin(D.to_float(1)) == pi / 2)
+    ref = D.to_float(D.pi / 2)
+    assert (D.asin(D.to_float(1)) == ref)
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_atan_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
-    pi = D.to_float(D.pi)
-    assert (D.atan(D.to_float(1)) == pi / 4)
+    ref = D.to_float(D.pi / 4)
+    assert (D.atan(D.to_float(1)) == ref)
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_atan2_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
-    pi = D.to_float(D.pi)
-    assert (D.atan2(D.to_float(1), D.to_float(1)) == pi / 4)
+    ref = D.to_float(D.pi / 4)
+    assert (D.atan2(D.to_float(1), D.to_float(1)) == ref)
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
