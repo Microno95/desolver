@@ -111,8 +111,8 @@ def test_backend():
             assert (0.5641895835477563 - 2 * D.epsilon() <= D.rsqrt(pi) <= 0.5641895835477563 + 2 * D.epsilon())
             assert (pi + 0.5 - 2 * D.epsilon() <= D.lerp(pi, pi + 1, 0.5) <= pi + 0.5 + 2 * D.epsilon())
 
-            assert (D.addcdiv(pi, 1, D.to_float(3), D.to_float(2)) == pi + (1 * (3 / 2)))
-            assert (D.addcmul(pi, 1, D.to_float(3), D.to_float(2)) == pi + (1 * (3 * 2)))
+            assert (D.addcdiv(pi, D.to_float(3), D.to_float(2), value=1) == pi + (1 * (3 / 2)))
+            assert (D.addcmul(pi, D.to_float(3), D.to_float(2), value=1) == pi + (1 * (3 * 2)))
 
             if not i.startswith('gdual'):
                 assert (-2 * D.epsilon() <= D.einsum("nm->", D.array([[1.0, 2.0], [-2.0, -1.0]])) <= 2 * D.epsilon())
@@ -138,7 +138,7 @@ def test_subtraction_with_out():
 
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
 def test_logspace():
-    assert (np.all(np.abs(np.logspace(-10.0, 10.0) - D.logspace(-10.0, 10.0).cpu().numpy()) <= 2 * D.epsilon()))
+    assert (np.all(np.abs(np.logspace(-10.0, 10.0) - D.logspace(-10.0, 10.0).cpu().numpy())/np.logspace(-10.0, 10.0) <= 2 * D.epsilon()))
 
 
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")

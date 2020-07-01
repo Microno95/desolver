@@ -83,6 +83,13 @@ def test_dense_init_mismatch_length():
 def test_dense_output(ffmt):
     D.set_float_fmt(ffmt)
 
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+
     print("Testing {} float format".format(D.float_fmt()))
 
     from . import common

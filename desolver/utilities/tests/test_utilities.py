@@ -15,11 +15,9 @@ def test_bisection_search():
 
 
 def test_blocktimer():
-    try:
-        with de.utilities.BlockTimer(start_now=False) as test:
-            assert (test.start_time is None and not test.start_now)
-    except:
-        raise
+    with de.utilities.BlockTimer(start_now=False) as test:
+        assert (test.start_time is None and not test.start_now)
+
     with de.utilities.BlockTimer(start_now=False) as test:
         assert (isinstance(test.start_now, bool) and test.start_now == False)
         assert (test.start_time is None)

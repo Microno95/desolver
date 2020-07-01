@@ -104,7 +104,7 @@ def rsqrt(x, out=None):
     return pow(x, -0.5, out=out)
 
 
-def addcdiv(x, value=1, y1=None, y2=None, out=None):
+def addcdiv(x, y1=None, y2=None, value=1, out=None):
     if y1 is None or y2 is None:
         raise ValueError("y1 and y2 must both be specified")
     if out is None:
@@ -117,7 +117,7 @@ def addcdiv(x, value=1, y1=None, y2=None, out=None):
     return out
 
 
-def addcmul(x, value=1, y1=None, y2=None, out=None):
+def addcmul(x, y1=None, y2=None, value=1, out=None):
     if y1 is None or y2 is None:
         raise ValueError("y1 and y2 must both be specified")
     if out is None:

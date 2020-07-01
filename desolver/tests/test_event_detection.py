@@ -11,6 +11,13 @@ def test_event_detection_multiple(ffmt, integrator_name):
         return
     D.set_float_fmt(ffmt)
 
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+
     print("Testing event detection for float format {}".format(D.float_fmt()))
 
     from .common import set_up_basic_system
@@ -32,28 +39,24 @@ def test_event_detection_multiple(ffmt, integrator_name):
                      atol=D.epsilon() ** 0.5)
 
     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
+        a.set_method(integrator_name)
+        print("Testing {}".format(a.integrator))
+        assert (a.integration_status() == "Integration has not been run.")
+
+        a.integrate(eta=False, events=[time_event, second_time_event])
+
+        assert (a.integration_status() == "Integration terminated upon finding a triggered event.")
+
         try:
-            a.set_method(integrator_name)
-            print("Testing {}".format(a.integrator))
-            assert (a.integration_status() == "Integration has not been run.")
-
-            a.integrate(eta=False, events=[time_event, second_time_event])
-
-            assert (a.integration_status() == "Integration terminated upon finding a triggered event.")
-
-            try:
-                assert (D.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon())
-                assert (D.abs(a.events[0].t - D.pi / 16) <= 10 * D.epsilon())
-                assert (len(a.events) == 2)
-            except:
-                print("Event detection with integrator {} failed with t[-1] = {}".format(a.integrator, a.t[-1]))
-                raise RuntimeError("Failed to detect event for integrator {}".format(str(i)))
-            else:
-                print("Event detection with integrator {} succeeded with t[-1] = {}".format(a.integrator, a.t[-1]))
-            a.reset()
-        except Exception as e:
-            raise e
-            # raise RuntimeError("Test failed for integration method: {}".format(a.integrator))
+            assert (D.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon())
+            assert (D.abs(a.events[0].t - D.pi / 16) <= 10 * D.epsilon())
+            assert (len(a.events) == 2)
+        except:
+            print("Event detection with integrator {} failed with t[-1] = {}".format(a.integrator, a.t[-1]))
+            raise RuntimeError("Failed to detect event for integrator {}".format(str(i)))
+        else:
+            print("Event detection with integrator {} succeeded with t[-1] = {}".format(a.integrator, a.t[-1]))
+        a.reset()
     print("")
 
     print("{} backend test passed successfully!".format(D.backend()))
@@ -64,7 +67,15 @@ def test_event_detection_multiple(ffmt, integrator_name):
 def test_event_detection_single(ffmt, integrator_name):
     if ffmt == 'float16':
         return
+
     D.set_float_fmt(ffmt)
+
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
 
     print("Testing event detection for float format {}".format(D.float_fmt()))
     from .common import set_up_basic_system
@@ -81,27 +92,23 @@ def test_event_detection_single(ffmt, integrator_name):
                      atol=D.epsilon() ** 0.5)
 
     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
+        a.set_method(integrator_name)
+        print("Testing {}".format(a.integrator))
+        assert (a.integration_status() == "Integration has not been run.")
+
+        a.integrate(eta=False, events=time_event)
+
+        assert (a.integration_status() == "Integration terminated upon finding a triggered event.")
+
         try:
-            a.set_method(integrator_name)
-            print("Testing {}".format(a.integrator))
-            assert (a.integration_status() == "Integration has not been run.")
-
-            a.integrate(eta=False, events=time_event)
-
-            assert (a.integration_status() == "Integration terminated upon finding a triggered event.")
-
-            try:
-                assert (D.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon())
-                assert (len(a.events) == 1)
-            except:
-                print("Event detection with integrator {} failed with t[-1] = {}".format(a.integrator, a.t[-1]))
-                raise RuntimeError("Failed to detect event for integrator {}".format(str(i)))
-            else:
-                print("Event detection with integrator {} succeeded with t[-1] = {}".format(a.integrator, a.t[-1]))
-            a.reset()
-        except Exception as e:
-            raise e
-            # raise RuntimeError("Test failed for integration method: {}".format(a.integrator))
+            assert (D.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon())
+            assert (len(a.events) == 1)
+        except:
+            print("Event detection with integrator {} failed with t[-1] = {}".format(a.integrator, a.t[-1]))
+            raise RuntimeError("Failed to detect event for integrator {}".format(str(i)))
+        else:
+            print("Event detection with integrator {} succeeded with t[-1] = {}".format(a.integrator, a.t[-1]))
+        a.reset()
     print("")
 
     print("{} backend test passed successfully!".format(D.backend()))

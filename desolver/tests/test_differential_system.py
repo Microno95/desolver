@@ -8,6 +8,13 @@ import pytest
 def test_getter_setters(ffmt):
     D.set_float_fmt(ffmt)
 
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+
     print("Testing {} float format".format(D.float_fmt()))
 
     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
@@ -15,19 +22,6 @@ def test_getter_setters(ffmt):
     @de.rhs_prettifier("""[vx, -x+t]""")
     def rhs(t, state, **kwargs):
         return de_mat @ state + D.array([0.0, t])
-
-    def analytic_soln(t, initial_conditions):
-        c1 = initial_conditions[0]
-        c2 = initial_conditions[1] - 1
-
-        return D.array([
-            c2 * D.sin(t) + c1 * D.cos(t) + t,
-            c2 * D.cos(t) - c1 * D.sin(t) + 1
-        ])
-
-    def kbinterrupt_cb(ode_sys):
-        if ode_sys[-1][0] > D.pi:
-            raise KeyboardInterrupt("Test Interruption and Catching")
 
     y_init = D.array([1., 0.])
 
@@ -97,6 +91,13 @@ def test_getter_setters(ffmt):
 def test_integration_and_representation(ffmt):
     D.set_float_fmt(ffmt)
 
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+
     print("Testing {} float format".format(D.float_fmt()))
 
     from . import common
@@ -109,14 +110,11 @@ def test_integration_and_representation(ffmt):
 
     assert (a.integration_status() == "Integration completed successfully.")
 
-    try:
-        print(str(a))
-        print(repr(a))
-        assert (D.max(D.abs(a.sol(a.t[0]) - y_init)) <= 8 * D.epsilon() ** 0.5)
-        assert (D.max(D.abs(a.sol(a.t[-1]) - analytic_soln(a.t[-1], y_init))) <= 8 * D.epsilon() ** 0.5)
-        assert (D.max(D.abs(a.sol(a.t).T - analytic_soln(a.t, y_init))) <= 8 * D.epsilon() ** 0.5)
-    except:
-        raise
+    print(str(a))
+    print(repr(a))
+    assert (D.max(D.abs(a.sol(a.t[0]) - y_init)) <= 8 * D.epsilon() ** 0.5)
+    assert (D.max(D.abs(a.sol(a.t[-1]) - analytic_soln(a.t[-1], y_init))) <= 8 * D.epsilon() ** 0.5)
+    assert (D.max(D.abs(a.sol(a.t).T - analytic_soln(a.t, y_init))) <= 8 * D.epsilon() ** 0.5)
 
     for i in a:
         assert (D.max(D.abs(i.y - analytic_soln(i.t, y_init))) <= 8 * D.epsilon() ** 0.5)
@@ -129,6 +127,13 @@ def test_integration_and_representation(ffmt):
 def test_integration_and_nearestfloat_no_dense_output(ffmt):
     D.set_float_fmt(ffmt)
 
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+
     print("Testing {} float format".format(D.float_fmt()))
 
     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
@@ -136,15 +141,6 @@ def test_integration_and_nearestfloat_no_dense_output(ffmt):
     @de.rhs_prettifier("""[vx, -x+t]""")
     def rhs(t, state, k, **kwargs):
         return de_mat @ state + D.array([0.0, t])
-
-    def analytic_soln(t, initial_conditions):
-        c1 = initial_conditions[0]
-        c2 = initial_conditions[1] - 1
-
-        return D.stack([
-            c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
-            c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
-        ])
 
     y_init = D.array([1., 0.])
 
@@ -164,6 +160,13 @@ def test_integration_and_nearestfloat_no_dense_output(ffmt):
 def test_no_events(ffmt):
     D.set_float_fmt(ffmt)
 
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+
     print("Testing {} float format".format(D.float_fmt()))
 
     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
@@ -171,15 +174,6 @@ def test_no_events(ffmt):
     @de.rhs_prettifier("""[vx, -x+t]""")
     def rhs(t, state, k, **kwargs):
         return de_mat @ state + D.array([0.0, t])
-
-    def analytic_soln(t, initial_conditions):
-        c1 = initial_conditions[0]
-        c2 = initial_conditions[1] - 1
-
-        return D.stack([
-            c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
-            c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
-        ])
 
     y_init = D.array([1., 0.])
 
@@ -196,6 +190,13 @@ def test_wrong_t0(ffmt):
     with pytest.raises(ValueError):
         D.set_float_fmt(ffmt)
 
+        if D.backend() == 'torch':
+            import torch
+
+            torch.set_printoptions(precision=17)
+
+            torch.autograd.set_detect_anomaly(True)
+
         print("Testing {} float format".format(D.float_fmt()))
 
         de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
@@ -203,15 +204,6 @@ def test_wrong_t0(ffmt):
         @de.rhs_prettifier("""[vx, -x+t]""")
         def rhs(t, state, k, **kwargs):
             return de_mat @ state + D.array([0.0, t])
-
-        def analytic_soln(t, initial_conditions):
-            c1 = initial_conditions[0]
-            c2 = initial_conditions[1] - 1
-
-            return D.stack([
-                c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
-                c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
-            ])
 
         y_init = D.array([1., 0.])
 
@@ -225,6 +217,13 @@ def test_wrong_t0(ffmt):
 def test_wrong_tf(ffmt):
     with pytest.raises(ValueError):
         D.set_float_fmt(ffmt)
+
+        if D.backend() == 'torch':
+            import torch
+
+            torch.set_printoptions(precision=17)
+
+            torch.autograd.set_detect_anomaly(True)
 
         print("Testing {} float format".format(D.float_fmt()))
 
@@ -240,6 +239,13 @@ def test_not_enough_time_values(ffmt):
     with pytest.raises(ValueError):
         D.set_float_fmt(ffmt)
 
+        if D.backend() == 'torch':
+            import torch
+
+            torch.set_printoptions(precision=17)
+
+            torch.autograd.set_detect_anomaly(True)
+
         print("Testing {} float format".format(D.float_fmt()))
 
         de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
@@ -247,15 +253,6 @@ def test_not_enough_time_values(ffmt):
         @de.rhs_prettifier("""[vx, -x+t]""")
         def rhs(t, state, k, **kwargs):
             return de_mat @ state + D.array([0.0, t])
-
-        def analytic_soln(t, initial_conditions):
-            c1 = initial_conditions[0]
-            c2 = initial_conditions[1] - 1
-
-            return D.stack([
-                c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
-                c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
-            ])
 
         y_init = D.array([1., 0.])
 
@@ -269,6 +266,13 @@ def test_not_enough_time_values(ffmt):
 def test_dt_dir_fix(ffmt):
     D.set_float_fmt(ffmt)
 
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+
     print("Testing {} float format".format(D.float_fmt()))
 
     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
@@ -276,15 +280,6 @@ def test_dt_dir_fix(ffmt):
     @de.rhs_prettifier("""[vx, -x+t]""")
     def rhs(t, state, k, **kwargs):
         return de_mat @ state + D.array([0.0, t])
-
-    def analytic_soln(t, initial_conditions):
-        c1 = initial_conditions[0]
-        c2 = initial_conditions[1] - 1
-
-        return D.stack([
-            c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),
-            c2 * D.cos(D.to_float(D.asarray(t))) - c1 * D.sin(D.to_float(D.asarray(t))) + 1
-        ])
 
     y_init = D.array([1., 0.])
 
@@ -296,6 +291,13 @@ def test_dt_dir_fix(ffmt):
 def test_non_callable_rhs(ffmt):
     with pytest.raises(TypeError):
         D.set_float_fmt(ffmt)
+
+        if D.backend() == 'torch':
+            import torch
+
+            torch.set_printoptions(precision=17)
+
+            torch.autograd.set_detect_anomaly(True)
 
         print("Testing {} float format".format(D.float_fmt()))
 

@@ -15,7 +15,6 @@ def test_gradients(ffmt, integrator_name):
     import torch
 
     torch.set_printoptions(precision=17)
-    torch.set_num_threads(1)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -74,34 +73,30 @@ def test_gradients(ffmt, integrator_name):
             return dy + torch.cat([torch.tensor([0.0]).to(dy), (controller_effect * 2.0 - 1.0)])
 
     with de.utilities.BlockTimer(section_label="Integrator Tests"):
-        try:
-            yi1 = D.array([1.0, 0.0], requires_grad=True).to(device)
-            df = SimpleODE(k=1.0)
+        yi1 = D.array([1.0, 0.0], requires_grad=True).to(device)
+        df = SimpleODE(k=1.0)
 
-            a = de.OdeSystem(df, yi1, t=(0, 1.), dt=0.0675, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
-            a.set_method(integrator_name)
-            a.integrate(eta=False)
+        a = de.OdeSystem(df, yi1, t=(0, 1.), dt=0.0675, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
+        a.set_method(integrator_name)
+        a.integrate(eta=False)
 
-            dyfdyi = D.jacobian(a.y[-1], a.y[0])
-            dyi = D.array([0.0, 1.0]).to(device) * D.epsilon() ** 0.5
-            dyf = D.einsum("nk,k->n", dyfdyi, dyi)
-            yi2 = yi1 + dyi
+        dyfdyi = D.jacobian(a.y[-1], a.y[0])
+        dyi = D.array([0.0, 1.0]).to(device) * D.epsilon() ** 0.5
+        dyf = D.einsum("nk,k->n", dyfdyi, dyi)
+        yi2 = yi1 + dyi
 
-            print(a.y[-1].device)
+        print(a.y[-1].device)
 
-            b = de.OdeSystem(df, yi2, t=(0, 1.), dt=0.0675, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
-            b.set_method(integrator_name)
-            b.integrate(eta=False)
+        b = de.OdeSystem(df, yi2, t=(0, 1.), dt=0.0675, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
+        b.set_method(integrator_name)
+        b.integrate(eta=False)
 
-            true_diff = b.y[-1] - a.y[-1]
+        true_diff = b.y[-1] - a.y[-1]
 
-            print(D.norm(true_diff - dyf), D.epsilon() ** 0.5)
+        print(D.norm(true_diff - dyf), D.epsilon() ** 0.5)
 
-            assert (D.allclose(true_diff, dyf, rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
-            print("{} method test succeeded!".format(a.integrator))
-        except:
-            raise
-            # raise RuntimeError("Test failed for integration method: {}".format(a.integrator))
+        assert (D.allclose(true_diff, dyf, rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
+        print("{} method test succeeded!".format(a.integrator))
         print("")
 
     print("{} backend test passed successfully!".format(D.backend()))

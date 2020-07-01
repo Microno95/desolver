@@ -1,8 +1,8 @@
 import desolver as de
 import desolver.backend as D
 
-def set_up_basic_system():
 
+def set_up_basic_system():
     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
 
     @de.rhs_prettifier("""[vx, -x+t]""")

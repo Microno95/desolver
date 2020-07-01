@@ -36,6 +36,14 @@ def test_brentsroot(ffmt):
 def test_brentsrootvec(ffmt):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
+
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+
     if ffmt == 'gdual_vdouble':
         return
     for _ in range(10):

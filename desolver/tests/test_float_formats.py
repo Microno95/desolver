@@ -9,6 +9,13 @@ import pytest
 def test_float_formats(ffmt, integrator_name):
     D.set_float_fmt(ffmt)
 
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+
     print("Testing {} float format".format(D.float_fmt()))
 
     from .common import set_up_basic_system
@@ -28,28 +35,23 @@ def test_float_formats(ffmt, integrator_name):
         if "Heun-Euler" in integrator_name.__name__ and D.float_fmt() == "gdual_real128":
             print("skipping {} due to ridiculous timestep requirements.".format(integrator_name))
             return
-        try:
-            a.set_method(integrator_name)
-            print("Testing {}".format(a.integrator))
-            try:
-                a.integrate(callback=kbinterrupt_cb, eta=False)
-            except KeyboardInterrupt as e:
-                pass
-            try:
-                a.integrate(eta=False)
-            except:
-                raise
+        a.set_method(integrator_name)
+        print("Testing {}".format(a.integrator))
 
-            max_diff = D.max(D.abs(analytic_soln(a.t[-1], a.y[0]) - a.y[-1]))
-            if a.method.__adaptive__ and max_diff >= a.atol * 10 + D.epsilon():
-                print("{} Failed with max_diff from analytical solution = {}".format(a.integrator, max_diff))
-                raise RuntimeError("Failed to meet tolerances for adaptive integrator {}".format(str(i)))
-            else:
-                print("{} Succeeded with max_diff from analytical solution = {}".format(a.integrator, max_diff))
-            a.reset()
-        except Exception as e:
-            print(e)
-            raise RuntimeError("Test failed for integration method: {}".format(a.integrator))
+        try:
+            a.integrate(callback=kbinterrupt_cb, eta=False)
+        except KeyboardInterrupt as e:
+            pass
+
+        a.integrate(eta=False)
+
+        max_diff = D.max(D.abs(analytic_soln(a.t[-1], a.y[0]) - a.y[-1]))
+        if a.method.__adaptive__ and max_diff >= a.atol * 10 + D.epsilon():
+            print("{} Failed with max_diff from analytical solution = {}".format(a.integrator, max_diff))
+            raise RuntimeError("Failed to meet tolerances for adaptive integrator {}".format(str(i)))
+        else:
+            print("{} Succeeded with max_diff from analytical solution = {}".format(a.integrator, max_diff))
+        a.reset()
     print("")
 
     print("{} backend test passed successfully!".format(D.backend()))
