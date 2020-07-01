@@ -9,9 +9,8 @@ python:
   - nightly
 
 env:
-  - PYAUDI_AVAILABLE=true
-  - PYAUDI_AVAILABLE=false
-  - DES_BACKEND='numpy'
+  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=false
+  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=true
   - DES_BACKEND='torch'
 
 jobs:
@@ -77,20 +76,20 @@ jobs:
     env: PYAUDI_AVAILABLE=true
   - python: 3.8-dev
     env: DES_BACKEND='torch'
-  - python: 3.0-dev
-    env: DES_BACKEND='torch'
   - python: 3.8-dev
     env: PYAUDI_AVAILABLE=true
   - python: 3.9-dev
     env: PYAUDI_AVAILABLE=true
+  - python: 3.9-dev
+    env: DES_BACKEND='torch'
   - python: nightly
     env: DES_BACKEND='torch'
   - python: nightly
     env: PYAUDI_AVAILABLE=true
   allow_failures:
-  - python: nightly
   - python: 3.8-dev
   - python: 3.9-dev
+  - python: nightly
   - os: windows
   - os: osx
 
