@@ -5,6 +5,19 @@ import desolver as de
 import desolver.backend as D
 
 
+def test_contract_first_ndims_reverse_order():
+    a = D.array([1.0, 2.0])
+    b = D.array([[1.0, 2.0], [2.0, 3.0]])
+    D.contract_first_ndims(a, b, n=1)
+
+
+def test_contract_first_ndims_shape_too_small():
+    with pytest.raises(ValueError):
+        a = D.array([1.0, 2.0])
+        b = D.array([[1.0, 2.0], [2.0, 3.0]])
+        D.contract_first_ndims(a, b, n=2)
+
+
 def test_wrong_float_fmt():
     with pytest.raises(ValueError):
         D.set_float_fmt('potato')

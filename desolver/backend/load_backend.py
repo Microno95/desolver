@@ -6,23 +6,25 @@ from .common import *
 
 if 'DES_BACKEND' in os.environ:
     set_backend(os.environ['DES_BACKEND'])
-    assert(backend() == str(os.environ['DES_BACKEND']))
+    assert (backend() == str(os.environ['DES_BACKEND']))
 
 if backend() == 'numpy':
     from .numpy_backend import *
+
     try:
         from .pyaudi_backend import *
+
         print("PyAudi backend is available.", file=sys.stderr)
     except:
         pass
 elif backend() == 'torch':
     from .torch_backend import *
+
     print("Default dtype set to float32 due to use of torch backend")
     set_float_fmt("float32")
-else:
-    raise ValueError("Unable to import backend : " + str(backend()))
-    
+
 print("Using " + str(backend()) + " backend", file=sys.stderr)
+
 
 def contract_first_ndims(a, b, n=1):
     """Contracts the tensors a and b along the first n dimensions
@@ -66,16 +68,17 @@ def contract_first_ndims(a, b, n=1):
     ```
     """
     if len(shape(a)) > len(shape(b)):
-        a,b = b,a
+        a, b = b, a
     if n > len(shape(a)):
         raise ValueError("Cannot contract along more dims than there exists!")
     na = len(shape(a))
     nb = len(shape(b))
     einsum_str = "{},{}->{}"
-    estr1      = "".join([chr(97 + i) for i in range(na)])
-    estr2      = "".join([chr(97 + i) for i in range(nb)])
-    estr3      = "".join([chr(97 + i + n) for i in range(nb - n)])
+    estr1 = "".join([chr(97 + i) for i in range(na)])
+    estr2 = "".join([chr(97 + i) for i in range(nb)])
+    estr3 = "".join([chr(97 + i + n) for i in range(nb - n)])
     einsum_str = einsum_str.format(estr1, estr2, estr3)
     return einsum(einsum_str, a, b)
+
 
 del os, sys

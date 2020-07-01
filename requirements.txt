@@ -1,8 +1,7 @@
-scipy>=0.18.0
-numpy>=1.17
+scipy>=1.4.1
+numpy>=1.18.0
 coverage
 pytest>=5.4.3
 pytest-cov>=2.10.0
 pytest-xdist>=1.32.0
-codecov
-tqdm
+tqdm>=4.47.0
