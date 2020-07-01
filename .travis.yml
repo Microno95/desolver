@@ -24,21 +24,21 @@ jobs:
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
-      - choco install python --version 3.8
+      - choco install python --version 3.8.2
       - python -m pip install --upgrade pip
     env: PATH=/c/Python38:/c/Python38/Scripts:$PATH
   - name: "Python 3.7 on Windows"
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
-     - choco install python --version 3.7
+     - choco install python --version 3.7.8
      - python -m pip install --upgrade pip
     env: PATH=/c/Python37:/c/Python37/Scripts:$PATH
   - name: "Python 3.6 on Windows"
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
-      - choco install python --version 3.6
+      - choco install python --version 3.6.8
       - python -m pip install --upgrade pip
     env: PATH=/c/Python36:/c/Python36/Scripts:$PATH
   - name: "Python 3.7.4 on macOS with PyTorch"
@@ -50,21 +50,21 @@ jobs:
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
-     - choco install python --version 3.8
+     - choco install python --version 3.8.2
      - python -m pip install --upgrade pip
     env: PATH=/c/Python38:/c/Python38/Scripts:$PATH DES_BACKEND=torch
   - name: "Python 3.7 on Windows with PyTorch"
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
-     - choco install python --version 3.7
+     - choco install python --version 3.7.8
      - python -m pip install --upgrade pip
     env: PATH=/c/Python37:/c/Python37/Scripts:$PATH DES_BACKEND=torch
   - name: "Python 3.6 on Windows with PyTorch"
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
-     - choco install python --version 3.6
+     - choco install python --version 3.6.8
      - python -m pip install --upgrade pip
     env: PATH=/c/Python36:/c/Python36/Scripts:$PATH DES_BACKEND=torch
   - name: "Python 3.7.4 on macOS with Pyaudi"
@@ -76,21 +76,21 @@ jobs:
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
-      - choco install python --version 3.8
+      - choco install python --version 3.8.2
       - python -m pip install --upgrade pip
     env: PATH=/c/Python38:/c/Python38/Scripts:$PATH DES_BACKEND=numpy PYAUDI_AVAILABLE=true
   - name: "Python 3.7 on Windows with Pyaudi"
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
-      - choco install python --version 3.7
+      - choco install python --version 3.7.8
       - python -m pip install --upgrade pip
     env: PATH=/c/Python37:/c/Python37/Scripts:$PATH DES_BACKEND=numpy PYAUDI_AVAILABLE=true
   - name: "Python 3.6 on Windows with Pyaudi"
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
-      - choco install python --version 3.6
+      - choco install python --version 3.6.8
       - python -m pip install --upgrade pip
     env: PATH=/c/Python36:/c/Python36/Scripts:$PATH DES_BACKEND=numpy PYAUDI_AVAILABLE=true
   exclude:
