@@ -72,7 +72,7 @@ jobs:
     osx_image: xcode11.2  # Python 3.7.4 running on macOS 10.14.4
     language: shell       # 'language: python' is an error on Travis CI macOS
     env: DES_BACKEND=numpy PYAUDI_AVAILABLE=true
-  - name: "Python 3.8 on Windows with PyTorch"
+  - name: "Python 3.8 on Windows with Pyaudi"
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
