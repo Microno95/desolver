@@ -14,15 +14,15 @@ __all__ = [
     'float_fmts'
 ]
 
-_BACKEND      = 'numpy'
+_BACKEND = 'numpy'
 _FLOAT_FORMAT = 'float64'
 
 float_fmts = dict()
 
 # Constants
-e           = 2.7182818284590452353602874713526624977572470936999595749669676277240766303535475945713821785251664274
+e = 2.7182818284590452353602874713526624977572470936999595749669676277240766303535475945713821785251664274
 euler_gamma = 0.5772156649015328606065120900824024310421593359399235988057672348848677267776646709369470632917467495
-pi          = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679
+pi = 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679
 
 
 def set_backend(backend):
@@ -34,9 +34,10 @@ def set_backend(backend):
         The new backend as a string
     """
     global _BACKEND
-    
+
     _BACKEND = str(backend)
-    
+
+
 def backend():
     """Method for determining the current backend.
 
@@ -52,8 +53,9 @@ def backend():
         'numpy'
     ```
     """
-    
+
     return _BACKEND
+
 
 def epsilon():
     """Returns fuzz factor used in numeric expressions
@@ -70,18 +72,18 @@ def epsilon():
         '1e-07'
     ```
     """
-    
+
     if _FLOAT_FORMAT == 'float16':
         return 5e-3
     elif _FLOAT_FORMAT == 'float32':
         return 5e-7
     elif _FLOAT_FORMAT in ['float64', 'gdual_double', 'gdual_vdouble']:
         return 5e-16
-    elif _FLOAT_FORMAT == 'gdual_real128':
-        return 5e-16
-    
+
+
 def available_float_fmt():
     return sorted(float_fmts.keys())
+
 
 def float_fmt():
     """Returns float format as a string
@@ -102,8 +104,9 @@ def float_fmt():
         'float64'
     ```
     """
-    
+
     return _FLOAT_FORMAT
+
 
 def set_float_fmt(new_fmt):
     """Sets the default float type
@@ -133,9 +136,9 @@ def set_float_fmt(new_fmt):
         'float16'
     ```
     """
-    
+
     global _FLOAT_FORMAT
-    
+
     if _BACKEND == 'numpy':
         if new_fmt not in available_float_fmt():
             raise ValueError("Unknown float type " + str(new_fmt) + " for backend " + str(_BACKEND))
@@ -147,7 +150,7 @@ def set_float_fmt(new_fmt):
             torch.set_default_dtype(torch.float32)
         elif new_fmt == 'float64':
             torch.set_default_dtype(torch.float64)
-    
+
     _FLOAT_FORMAT = str(new_fmt)
 
 
@@ -185,5 +188,5 @@ def cast_to_float_fmt(x):
         dtype('float64')
     ```
     """
-    
+
     return numpy.asarray(x, dtype=float_fmt())

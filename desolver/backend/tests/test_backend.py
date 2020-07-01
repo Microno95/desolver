@@ -5,6 +5,11 @@ import desolver as de
 import desolver.backend as D
 
 
+def test_wrong_float_fmt():
+    with pytest.raises(ValueError):
+        D.set_float_fmt('potato')
+
+
 def test_backend():
     try:
         import numpy as np
@@ -311,11 +316,25 @@ class TestPyAudiLog(PyAudiTestCase):
         assert (res == pd.log(x2))
 
 
+class TestPyAudiLog10(PyAudiTestCase):
+    def do(self, x1, x2):
+        import pyaudi as pd
+        res = x2.log10()
+        assert (res == pd.log(x2)/np.log(10.0))
+
+
 class TestPyAudiLog1p(PyAudiTestCase):
     def do(self, x1, x2):
         import pyaudi as pd
         res = x2.log1p()
         assert (res == pd.log(x2 + 1.0))
+
+
+class TestPyAudiLog2(PyAudiTestCase):
+    def do(self, x1, x2):
+        import pyaudi as pd
+        res = x2.log2()
+        assert (res == pd.log(x2)/np.log(2.0))
 
 
 class TestPyAudiCos(PyAudiTestCase):
