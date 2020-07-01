@@ -393,8 +393,8 @@ class TestPyAudiArcTan2(PyAudiTestCase):
 class TestPyAudiCosh(PyAudiTestCase):
     def do(self, x1, x2):
         import pyaudi as pd
-        res = x1.cos()
-        assert (res == pd.cos(x1))
+        res = x1.cosh()
+        assert (res == pd.cosh(x1))
 
 
 class TestPyAudiSinh(PyAudiTestCase):
