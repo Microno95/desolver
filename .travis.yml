@@ -41,26 +41,26 @@ jobs:
       - choco install python --version 3.6.0
       - python -m pip install --upgrade pip
     env: PATH=/c/Python36:/c/Python36/Scripts:$PATH
-  - name: "Python 3.7.4 on macOS"
+  - name: "Python 3.7.4 on macOS with PyTorch"
     os: osx
     osx_image: xcode11.2  # Python 3.7.4 running on macOS 10.14.4
     language: shell       # 'language: python' is an error on Travis CI macOS
     env: DES_BACKEND=torch
-  - name: "Python 3.8.0 on Windows"
+  - name: "Python 3.8.0 on Windows with PyTorch"
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
      - choco install python --version 3.8.0
      - python -m pip install --upgrade pip
     env: PATH=/c/Python38:/c/Python38/Scripts:$PATH DES_BACKEND=torch
-  - name: "Python 3.7.0 on Windows"
+  - name: "Python 3.7.0 on Windows with PyTorch"
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
      - choco install python --version 3.7.0
      - python -m pip install --upgrade pip
     env: PATH=/c/Python37:/c/Python37/Scripts:$PATH DES_BACKEND=torch
-  - name: "Python 3.6.0 on Windows"
+  - name: "Python 3.6.0 on Windows with PyTorch"
     os: windows           # Windows 10.0.17134 N/A Build 17134
     language: shell       # 'language: python' is an error on Travis CI Windows
     before_install:
@@ -98,11 +98,19 @@ install:
   - pip3 install -r requirements.txt
   - if [[ $TRAVIS_OS_NAME == windows ]]; then if [[ $PYAUDI_AVAILABLE == true ]]; then pip3 install pyaudi==1.6.5 numpy>=1.19 -U; fi; fi
   - if [[ $TRAVIS_OS_NAME == linux ]]; then if [[ $PYAUDI_AVAILABLE == true ]]; then pip3 install pyaudi>=1.9 numpy>=1.19 -U; fi; fi
-  - if [[ "$DES_BACKEND" == "torch" ]]; then pip3 install torch==1.5.1+cpu torchvision==0.6.1+cpu -f https://download.pytorch.org/whl/torch_stable.html; fi
+  - if [[ $DES_BACKEND == torch ]];
+    then if [[ $TRAVIS_OS_NAME == osx ]];
+      then pip3 install torch torchvision;
+      else pip3 install torch==1.5.1+cpu torchvision==0.6.1+cpu -f https://download.pytorch.org/whl/torch_stable.html;
+    fi; fi
   - pip3 install .
 
 # command to run tests
 script:
   - py.test --cov-report=xml --cov=desolver
+
+# command to upload coverage statistics
+after_success:
+  - pip install codecov
   - codecov
 
