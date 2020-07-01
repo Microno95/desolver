@@ -76,9 +76,9 @@ def test_gradients(ffmt, integrator_name):
         yi1 = D.array([1.0, 0.0], requires_grad=True).to(device)
         df = SimpleODE(k=1.0)
 
-        a = de.OdeSystem(df, yi1, t=(0, 1.), dt=0.0675, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
+        a = de.OdeSystem(df, yi1, t=(0, 0.2), dt=0.025, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
         a.set_method(integrator_name)
-        a.integrate(eta=False)
+        a.integrate(eta=True)
 
         dyfdyi = D.jacobian(a.y[-1], a.y[0])
         dyi = D.array([0.0, 1.0]).to(device) * D.epsilon() ** 0.5
@@ -87,9 +87,9 @@ def test_gradients(ffmt, integrator_name):
 
         print(a.y[-1].device)
 
-        b = de.OdeSystem(df, yi2, t=(0, 1.), dt=0.0675, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
+        b = de.OdeSystem(df, yi2, t=(0, 0.2), dt=0.025, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
         b.set_method(integrator_name)
-        b.integrate(eta=False)
+        b.integrate(eta=True)
 
         true_diff = b.y[-1] - a.y[-1]
 
