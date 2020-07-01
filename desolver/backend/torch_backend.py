@@ -291,48 +291,54 @@ def shape(x):
         return shape(asarray(x))
 
 
-def logical_not(a, out=None, where=None):
-    if where is None:
-        if a.is_cuda:
-            out = 1 - a
+def logical_not(a, out=None, where=True):
+    if where is None or (isinstance(where, type(True)) and where is True):
+        if out is not None:
+            torch.logical_not(a, out=out)
         else:
-            out = (1 - a.to(torch.uint8)).to(torch.bool)
+            out = torch.logical_not(a)
     else:
         if out is None:
-            out = a.clone()
-        if a.is_cuda:
-            out[where] = 1 - out[where]
-        else:
-            out[where] = (1 - out[where].to(torch.uint8)).to(torch.bool)
+            out = torch.zeros_like(a, dtype=torch.bool)
+        out[where] = torch.logical_not(a[where])
     return out
 
 
-def logical_or(a, b, out=None, where=None):
-    if where is None:
-        out = a | b
+def logical_or(a, b, out=None, where=True):
+    if where is None or (isinstance(where, type(True)) and where is True):
+        if out is not None:
+            torch.logical_or(a, b, out=out)
+        else:
+            out = torch.logical_or(a, b)
     else:
         if out is None:
-            out = a.clone()
+            out = torch.zeros_like(a, dtype=torch.bool)
         out[where] = a[where] | b[where]
     return out
 
 
-def logical_and(a, b, out=None, where=None):
-    if where is None:
-        out = a & b
+def logical_and(a, b, out=None, where=True):
+    if where is None or (isinstance(where, type(True)) and where is True):
+        if out is not None:
+            torch.logical_and(a, b, out=out)
+        else:
+            out = torch.logical_and(a, b)
     else:
         if out is None:
-            out = a.clone()
+            out = torch.zeros_like(a, dtype=torch.bool)
         out[where] = a[where] & b[where]
     return out
 
 
-def logical_xor(a, b, out=None, where=None):
-    if where is None:
-        out = a ^ b
+def logical_xor(a, b, out=None, where=True):
+    if where is None or (isinstance(where, type(True)) and where is True):
+        if out is not None:
+            torch.logical_xor(a, b, out=out)
+        else:
+            out = torch.logical_xor(a, b)
     else:
         if out is None:
-            out = a.clone()
+            out = torch.zeros_like(a, dtype=torch.bool)
         out[where] = a[where] ^ b[where]
     return out
 

@@ -324,12 +324,28 @@ def test_addcdiv_within_tolerance(ffmt):
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
+def test_addcdiv_error(ffmt):
+    D.set_float_fmt(ffmt)
+    pi = D.to_float(D.pi)
+    with pytest.raises((ValueError, TypeError)):
+        D.addcdiv(pi, value=1)
+
+
+@pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_addcdiv_within_tolerance_out(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
     out = D.array([pi])
     D.addcdiv(pi, D.to_float(3), D.to_float(2), value=1, out=out)
     assert (pi + (1 * (3 / 2)) - 2 * D.epsilon() <= out <= pi + (1 * (3 / 2)) + 2 * D.epsilon())
+
+
+@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+def test_addcmul_error(ffmt):
+    D.set_float_fmt(ffmt)
+    pi = D.to_float(D.pi)
+    with pytest.raises(ValueError):
+        D.addcmul(pi, value=1)
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
@@ -340,7 +356,15 @@ def test_addcmul_within_tolerance(ffmt):
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
-def test_addcmul_within_tolerance(ffmt):
+def test_addcmul_error(ffmt):
+    D.set_float_fmt(ffmt)
+    pi = D.to_float(D.pi)
+    with pytest.raises((ValueError, TypeError)):
+        D.addcmul(pi, value=1)
+
+
+@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+def test_addcmul_within_tolerance_out(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
     out = D.array([pi])
@@ -353,6 +377,13 @@ def test_softplus_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
     assert (pi + (1 * (3 * 2)) - 2 * D.epsilon() <= D.addcmul(pi, D.to_float(3), D.to_float(2), value=1) <= pi + (1 * (3 * 2)) + 2 * D.epsilon())
+
+
+@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+def test_equal(ffmt):
+    D.set_float_fmt(ffmt)
+    a = D.array([[[1.0, 2.0, 3.0], [2.0, 5.0, 8.0]], [[1.0, -2.0, 3.0], [12.0, 5.0, -8.0]]])
+    assert(D.equal(a, a))
 
 
 @pytest.mark.parametrize('ffmt', list(i for i in D.available_float_fmt() if not i.startswith('gdual')))
@@ -492,6 +523,139 @@ def test_square_within_tolerance_out(ffmt):
     out = D.array(pi)
     D.square(pi, out=out)
     assert(9.8696044010893586188 - 2*D.epsilon() <= out <= 9.8696044010893586188 + 2*D.epsilon())
+
+
+def test_logical_not():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    ref = D.array([False, True, True, False], dtype=D.bool)
+    assert (D.all(D.logical_not(a) == ref))
+
+
+def test_logical_not_out():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    ref = D.array([False, True, True, False], dtype=D.bool)
+    out = D.zeros_like(a, dtype=D.bool)
+    D.logical_not(a, out=out)
+    assert (D.all(out == ref))
+
+
+def test_logical_not_where():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    ref = D.array([False, False, False, False], dtype=D.bool)
+    where = D.array([True, False, False, True], dtype=D.bool)
+    assert (D.all(D.logical_not(a, where=where)[where] == ref[where]))
+
+
+def test_logical_not_out_where():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    ref = D.array([False, False, False, False], dtype=D.bool)
+    out = D.zeros_like(a, dtype=D.bool)
+    where = D.array([True, False, False, True], dtype=D.bool)
+    D.logical_not(a, out=out, where=where)
+    assert (D.all(out[where] == ref[where]))
+
+
+def test_logical_or():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([True, False, True, True], dtype=D.bool)
+    assert (D.all(D.logical_or(a, b) == ref))
+
+
+def test_logical_or_out():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([True, False, True, True], dtype=D.bool)
+    out = D.zeros_like(a, dtype=D.bool)
+    D.logical_or(a, b, out=out)
+    assert (D.all(out == ref))
+
+
+def test_logical_or_where():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([True, False, True, True], dtype=D.bool)
+    where = D.array([True, False, False, True], dtype=D.bool)
+    assert (D.all(D.logical_or(a, b, where=where)[where] == ref[where]))
+
+
+def test_logical_or_out_where():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([True, False, True, True], dtype=D.bool)
+    out = D.zeros_like(a, dtype=D.bool)
+    where = D.array([True, False, False, True], dtype=D.bool)
+    D.logical_or(a, b, out=out, where=where)
+    assert (D.all(out[where] == ref[where]))
+
+
+def test_logical_and():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([False, False, False, True], dtype=D.bool)
+    assert (D.all(D.logical_and(a, b) == ref))
+
+
+def test_logical_and_out():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([False, False, False, True], dtype=D.bool)
+    out = D.zeros_like(a, dtype=D.bool)
+    D.logical_and(a, b, out=out)
+    assert (D.all(out == ref))
+
+
+def test_logical_and_where():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([False, False, False, True], dtype=D.bool)
+    where = D.array([True, False, False, True], dtype=D.bool)
+    assert (D.all(D.logical_and(a, b, where=where)[where] == ref[where]))
+
+
+def test_logical_and_out_where():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([False, False, False, True], dtype=D.bool)
+    out = D.zeros_like(a, dtype=D.bool)
+    where = D.array([True, False, False, True], dtype=D.bool)
+    D.logical_and(a, b, out=out, where=where)
+    assert (D.all(out[where] == ref[where]))
+
+
+def test_logical_xor():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([True, False, True, False], dtype=D.bool)
+    assert (D.all(D.logical_xor(a, b) == ref))
+
+
+def test_logical_xor_out():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([True, False, True, False], dtype=D.bool)
+    out = D.zeros_like(a, dtype=D.bool)
+    D.logical_xor(a, b, out=out)
+    assert (D.all(out == ref))
+
+
+def test_logical_xor_where():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([True, False, True, False], dtype=D.bool)
+    where = D.array([True, False, False, True], dtype=D.bool)
+    assert (D.all(D.logical_xor(a, b, where=where)[where] == ref[where]))
+
+
+def test_logical_xor_out_where():
+    a = D.array([True, False, False, True], dtype=D.bool)
+    b = D.array([False, False, True, True], dtype=D.bool)
+    ref = D.array([True, False, True, False], dtype=D.bool)
+    out = D.zeros_like(a, dtype=D.bool)
+    where = D.array([True, False, False, True], dtype=D.bool)
+    D.logical_xor(a, b, out=out, where=where)
+    assert (D.all(out[where] == ref[where]))
+
 
 
 @pytest.mark.skipif(D.backend() == 'numpy', reason="Numpy is Reference")

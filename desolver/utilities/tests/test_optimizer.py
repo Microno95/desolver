@@ -46,6 +46,7 @@ def test_brentsrootvec(ffmt):
 
     if ffmt == 'gdual_vdouble':
         return
+    
     for _ in range(10):
         slope_list = D.array(np.copysign(np.random.uniform(0.9, 1.1, size=25), np.random.uniform(-1, 1, size=25)))
         intercept_list = slope_list
