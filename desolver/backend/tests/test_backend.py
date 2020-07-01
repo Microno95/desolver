@@ -121,49 +121,49 @@ def test_tan_within_tolerance(ffmt):
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_acos_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
-    assert (D.acos(D.to_float(1)) == 0)
+    assert (D.abs(D.acos(D.to_float(1))) <= 2*D.epsilon())
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_asin_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
     ref = D.to_float(D.pi / 2)
-    assert (D.asin(D.to_float(1)) == ref)
+    assert (D.abs(D.asin(D.to_float(1)) - ref) <= 2*D.epsilon())
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_atan_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
     ref = D.to_float(D.pi / 4)
-    assert (D.atan(D.to_float(1)) == ref)
+    assert (D.abs(D.atan(D.to_float(1)) - ref) <= 2*D.epsilon())
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_atan2_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
     ref = D.to_float(D.pi / 4)
-    assert (D.atan2(D.to_float(1), D.to_float(1)) == ref)
+    assert (D.abs(D.atan2(D.to_float(1), D.to_float(1)) - ref) <= 2*D.epsilon())
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_cosh_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
-    assert (D.cosh(pi) == np.cosh(pi))
+    assert (D.abs(D.cosh(pi) - np.cosh(pi)) <= 2*D.epsilon())
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_sinh_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
-    assert (D.sinh(pi) == np.sinh(pi))
+    assert (D.abs(D.sinh(pi) - np.sinh(pi)) <= 2*D.epsilon())
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 def test_tanh_within_tolerance(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
-    assert (D.tanh(pi) == np.tanh(pi))
+    assert (D.abs(D.tanh(pi) - np.tanh(pi)) <= 2*D.epsilon())
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
