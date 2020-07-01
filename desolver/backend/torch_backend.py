@@ -12,8 +12,8 @@ int32 = torch.int32
 int64 = torch.int64
 
 float_fmts.update({
-    'float32': 'float32',
-    'float64': 'float64'
+    'float32': float32,
+    'float64': float64
 })
 
 
@@ -115,7 +115,8 @@ sigmoid = torch.sigmoid
 
 def softplus(x, out=None):
     if out is not None:
-        out.data = log(1 + exp(x))
+        exp(x, out=out)
+        log(1 + out, out=out)
         return out
     else:
         return log(1 + exp(x))
@@ -124,7 +125,7 @@ def softplus(x, out=None):
 # Additional Math Definitions
 def square(x, out=None):
     if out is not None:
-        out.data = x ** 2
+        pow(x, 2, out=out)
         return out
     else:
         return x ** 2
@@ -189,10 +190,10 @@ def eye(N, M=None, out=None, dtype=None):
             return torch.eye(N, m=M, dtype=dtype)
     else:
         if M is None:
-            out.data = torch.eye(N, dtype=dtype)
+            torch.eye(N, dtype=dtype, out=out)
         else:
-            out.data = torch.eye(N, m=M, dtype=dtype)
-    return out
+            torch.eye(N, m=M, dtype=dtype, out=out)
+        return out
 
 
 # Reduction Ops

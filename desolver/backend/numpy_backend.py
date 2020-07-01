@@ -104,6 +104,10 @@ def rsqrt(x, out=None):
     return pow(x, -0.5, out=out)
 
 
+def square(x, out=None):
+    return pow(x, 2, out=out)
+
+
 def addcdiv(x, y1=None, y2=None, value=1, out=None):
     if y1 is None or y2 is None:
         raise ValueError("y1 and y2 must both be specified")
@@ -134,7 +138,7 @@ def frac(x, out=None):
     if out is None:
         return x - floor(x)
     floor(x, out=out)
-    sub(x, out=out)
+    sub(x, out, out=out)
     return out
 
 
@@ -179,7 +183,10 @@ norm = numpy.linalg.norm
 
 
 def dist(x, y, ord=2):
-    return numpy.linalg.norm(x - y, ord=ord)
+    if asarray(x).dtype == float16 or asarray(y).dtype == float16:
+        return numpy.linalg.norm(asarray(x).astype(float64) - asarray(y).astype(float64), ord=ord).astype(float16)
+    else:
+        return numpy.linalg.norm(x - y, ord=ord)
 
 
 # Comparison Ops
