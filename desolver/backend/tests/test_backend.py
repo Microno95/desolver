@@ -8,7 +8,7 @@ import desolver.backend as D
 def test_contract_first_ndims_reverse_order():
     a = D.array([1.0, 2.0])
     b = D.array([[1.0, 2.0], [2.0, 3.0]])
-    D.contract_first_ndims(a, b, n=1)
+    D.contract_first_ndims(b, a, n=1)
 
 
 def test_contract_first_ndims_shape_too_small():
