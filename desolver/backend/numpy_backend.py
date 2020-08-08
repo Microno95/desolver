@@ -215,6 +215,7 @@ all = numpy.all
 
 array = type_reg(numpy.array)
 zeros = type_reg(numpy.zeros)
+ones  = type_reg(numpy.ones)
 empty = type_reg(numpy.empty)
 full = type_reg(numpy.full)
 zeros_like = type_reg(numpy.zeros_like)

@@ -252,6 +252,7 @@ all = torch.all
 
 array = type_reg(torch.tensor)
 zeros = type_reg(torch.zeros)
+ones  = type_reg(torch.ones)
 empty = type_reg(torch.empty)
 full = type_reg(torch.full)
 zeros_like = type_reg(torch.zeros_like)
