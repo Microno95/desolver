@@ -299,7 +299,7 @@ class OdeSystem(object):
         self.sol            = None
             
         self.__move_to_device()
-        self.__allocate_soln_space(10)
+        self.__allocate_soln_space(self.__alloc_space_steps(self.tf))
         self.__fix_dt_dir(self.tf, self.t0)
         self.__events       = []
         self.initialise_integrator()
@@ -496,15 +496,32 @@ class OdeSystem(object):
             except:
                 raise
         return
+    
+    def __alloc_space_steps(self, tf):
+        """Returns the number of steps to allocate for a given final integration time
+        
+        Returns
+        -------
+        int
+            integer number of steps to allocate in the solution arrays of y and t. Defaults to 10 if the final time is set to infinity.
+        """
+        if D.to_numpy(tf) == np.inf:
+            return 10
+        else:
+            return int((tf - self.__t[self.counter])/self.dt)
         
     def __allocate_soln_space(self, num_units):
-        if num_units != 0:
-            if D.backend() in ['numpy', 'pyaudi']:
-                self.__y  = D.concatenate([self.__y, D.zeros((num_units, ) + D.shape(self.__y[0]), dtype=self.__y[0].dtype)], axis=0)
-                self.__t  = D.concatenate([self.__t, D.zeros((num_units, ) + D.shape(self.__t[0]), dtype=self.__y[0].dtype)], axis=0)
-            else:
-                self.__y  = self.__y + [None for _ in range(num_units)]
-                self.__t  = self.__t + [None for _ in range(num_units)]
+        try:
+            if num_units != 0:
+                if D.backend() in ['numpy', 'pyaudi']:
+                    self.__y  = D.concatenate([self.__y, D.zeros((num_units, ) + D.shape(self.__y[0]), dtype=self.__y[0].dtype)], axis=0)
+                    self.__t  = D.concatenate([self.__t, D.zeros((num_units, ) + D.shape(self.__t[0]), dtype=self.__y[0].dtype)], axis=0)
+                else:
+                    self.__y  = self.__y + [None for _ in range(num_units)]
+                    self.__t  = self.__t + [None for _ in range(num_units)]
+        except MemoryError as E:
+            deutil.warning("Final tf ({}) too large, space allocation failed with MemoryError:\n{}".format(self.tf, E))
+            self.__allocate_soln_space(100)
     
     def __trim_soln_space(self):
         self.__y = self.__y[:self.counter+1]
@@ -607,7 +624,7 @@ class OdeSystem(object):
                     self.equ_rhs(self.__t[self.counter-1], self.__y[self.counter-1], **self.constants),
                     self.equ_rhs(self.__t[self.counter], self.__y[self.counter], **self.constants)
                 )
-
+    
     def integration_status(self):
         """Returns the integration status as a human-readable string.
 
@@ -694,16 +711,23 @@ class OdeSystem(object):
         if D.abs(tf - self.t[-1]) < D.epsilon():
             return
         steps  = 0
+            
+        events, is_terminal, direction = prepare_events(events)
+        
+        if D.to_numpy(tf) == np.inf and not any(is_terminal):
+            deutil.warning("Specifying an indefinite integration time with no terminal events will lead to memory issues.")
         
         self.__fix_dt_dir(tf, self.t[-1])
 
         if D.abs(self.dt) > D.abs(tf - self.t[-1]):
             self.dt = D.abs(tf - self.t[-1])*0.5
 
-        total_steps = int((tf-self.t[-1])/self.dt)
+        total_steps = self.__alloc_space_steps(tf)
+        
+        print(total_steps)
         
         if eta:
-            tqdm_progress_bar = tqdm(total=9e9)
+            tqdm_progress_bar = tqdm(total=total_steps)
         else:
             tqdm_progress_bar = None
             
@@ -715,12 +739,10 @@ class OdeSystem(object):
             else:
                 callback = [callback]
             
-        events, is_terminal, direction = prepare_events(events)
-            
         end_int = False
         self.equ_rhs.nfev = 0 if self.int_status == 1 else self.equ_rhs.nfev
         cState  = D.zeros_like(self.__y[self.counter])
-        cTime   = D.zeros_like(self.__t[self.counter])
+        cTime   = D.zeros_like(self.__t[self.counter])        
         self.__allocate_soln_space(total_steps)
         try:
             while self.dt != 0 and D.abs(tf - self.__t[self.counter]) > 4 * D.epsilon() and not end_int:
@@ -729,7 +751,7 @@ class OdeSystem(object):
                 self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter], self.constants, timestep=self.dt)
                 
                 if self.counter+1 >= len(self.__y):
-                    total_steps = int((tf-self.__t[self.counter]-dTime)/self.dt) + 1
+                    total_steps = self.__alloc_space_steps(tf - dTime) + 1
                     self.__allocate_soln_space(total_steps)
 
                 #
@@ -755,7 +777,7 @@ class OdeSystem(object):
                         active_events, roots, end_int = handle_events(tsol, events, self.constants, direction, is_terminal)
 
                         if self.counter+len(roots)+1 >= len(self.__y):
-                            total_steps = max(int(abs((tf-self.__t[self.counter]-dTime)/self.dt)), 2) + len(roots)
+                            total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
                             self.__allocate_soln_space(total_steps)
 
                         prev_time = self.__t[self.counter - 1]
@@ -782,7 +804,11 @@ class OdeSystem(object):
                         self.sol.add_interpolant(self.__t[self.counter], tsol)
 
                 if tqdm_progress_bar is not None:
-                    tqdm_progress_bar.total = tqdm_progress_bar.n + int(abs((tf - self.__t[self.counter]) / self.dt))
+                    tqdm_progress_bar.total = tqdm_progress_bar.n
+                    if D.to_numpy(tf) == np.inf:
+                        tqdm_progress_bar.total = None
+                    else:
+                        tqdm_progress_bar.total = tqdm_progress_bar.n + total_steps
                     tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.__t[self.counter], tf, self.dt).ljust(8)
                     tqdm_progress_bar.update()
 
