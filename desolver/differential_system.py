@@ -508,7 +508,7 @@ class OdeSystem(object):
         if D.to_numpy(tf) == np.inf:
             return 10
         else:
-            return int((tf - self.__t[self.counter])/self.dt)
+            return max(1, min(5000, int((tf - self.__t[self.counter])/self.dt)))
         
     def __allocate_soln_space(self, num_units):
         try:
