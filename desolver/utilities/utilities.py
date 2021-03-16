@@ -80,9 +80,9 @@ class JacobianWrapper(object):
             return jacobian_y[0,0]
         return jacobian_y
     
-    def richardson(self, y, dy=1e-1, factor=2, **kwargs):
-        A       = [[self.estimate(y, dy=dy * D.pow(factor, -float(m)), **kwargs)] for m in range(self.richardson_iter)]
-        denom  = D.pow(1.0*factor, self.base_order)
+    def richardson(self, y, dy=1e-1, factor=2.0, **kwargs):
+        A       = [[self.estimate(y, dy=dy * (factor**-m), **kwargs)] for m in range(self.richardson_iter)]
+        denom  = factor**self.base_order
         for m in range(1, self.richardson_iter):
             for n in range(1, m):
                 A[m].append(A[m][n-1] + (A[m][n-1] - A[m-1][n-1]) / (denom**n - 1))
