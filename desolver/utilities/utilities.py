@@ -1,12 +1,125 @@
 import time
 import sys
+import numpy
+from .. import backend as D
 
 __all__ = [
+    'JacobianWrapper',
     'convert_suffix',
     'warning',
     'search_bisection',
     'BlockTimer'
 ]
+
+class JacobianWrapper(object):
+    """
+    A wrapper class that uses Richardson Extrapolation and 4th order finite differences to compute the jacobian of a given callable function.
+    
+    The Jacobian is computed using up to 16 richardson iterations which translates to a maximum order of 4+16 for the gradients with respect to Δx as Δx->0. The evalaution is adaptive so within the given tolerances, the evaluation will exit early in order to minimise computation so gradients can be calculated with controllable precision.
+    
+    Attributes
+    ----------
+    rhs : Callable of the form f(x)->D.array of arbitrary shape
+        A callable function that 
+        
+    base_order : int
+        The order of the underlying finite difference gradient estimate, this can be evaluated at different step sizes using the `estimate` method.
+        
+    richardson_iter : int
+        The maximum number of richardson iterations to use for estimating gradients. In most cases, less than 16 should be enough, and if you start needing more than 16, it might be worth considering that finite differences are inappropriate.
+        
+    order : int
+        Maximum order of the gradient estimate
+    
+    adaptive : bool
+        Whether to use adaptive evaluation of the richardson extrapolation or to run for the full 16 iterations.
+        
+    atol, rtol : float
+        Absolute and relative tolerances for the adaptive gradient extrapolation
+        
+    flat : bool
+        If set to True, the gradients will be returned as a ravelled array (ie. jacobian.shape = (-1,))
+        If set to False, the shape will be (*x.shape, *f(x).shape). When x and f(x) are vector valued of length n and m respectively, the gradient will have the shape (n,m) as expected of the Jacobian of f(x).
+    
+    """
+    def __init__(self, rhs, richardson_iter=16, adaptive=True, flat=False, atol=None, rtol=None):
+        self.rhs        = rhs
+        self.base_order = 4
+        self.richardson_iter = richardson_iter
+        self.order      = self.base_order + self.richardson_iter
+        self.adaptive   = adaptive
+        self.atol       = 4*D.epsilon() if atol is None else atol
+        self.rtol       = 4*D.epsilon() if rtol is None else rtol
+        self.flat       = flat
+        
+    
+    def estimate(self, y, dy=1e-8, **kwargs):
+        unravelled_y  = D.reshape(y, (-1,))
+        dy_val        = self.rhs(y, **kwargs)
+        unravelled_dy = D.reshape(dy_val, (-1,))
+        jacobian_y    = D.zeros((*unravelled_y.shape, *unravelled_dy.shape), dtype=unravelled_dy.dtype)
+        for idx,val in enumerate(unravelled_y):
+            y_jac = D.copy(unravelled_y)
+            dy_cur = dy
+            if not self.adaptive and (D.abs(y_jac[idx]) > 1.0 or dy_cur > D.abs(y_jac[idx]) > 0.0):
+                dy_cur *= y_jac[idx]
+
+            # 1*f[i-2]-8*f[i-1]+0*f[i+0]+8*f[i+1]-1*f[i+2]
+            y_jac[idx] = val + 2*dy_cur
+            jacobian_y[idx]  = -D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+            y_jac[idx] = val + dy_cur
+            jacobian_y[idx] += 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+            y_jac[idx] = val - 2*dy_cur
+            jacobian_y[idx] += D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+            y_jac[idx] = val - dy_cur
+            jacobian_y[idx] -= 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+
+            jacobian_y[idx] = jacobian_y[idx] / (12*dy_cur)
+        
+        if D.shape(jacobian_y) == (1,1):
+            return jacobian_y[0,0]
+        return jacobian_y
+    
+    def richardson(self, y, dy=1e-1, factor=2, **kwargs):
+        A       = [[self.estimate(y, dy=dy * D.pow(factor, -float(m)), **kwargs)] for m in range(self.richardson_iter)]
+        denom  = D.pow(1.0*factor, self.base_order)
+        for m in range(1, self.richardson_iter):
+            for n in range(1, m):
+                A[m].append(A[m][n-1] + (A[m][n-1] - A[m-1][n-1]) / (denom**n - 1))
+        return A[-1][-1]
+    
+    def adaptive_richardson(self, y, dy=0.5, factor=2, **kwargs):
+        A       = [[self.estimate(y, dy=dy, **kwargs)]]
+        factor = 1.0*factor
+        denom  = factor**self.base_order
+        prev_error = numpy.inf
+        for m in range(1, self.richardson_iter):
+            A.append([self.estimate(y, dy=dy * (factor**(-m)), **kwargs)])
+            for n in range(1, m+1):
+                A[m].append(A[m][n-1] + (A[m][n-1] - A[m-1][n-1]) / (denom**n - 1))
+            if m >= 3:
+                prev_error, t_conv = self.check_converged(A[-1][-1], A[-1][-1] - A[-2][-1], prev_error)
+                if t_conv:
+                    break
+        return A[-2][-1]
+
+    def check_converged(self, initial_state, diff, prev_error):
+        err_estimate = D.max(D.abs(D.to_float(diff)))
+        relerr = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state)))
+        if err_estimate > relerr and err_estimate <= prev_error:
+            return err_estimate, False
+        else:
+            return err_estimate, True
+    
+    def __call__(self, y, **kwargs):
+        if self.richardson_iter > 0:
+            if self.adaptive:
+                out = self.adaptive_richardson(y, **kwargs)
+            else:
+                out = self.richardson(y, **kwargs)
+        else:
+            out = self.estimate(y, **kwargs)
+        return out
 
 def convert_suffix(value, suffixes=('d', 'h', 'm', 's'), ratios=(24, 60, 60), delimiter=':'):
     """Converts a base value into a human readable format with the given suffixes and ratios.
