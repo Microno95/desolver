@@ -33,7 +33,9 @@ def test_jacobian_wrapper_exact(ffmt):
     drhs_exact = lambda x: -D.exp(-x)
     jac_rhs = de.utilities.JacobianWrapper(rhs, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
     
-    assert (D.allclose(drhs_exact(0.0), jac_rhs(0.0), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
+    x = D.array(0.0)
+    
+    assert (D.allclose(drhs_exact(x), jac_rhs(x), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
         
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
@@ -43,7 +45,9 @@ def test_jacobian_wrapper_no_adaptive(ffmt):
     drhs_exact = lambda x: -D.exp(-x)
     jac_rhs = de.utilities.JacobianWrapper(rhs, richardson_iter=4, adaptive=False, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
     
-    assert (D.allclose(drhs_exact(0.0), jac_rhs(0.0), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
+    x = D.array(0.0)
+    
+    assert (D.allclose(drhs_exact(x), jac_rhs(x), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
         
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
@@ -52,7 +56,9 @@ def test_jacobian_wrapper_calls_estimate(ffmt):
     rhs     = lambda x: D.exp(-x)
     jac_rhs = de.utilities.JacobianWrapper(rhs, richardson_iter=0, adaptive=False, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
     
-    assert (D.allclose(jac_rhs.estimate(0.0), jac_rhs(0.0), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
+    x = D.array(0.0)
+    
+    assert (D.allclose(jac_rhs.estimate(x), jac_rhs(x), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
 
     
 def test_blocktimer():
@@ -73,7 +79,3 @@ def test_blocktimer():
         test.restart_timer()
         assert (test.end_time is None)
         assert (test.stopped == False)
-
-
-if __name__ == "__main__":
-    np.testing.run_module_suite()
