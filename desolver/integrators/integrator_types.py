@@ -1,9 +1,10 @@
-from .integrator_template import IntegratorTemplate
+from .integrator_template import IntegratorTemplate, RichardsonIntegratorTemplate
 from .. import backend as D
 
 __all__ = [
     'ExplicitRungeKuttaIntegrator',
-    'ExplicitSymplecticIntegrator'
+    'ExplicitSymplecticIntegrator',
+    'generate_richardson_integrator'
 ]
 
 class ExplicitRungeKuttaIntegrator(IntegratorTemplate):
@@ -80,7 +81,7 @@ class ExplicitRungeKuttaIntegrator(IntegratorTemplate):
                 
                            
             self.dState = D.sum(self.final_state[0][tableau_idx_expand] * aux, axis=0)
-            self.dTime  = timestep
+            self.dTime  = D.copy(timestep)
             
             if self.adaptive:
                 diff = self.get_error_estimate(self.dState, self.dTime, aux, tableau_idx_expand)
@@ -179,9 +180,9 @@ class ExplicitSymplecticIntegrator(IntegratorTemplate):
                 current_time = current_time + timestep * self.tableau[stage, 0]
                 self.dState += aux * self.tableau[stage, 1] * msk + aux * self.tableau[stage, 2] * nmsk
                 
-            self.dTime = timestep
+            self.dTime = D.copy(timestep)
             
-            return timestep, (self.dTime, self.dState)
+            return self.dTime, (self.dTime, self.dState)
         
     def dense_output(self, rhs, initial_time, initial_state, constants):
         return CubicHermiteInterp(
@@ -194,3 +195,68 @@ class ExplicitSymplecticIntegrator(IntegratorTemplate):
         )
 
     __call__ = forward
+    
+def generate_richardson_integrator(basis_integrator):
+    """
+    A function for generating an integrator that uses local Richardson Extrapolation to find the change in state ΔY over a timestep h by estimating lim ΔY as h->0.
+    
+    Takes any integrator as input and returns a specialisation of the RichardsonExtrapolatedIntegrator class that uses basis_integrator as the underlying integration mechanism.
+    
+    Parameters
+    ----------
+    basis_integrator : A subclass of IntegratorTemplate or a class that implements the methods and attributes of IntegratorTemplate.
+
+    Returns
+    -------
+    RichardsonExtrapolatedIntegrator
+        returns the Richardson Extrapolated specialisation of basis_integrator
+    """
+    class RichardsonExtrapolatedIntegrator(RichardsonIntegratorTemplate):
+        __alt_names__ = ("Local Richardson Extrapolation of {}".format(basis_integrator.__name__),)
+        __symplectic__ = basis_integrator.__symplectic__
+        __adaptive__   = True
+
+        def __init__(self, sys_dim, richardson_iter=8, **kwargs):
+            self.richardson_iter      = richardson_iter
+            self.basis_integrators = [basis_integrator(sys_dim, **kwargs) for _ in range(self.richardson_iter)]
+            for integrator in self.basis_integrators:
+                integrator.adaptive = False
+            self.basis_order       = basis_integrator.order
+            self.order             = self.basis_order + 3
+            self.dim               = sys_dim
+            self.rtol              = kwargs.get('rtol', 1e-3)
+            self.atol              = kwargs.get('atol', 1e-3)
+            self.adaptive          = not basis_integrator.__symplectic__
+            self.aux               = D.zeros((self.richardson_iter, self.richardson_iter) + self.dim)
+            self.dtype             = kwargs.get('dtype')
+            self.device            = kwargs.get('device')
+            if 'staggered_mask' in kwargs:
+                if kwargs['staggered_mask'] is None:
+                    staggered_mask      = D.arange(sys_dim[0]//2, sys_dim[0], dtype=D.int64)
+                    self.staggered_mask = D.zeros(sys_dim, dtype=D.bool)
+                    self.staggered_mask[staggered_mask] = 1
+                else:
+                    self.staggered_mask = D.to_type(kwargs['staggered_mask'], D.bool)
+
+            if self.dtype is not None:
+                if D.backend() == 'torch':
+                    self.aux = self.aux.to(self.dtype)
+                else:
+                    self.aux = self.aux.astype(self.dtype)
+
+            if D.backend() == 'torch':
+                self.aux         = self.aux.to(self.device)
+        
+        def dense_output(self, rhs, initial_time, initial_state, constants):
+            return CubicHermiteInterp(
+                initial_time, 
+                initial_time + self.dTime, 
+                initial_state, 
+                initial_state + self.dState,
+                rhs(initial_time, initial_state, **constants),
+                rhs(initial_time + self.dTime, initial_state + self.dState, **constants)
+            )
+    
+    RichardsonExtrapolatedIntegrator.__name__ = RichardsonExtrapolatedIntegrator.__qualname__ = "RichardsonExtrapolated_{}_Integrator".format(basis_integrator.__name__)
+    
+    return RichardsonExtrapolatedIntegrator
