@@ -259,6 +259,8 @@ def logical_and(a, b, out=None, where=True):
 def logical_xor(a, b, out=None, where=True):
     return numpy.logical_xor(a, b, out=out, where=where)
 
-
 nonzero = numpy.nonzero
 argsort = numpy.argsort
+
+def solve_linear_system(A,b):
+    return numpy.linalg.solve(A,b)

@@ -453,3 +453,6 @@ def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True):
     if nu > 1:
         temp = jacobian(temp, in_tensor, create_graph=create_graph, nu=nu - 1, batch_mode=batch_mode)
     return temp
+
+def solve_linear_system(A,b):
+    return torch.solve(b,A).solution
