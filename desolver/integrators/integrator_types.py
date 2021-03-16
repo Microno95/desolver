@@ -7,7 +7,26 @@ __all__ = [
     'generate_richardson_integrator'
 ]
 
-class ExplicitRungeKuttaIntegrator(IntegratorTemplate):
+class ExplicitIntegrator(IntegratorTemplate):
+    def __init__(self, sys_dim, aux_shape, adaptive, dtype=None, rtol=None, atol=None):
+        self.dim        = sys_dim
+        self.rtol       = rtol
+        self.atol       = atol
+        self.adaptive   = adaptive
+        self.dtype      = dtype
+        self.aux        = D.zeros(aux_shape + self.dim, dtype=self.dtype)
+        
+    def dense_output(self, rhs, initial_time, initial_state):
+        return CubicHermiteInterp(
+            initial_time, 
+            initial_time + self.dTime, 
+            initial_state, 
+            initial_state + self.dState,
+            rhs(initial_time, initial_state),
+            rhs(initial_time + self.dTime, initial_state + self.dState)
+        )
+
+class ExplicitRungeKuttaIntegrator(ExplicitIntegrator):
     """
     A base class for all explicit Runge-Kutta methods with a lower triangular Butcher Tableau.
 
@@ -43,19 +62,13 @@ class ExplicitRungeKuttaIntegrator(IntegratorTemplate):
     __symplectic__ = False
 
     def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
+        super().__init__(sys_dim, (D.shape(self.tableau)[0],), D.shape(self.final_state)[0] == 2, dtype, rtol, atol)
         if dtype is None:
             self.tableau     = D.array(self.tableau)
             self.final_state = D.array(self.final_state)
         else:
             self.tableau     = D.to_type(self.tableau, dtype)
             self.final_state = D.to_type(self.final_state, dtype)
-            
-        self.dim        = sys_dim
-        self.rtol       = rtol
-        self.atol       = atol
-        self.adaptive   = D.shape(self.final_state)[0] == 2
-        self.num_stages = D.shape(self.tableau)[0]
-        self.aux        = D.zeros((self.num_stages, ) + self.dim)
         
         if dtype is not None:
             if D.backend() == 'torch':
@@ -72,19 +85,18 @@ class ExplicitRungeKuttaIntegrator(IntegratorTemplate):
         if self.tableau is None:
             raise NotImplementedError("In order to use the fixed step integrator, subclass this class and populate the butcher tableau")
         else:
-            aux = self.aux
-            tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (aux.ndim - 1))
+            tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (self.aux.ndim - 1))
 
-            for stage in range(self.num_stages):
-                current_state = initial_state    + D.sum(self.tableau[stage][tableau_idx_expand] * aux, axis=0)
-                aux[stage]    = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
+            for stage in range(D.shape(self.aux)[0]):
+                current_state   = initial_state    + D.sum(self.tableau[stage][tableau_idx_expand] * self.aux, axis=0)
+                self.aux[stage] = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
                 
                            
-            self.dState = D.sum(self.final_state[0][tableau_idx_expand] * aux, axis=0)
+            self.dState = D.sum(self.final_state[0][tableau_idx_expand] * self.aux, axis=0)
             self.dTime  = D.copy(timestep)
             
             if self.adaptive:
-                diff = self.get_error_estimate(self.dState, self.dTime, aux, tableau_idx_expand)
+                diff = self.get_error_estimate(self.dState, self.dTime, self.aux, tableau_idx_expand)
                 timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, timestep)
                 if redo_step:
                     timestep, (self.dTime, self.dState) = self(rhs, initial_time, initial_state, constants, timestep)
@@ -93,20 +105,10 @@ class ExplicitRungeKuttaIntegrator(IntegratorTemplate):
         
     def get_error_estimate(self, dState, dTime, aux, tableau_idx_expand):
         return dState - D.sum(self.final_state[1][tableau_idx_expand] * aux, axis=0)
-        
-    def dense_output(self, rhs, initial_time, initial_state):
-        return CubicHermiteInterp(
-            initial_time, 
-            initial_time + self.dTime, 
-            initial_state, 
-            initial_state + self.dState,
-            rhs(initial_time, initial_state),
-            rhs(initial_time + self.dTime, initial_state + self.dState)
-        )
 
     __call__ = forward
 
-class ExplicitSymplecticIntegrator(IntegratorTemplate):
+class ExplicitSymplecticIntegrator(ExplicitIntegrator):
     """
     A base class for all symplectic numerical integration methods.
 
@@ -139,6 +141,7 @@ class ExplicitSymplecticIntegrator(IntegratorTemplate):
     __symplectic__ = True
 
     def __init__(self, sys_dim, dtype=None, staggered_mask=None, rtol=None, atol=None, device=None):
+        super().__init__(sys_dim, (D.shape(self.tableau)[0],), False, dtype, rtol, atol)
         if staggered_mask is None:
             staggered_mask      = D.arange(sys_dim[0]//2, sys_dim[0], dtype=D.int64)
             self.staggered_mask = D.zeros(sys_dim, dtype=D.bool)
@@ -150,12 +153,7 @@ class ExplicitSymplecticIntegrator(IntegratorTemplate):
             self.tableau     = D.array(self.tableau)
         else:
             self.tableau     = D.to_type(self.tableau, dtype)
-
-        self.dim        = sys_dim
-        self.rtol       = rtol
-        self.atol       = atol
-        self.adaptive   = False
-        self.num_stages = D.shape(self.tableau)[0]
+            
         self.msk  = self.staggered_mask
         self.nmsk = D.logical_not(self.staggered_mask)
         
@@ -175,7 +173,7 @@ class ExplicitSymplecticIntegrator(IntegratorTemplate):
             current_state = D.copy(initial_state)
             self.dState   = D.zeros_like(current_state)
 
-            for stage in range(self.num_stages):
+            for stage in range(D.shape(self.tableau)[0]):
                 aux          = rhs(current_time, initial_state + self.dState, **constants) * timestep
                 current_time = current_time + timestep * self.tableau[stage, 0]
                 self.dState += aux * self.tableau[stage, 1] * msk + aux * self.tableau[stage, 2] * nmsk
@@ -184,16 +182,6 @@ class ExplicitSymplecticIntegrator(IntegratorTemplate):
             
             return self.dTime, (self.dTime, self.dState)
         
-    def dense_output(self, rhs, initial_time, initial_state, constants):
-        return CubicHermiteInterp(
-            initial_time, 
-            initial_time + self.dTime, 
-            initial_state, 
-            initial_state + self.dState,
-            rhs(initial_time, initial_state, **constants),
-            rhs(initial_time + self.dTime, initial_state + self.dState, **constants)
-        )
-
     __call__ = forward
     
 def generate_richardson_integrator(basis_integrator):
@@ -211,24 +199,23 @@ def generate_richardson_integrator(basis_integrator):
     RichardsonExtrapolatedIntegrator
         returns the Richardson Extrapolated specialisation of basis_integrator
     """
-    class RichardsonExtrapolatedIntegrator(RichardsonIntegratorTemplate):
+    if issubclass(basis_integrator, ExplicitIntegrator):
+        first_base = ExplicitIntegrator
+    else:
+        first_base = IntegratorTemplate
+    class RichardsonExtrapolatedIntegrator(first_base, RichardsonIntegratorTemplate):
         __alt_names__ = ("Local Richardson Extrapolation of {}".format(basis_integrator.__name__),)
         __symplectic__ = basis_integrator.__symplectic__
         __adaptive__   = True
 
         def __init__(self, sys_dim, richardson_iter=8, **kwargs):
+            super().__init__(sys_dim, (richardson_iter, richardson_iter), True, kwargs.get('dtype'), kwargs.get('rtol', 1e-3), kwargs.get('atol', 1e-3))
             self.richardson_iter      = richardson_iter
             self.basis_integrators = [basis_integrator(sys_dim, **kwargs) for _ in range(self.richardson_iter)]
             for integrator in self.basis_integrators:
                 integrator.adaptive = False
             self.basis_order       = basis_integrator.order
             self.order             = self.basis_order + 3
-            self.dim               = sys_dim
-            self.rtol              = kwargs.get('rtol', 1e-3)
-            self.atol              = kwargs.get('atol', 1e-3)
-            self.adaptive          = not basis_integrator.__symplectic__
-            self.aux               = D.zeros((self.richardson_iter, self.richardson_iter) + self.dim)
-            self.dtype             = kwargs.get('dtype')
             self.device            = kwargs.get('device')
             if 'staggered_mask' in kwargs:
                 if kwargs['staggered_mask'] is None:
@@ -245,18 +232,8 @@ def generate_richardson_integrator(basis_integrator):
                     self.aux = self.aux.astype(self.dtype)
 
             if D.backend() == 'torch':
-                self.aux         = self.aux.to(self.device)
+                self.aux = self.aux.to(self.device)
         
-        def dense_output(self, rhs, initial_time, initial_state, constants):
-            return CubicHermiteInterp(
-                initial_time, 
-                initial_time + self.dTime, 
-                initial_state, 
-                initial_state + self.dState,
-                rhs(initial_time, initial_state, **constants),
-                rhs(initial_time + self.dTime, initial_state + self.dState, **constants)
-            )
-    
     RichardsonExtrapolatedIntegrator.__name__ = RichardsonExtrapolatedIntegrator.__qualname__ = "RichardsonExtrapolated_{}_Integrator".format(basis_integrator.__name__)
     
     return RichardsonExtrapolatedIntegrator
