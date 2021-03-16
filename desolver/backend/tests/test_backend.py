@@ -661,14 +661,14 @@ def test_logical_xor_out_where():
 def test_linspace():
     ref_lin = np.linspace(1.0, 10.0, num=100)
     test_lin = D.linspace(1.0, 10.0, num=100)
-    assert (np.all(np.abs(ref_lin - test_lin.cpu().numpy())/ref_lin <= 2 * D.epsilon()))
+    assert (np.all(np.abs(ref_lin - test_lin.cpu().numpy())/ref_lin <= 10 * D.epsilon()))
 
 
 @pytest.mark.skipif(D.backend() == 'numpy', reason="Numpy is Reference")
 def test_logspace():
     ref_lin = np.logspace(-10.0, 10.0, num=100)
     test_lin = D.logspace(-10.0, 10.0, num=100)
-    assert (np.all(np.abs(ref_lin - test_lin.cpu().numpy())/ref_lin <= 2 * D.epsilon()))
+    assert (np.all(np.abs(ref_lin - test_lin.cpu().numpy())/ref_lin <= 10 * D.epsilon()))
 
 
 @pytest.mark.skipif(D.backend() == 'numpy', reason="Numpy is Reference")
