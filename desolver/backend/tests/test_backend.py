@@ -503,7 +503,7 @@ def test_softplus_within_tolerance(ffmt):
 def test_softplus_within_tolerance_out(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
-    out = D.array(pi)
+    out = D.copy(pi)
     D.softplus(pi, out=out)
     assert(3.18389890758499587775 - 2*D.epsilon() <= out <= 3.18389890758499587775 + 2*D.epsilon())
 
@@ -519,7 +519,7 @@ def test_square_within_tolerance(ffmt):
 def test_square_within_tolerance_out(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
-    out = D.array(pi)
+    out = D.copy(pi)
     D.square(pi, out=out)
     assert(9.8696044010893586188 - 2*D.epsilon() <= out <= 9.8696044010893586188 + 2*D.epsilon())
 
