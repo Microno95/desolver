@@ -11,6 +11,7 @@ integrator_set = sorted(integrator_set, key=lambda x: x.__name__)
 
 devices_set = ['cpu']
     
+@pytest.mark.skip(reason="Test too slow, needs refactoring")
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', integrator_set)
@@ -67,6 +68,8 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
 
     print("{} backend test passed successfully!".format(D.backend()))
 
+    
+@pytest.mark.skip(reason="Test too slow, needs refactoring")
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', integrator_set)
