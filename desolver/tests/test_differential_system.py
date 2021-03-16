@@ -102,7 +102,7 @@ def test_integration_and_representation(ffmt):
 
     from . import common
 
-    (de_mat, rhs, analytic_soln, y_init, a) = common.set_up_basic_system()
+    (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system()
 
     assert (a.integration_status() == "Integration has not been run.")
 
@@ -124,7 +124,7 @@ def test_integration_and_representation(ffmt):
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
-def test_integration_and_nearestfloat_no_dense_output(ffmt):
+def test_integration_and_nearest_float_no_dense_output(ffmt):
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -229,7 +229,7 @@ def test_wrong_tf(ffmt):
 
         from . import common
 
-        (de_mat, rhs, analytic_soln, y_init, a) = common.set_up_basic_system()
+        (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system()
 
         a.tf = 0.0
 
@@ -303,9 +303,9 @@ def test_non_callable_rhs(ffmt):
 
         from . import common
 
-        (de_mat, rhs, analytic_soln, y_init, _) = common.set_up_basic_system()
+        (de_mat, rhs, analytic_soln, y_init, dt, _) = common.set_up_basic_system()
 
-        a = de.OdeSystem(de_mat, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
+        a = de.OdeSystem(de_mat, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=dt, rtol=D.epsilon() ** 0.5,
                          atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
 
         a.tf = 0.0

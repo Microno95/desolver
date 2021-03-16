@@ -2,7 +2,7 @@ import desolver as de
 import desolver.backend as D
 
 
-def set_up_basic_system():
+def set_up_basic_system(integrator=None):
     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
 
     @de.rhs_prettifier("""[vx, -x+t]""")
@@ -21,6 +21,11 @@ def set_up_basic_system():
     y_init = D.array([1., 0.])
 
     a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-                     atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
+                     atol=D.epsilon() ** 0.5)
+    a.set_kick_vars(D.array([0,1],dtype=D.bool))
+    if integrator is None:
+        integrator = a.method
+    dt = (D.epsilon() ** 0.5)**(1.0/(2+integrator.order))/(2*D.pi)
+    a.dt = dt
 
-    return de_mat, rhs, analytic_soln, y_init, a
+    return de_mat, rhs, analytic_soln, y_init, dt, a

@@ -329,19 +329,21 @@ class OdeSystem(object):
     def y(self):
         """The states at which the system has been evaluated.
         """
-        if D.backend() == 'torch':
-            return D.stack(self.__y[:self.counter + 1])
-        else:
-            return self.__y[:self.counter + 1]
+#         if D.backend() == 'torch':
+#             return D.stack(self.__y[:self.counter + 1])
+#         else:
+#             return self.__y[:self.counter + 1]
+        return self.__y[:self.counter + 1]
     
     @property
     def t(self):
         """The times at which the system has been evaluated.
         """
-        if D.backend() == 'torch':
-            return D.stack(self.__t[:self.counter + 1])
-        else:
-            return self.__t[:self.counter + 1]
+#         if D.backend() == 'torch':
+#             return D.stack(self.__t[:self.counter + 1])
+#         else:
+#             return self.__t[:self.counter + 1]
+        return self.__t[:self.counter + 1]
     
     @property
     def nfev(self):
@@ -606,7 +608,7 @@ class OdeSystem(object):
         if new_method in integrators.available_methods():
             self.__method = integrators.available_methods(False)[new_method]
         elif issubclass(new_method, integrators.IntegratorTemplate):
-            if new_method not in map(lambda x:x[1], integrators.available_methods(False).items()):
+            if not issubclass(new_method, integrators.RichardsonIntegratorTemplate) and new_method not in map(lambda x:x[1], integrators.available_methods(False).items()):
                 deutil.warning("This is not a method implemented as part of the DESolver package. Cannot guarantee results.")
             self.__method = new_method
         else:
@@ -724,10 +726,8 @@ class OdeSystem(object):
 
         total_steps = self.__alloc_space_steps(tf)
         
-        print(total_steps)
-        
         if eta:
-            tqdm_progress_bar = tqdm(total=total_steps)
+            tqdm_progress_bar = tqdm(total=int((tf - self.__t[self.counter])/self.dt))
         else:
             tqdm_progress_bar = None
             
@@ -808,7 +808,7 @@ class OdeSystem(object):
                     if D.to_numpy(tf) == np.inf:
                         tqdm_progress_bar.total = None
                     else:
-                        tqdm_progress_bar.total = tqdm_progress_bar.n + total_steps
+                        tqdm_progress_bar.total = tqdm_progress_bar.n + int((tf - self.__t[self.counter])/self.dt)
                     tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.__t[self.counter], tf, self.dt).ljust(8)
                     tqdm_progress_bar.update()
 
@@ -886,7 +886,7 @@ class OdeSystem(object):
             print_str += "\nThe constants that have been defined for this system are: "
             print_str += "\n" + str(self.constants)
         
-        print_str += "The time limits for this system are:\n"
+        print_str += "\nThe time limits for this system are:\n"
         print_str += "t0 = {}, tf = {}, t_current = {}, step_size = {}".format(self.t0, self.tf, self.t[-1], self.dt)
         
         return print_str

@@ -94,7 +94,7 @@ def test_dense_output(ffmt):
 
     from . import common
 
-    (de_mat, rhs, analytic_soln, y_init, a) = common.set_up_basic_system()
+    (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system()
 
     assert (a.integration_status() == "Integration has not been run.")
 
@@ -110,12 +110,12 @@ def test_dense_output(ffmt):
     assert (D.max(D.abs(a[a[0].t].t)) <= 4 * D.epsilon())
     assert (D.max(D.abs(a[a[-1].t].y - analytic_soln(a[-1].t, y_init))) <= 10 * D.epsilon() ** 0.5)
 
-    assert (D.max(D.abs(a[a[0].t:a[-1].t].y - a.y)) <= 4 * D.epsilon())
-    assert (D.max(D.abs(a[:a[-1].t].y - a.y)) <= 4 * D.epsilon())
+    assert (D.max(D.abs(D.stack(a[a[0].t:a[-1].t].y) - D.stack(a.y))) <= 4 * D.epsilon())
+    assert (D.max(D.abs(D.stack(a[:a[-1].t].y) - D.stack(a.y))) <= 4 * D.epsilon())
 
-    assert (D.max(D.abs(a[a[0].t:a[-1].t:2].y - a.y[::2])) <= 4 * D.epsilon())
-    assert (D.max(D.abs(a[a[0].t::2].y - a.y[::2])) <= 4 * D.epsilon())
-    assert (D.max(D.abs(a[:a[-1].t:2].y - a.y[::2])) <= 4 * D.epsilon())
+    assert (D.max(D.abs(D.stack(a[a[0].t:a[-1].t:2].y) - D.stack(a.y[::2]))) <= 4 * D.epsilon())
+    assert (D.max(D.abs(D.stack(a[a[0].t::2].y) - D.stack(a.y[::2]))) <= 4 * D.epsilon())
+    assert (D.max(D.abs(D.stack(a[:a[-1].t:2].y) - D.stack(a.y[::2]))) <= 4 * D.epsilon())
 
 
 if __name__ == "__main__":
