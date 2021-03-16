@@ -116,7 +116,3 @@ def test_dense_output(ffmt):
     assert (D.max(D.abs(D.stack(a[a[0].t:a[-1].t:2].y) - D.stack(a.y[::2]))) <= 4 * D.epsilon())
     assert (D.max(D.abs(D.stack(a[a[0].t::2].y) - D.stack(a.y[::2]))) <= 4 * D.epsilon())
     assert (D.max(D.abs(D.stack(a[:a[-1].t:2].y) - D.stack(a.y[::2]))) <= 4 * D.epsilon())
-
-
-if __name__ == "__main__":
-    np.testing.run_module_suite()

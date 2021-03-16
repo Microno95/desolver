@@ -120,7 +120,3 @@ def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapola
     print("")
 
     print("{} backend test passed successfully!".format(D.backend()))
-
-
-# if __name__ == "__main__":
-#     np.testing.run_module_suite()

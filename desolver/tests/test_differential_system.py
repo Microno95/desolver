@@ -334,7 +334,3 @@ def test_DiffRHS():
 
     assert (str(wrapped_rhs_both_repr) == "1")
     assert (wrapped_rhs_both_repr._repr_markdown_() == "2")
-
-
-if __name__ == "__main__":
-    np.testing.run_module_suite()

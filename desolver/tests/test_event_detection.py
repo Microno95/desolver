@@ -135,7 +135,3 @@ def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation):
     print("")
 
     print("{} backend test passed successfully!".format(D.backend()))
-
-
-if __name__ == "__main__":
-    np.testing.run_module_suite()

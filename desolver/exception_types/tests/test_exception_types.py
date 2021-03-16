@@ -18,7 +18,3 @@ def test_failed_integration_error():
         pass
     except:
         raise
-
-
-if __name__ == "__main__":
-    np.testing.run_module_suite()

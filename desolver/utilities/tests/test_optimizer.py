@@ -68,7 +68,3 @@ def test_brentsrootvec(ffmt):
 
         assert (all(map((lambda i: D.to_numpy(D.to_float(D.abs(i))) <= 32 * D.epsilon()),
                         map((lambda x: x[0](x[1])), zip(fun_list, root_list)))))
-
-
-if __name__ == "__main__":
-    np.testing.run_module_suite()

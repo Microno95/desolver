@@ -1035,7 +1035,3 @@ class TestPyAudiErfc(PyAudiTestCase):
         import pyaudi as pd
         res = x1.erfc()
         assert (res == 1.0 - pd.erf(x1))
-
-
-if __name__ == "__main__":
-    np.testing.run_module_suite()
