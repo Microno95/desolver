@@ -259,7 +259,7 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000):
         else:
             dx  = D.solve_linear_system(Jf0, -D.reshape(F0, (-1, 1)))
         if verbose:
-            print(f"[{iteration}]: x = {x}, dx = {dx}, F = {F0}, Jf = {Jf0}")
+            print("[{iteration}]: x = {x}, dx = {dx}, F = {F0}, Jf = {Jf0}".format(**locals()))
             print()
         x = x+D.reshape(dx, D.shape(x))
         if D.max(D.abs(dx)) <= tol:
