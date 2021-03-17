@@ -57,7 +57,7 @@ class JacobianWrapper(object):
         unravelled_y  = D.reshape(y, (-1,))
         dy_val        = self.rhs(y, **kwargs)
         unravelled_dy = D.reshape(dy_val, (-1,))
-        jacobian_y    = D.zeros((*unravelled_y.shape, *unravelled_dy.shape), dtype=unravelled_dy.dtype)
+        jacobian_y    = D.zeros((*unravelled_y.shape, *unravelled_dy.shape), dtype=unravelled_dy.dtype, device=y.device)
         for idx,val in enumerate(unravelled_y):
             y_jac = D.copy(unravelled_y)
             dy_cur = dy

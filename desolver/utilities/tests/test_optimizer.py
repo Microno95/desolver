@@ -8,6 +8,14 @@ import pytest
 def test_brentsroot(ffmt):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
+
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+        
     for _ in range(10):
         ac_prod = D.array(np.random.uniform(0.9, 1.1))
         a = D.array(np.random.uniform(-1, 1))
@@ -68,3 +76,90 @@ def test_brentsrootvec(ffmt):
 
         assert (all(map((lambda i: D.to_numpy(D.to_float(D.abs(i))) <= 32 * D.epsilon()),
                         map((lambda x: x[0](x[1])), zip(fun_list, root_list)))))
+
+
+
+@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+def test_newtonraphson(ffmt):
+    print("Set dtype to:", ffmt)
+    D.set_float_fmt(ffmt)
+
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+
+    if ffmt == 'gdual_vdouble':
+        return
+    
+    for _ in range(10):
+        ac_prod = D.array(np.random.uniform(0.9, 1.1))
+        a = D.array(np.random.uniform(-1, 1))
+        a = D.to_float(-1 * (a <= 0) + 1 * (a > 0))
+        c = ac_prod / a
+        b = D.sqrt(0.01 + 4 * ac_prod)
+
+        gt_root = -b / (2 * a) - 0.1 / (2 * a)
+
+        ub = -b / (2 * a)
+        lb = -b / (2 * a) - 1.0 / (2 * a)
+        
+        x0  = D.array(np.random.uniform(ub, lb))
+
+        fun = lambda x: a * x ** 2 + b * x + c
+        jac = lambda x: 2 * a * x + b
+
+        assert (D.to_numpy(D.to_float(D.abs(fun(gt_root)))) <= 32 * D.epsilon())
+
+        root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=jac, tol=32*D.epsilon(), verbose=False)
+
+        print(root, gt_root, x0, root - gt_root, 32*D.epsilon(), num_iter)
+        
+        assert (success)
+        assert (np.allclose(D.to_numpy(D.to_float(gt_root)), D.to_numpy(D.to_float(root)), 32 * D.epsilon(),
+                            32 * D.epsilon()))
+        assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32 * D.epsilon())
+
+@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+def test_newtonraphson_estimated_jac(ffmt):
+    print("Set dtype to:", ffmt)
+    D.set_float_fmt(ffmt)
+
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(True)
+
+    if ffmt == 'gdual_vdouble':
+        return
+    
+    for _ in range(10):
+        ac_prod = D.array(np.random.uniform(0.9, 1.1))
+        a = D.array(np.random.uniform(-1, 1))
+        a = D.to_float(-1 * (a <= 0) + 1 * (a > 0))
+        c = ac_prod / a
+        b = D.sqrt(0.01 + 4 * ac_prod)
+
+        gt_root = -b / (2 * a) - 0.1 / (2 * a)
+
+        ub = -b / (2 * a)
+        lb = -b / (2 * a) - 1.0 / (2 * a)
+        
+        x0  = D.array(np.random.uniform(ub, lb))
+
+        fun = lambda x: a * x ** 2 + b * x + c
+
+        assert (D.to_numpy(D.to_float(D.abs(fun(gt_root)))) <= 32 * D.epsilon())
+
+        root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, tol=32*D.epsilon(), verbose=False)
+
+        print(root, gt_root, x0, root - gt_root, 32*D.epsilon(), num_iter)
+        
+        assert (success)
+        assert (np.allclose(D.to_numpy(D.to_float(gt_root)), D.to_numpy(D.to_float(root)), 32 * D.epsilon(),
+                            32 * D.epsilon()))
+        assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32 * D.epsilon())

@@ -1,9 +1,11 @@
 import numpy
 from .. import backend as D
+from . import utilities
 
 __all__ = [
     'brentsroot',
-    'brentsrootvec'
+    'brentsrootvec',
+    'newtonraphson'
 ]
 
 def brentsroot(f, bounds, tol=None, verbose=False):
@@ -227,3 +229,45 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
     if verbose:
         print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}, conv={true_conv}".format(**locals()))
     return b, true_conv
+
+def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000):
+    if jac is None:
+        jac_provided = False
+        jac = utilities.JacobianWrapper(f)
+    else:
+        jac_provided = True
+    if tol is None:
+        tol = 32 * D.epsilon()
+    no_dim = len(D.shape(x0)) == 0 or D.shape(x0) == (1,)
+    if not no_dim:
+        x0 = D.reshape(x0, (-1,))
+    else:
+        x0 = D.reshape(x0, tuple())
+    k0 = f(x0)
+    dk = D.array(tol*10 + 1)
+    w_relax = 0.5
+    for iteration in range(maxiter):
+        if D.backend() == 'torch' and not jac_provided:
+            _x  = (x0 + k0).detach().clone()
+            _x.requires_grad = True
+            F0  = f(_x)
+            Jf0 = D.jacobian(F0, _x).detach()
+            F0  = F0.detach()
+        else:
+            F0  = f(x0 + k0)
+            Jf0 = jac(x0 + k0)
+        if no_dim:
+            dk = -D.reshape(F0, tuple()) / D.reshape(Jf0, tuple())
+        else:
+            dk  = D.solve_linear_system(Jf0, -D.reshape(F0, (-1, 1)))
+        if verbose:
+            print(f"[{iteration}]: x = {x0 + k0} k0 = {k0}, dk = {dk}, F = {F0}, Jf = {Jf0}")
+            print()
+        if D.backend() == 'torch' and not no_dim:
+            k0 = k0 + w_relax * D.reshape(dk, (-1,))
+        else:
+            k0 = k0 + w_relax * dk
+        if D.max(D.abs(dk)) <= tol:
+            break
+    return x0 + k0, (D.max(D.abs(dk)) <= tol, iteration, D.max(D.abs(dk)))
+
