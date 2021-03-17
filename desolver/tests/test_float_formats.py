@@ -41,7 +41,7 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
 
     y_init = D.array([1., 0.])
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=0.01, rtol=D.epsilon() ** 0.5,
                      atol=D.epsilon() ** 0.5)
 
     method = integrator
@@ -106,7 +106,7 @@ def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapola
 
     y_init = D.array([[[[1., 0.]]*1]*1]*3).T
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=0.01, rtol=D.epsilon() ** 0.5,
                      atol=D.epsilon() ** 0.5)
 
     method = integrator
