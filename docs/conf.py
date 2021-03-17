@@ -20,11 +20,11 @@ master_doc = 'index'
 # -- Project information -----------------------------------------------------
 
 project = 'desolver'
-copyright = '2020, Ekin Ozturk'
+copyright = '2021, Ekin Ozturk'
 author = 'Ekin Ozturk'
 
 # The full version, including alpha/beta/rc tags
-release = '3.1.4'
+release = '4.0.0'
 
 
 # -- General configuration ---------------------------------------------------

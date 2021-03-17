@@ -11,7 +11,10 @@ python:
 env:
   - DES_BACKEND='numpy' PYAUDI_AVAILABLE=false
   - DES_BACKEND='numpy' PYAUDI_AVAILABLE=true
-  - DES_BACKEND='torch'
+  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients'
+  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS=''
+  - PYTEST_FLAGS='--run_implicit'
+  - PYTEST_FLAGS='--run_explicit'
 
 jobs:
   include:
@@ -129,7 +132,7 @@ install:
 
 # command to run tests
 script:
-  - py.test --cov-report=xml --cov=desolver
+  - pytest --cov-report=xml --cov=desolver $PYTEST_FLAGS $RUN_TORCH_GRADIENTS
 
 # command to upload coverage statistics
 after_success:

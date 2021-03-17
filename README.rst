@@ -31,6 +31,8 @@ Documentation is now available at `desolver docs <https://desolver.readthedocs.i
 Latest Release
 ==============
 
+**4.0.0-alpha** - Initial implementation of implicit integration schemes that use a basic newton-raphson algorithm to solve for the intermediate states.
+
 **3.0.0** - PyAudi support has been finalised. It is now possible to do numerical integrations using ``gdual`` variables such as ``gdual_double``\ , ``gdual_vdouble`` and ``gdual_real128`` (only on select platforms, refer to `pyaudi docs <https://darioizzo.github.io/audi/>`_ for more information). Install desolver with pyaudi support using ``pip install desolver[pyaudi]``. Documentation has also been added and is available at `desolver docs <https://desolver.readthedocs.io/>`_.
 
 **2.5.0** - Event detection has been added to the module. It is now possible to do numerical integration with terminal and non-terminal events.
@@ -75,7 +77,9 @@ Fixed Step Methods
 
 Implicit Methods
 ~~~~~~~~~~~~~~~~
-**NOT YET IMPLEMENTED**
+#. Backward Euler
+#. Implicit Midpoint
+#. Gauss-Legendre 4
 
 Minimal Working Example
 =======================

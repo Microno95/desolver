@@ -5,17 +5,21 @@ import pytest
 
 integrator_set = set(de.available_methods(False).values())
 integrator_set = sorted(integrator_set, key=lambda x: x.__name__)
-# integrator_set = [
-#     intg if intg.__order__ > 1 else pytest.param(intg, marks=pytest.mark.xfail(reason=f"{intg.__name__} is too low order")) for intg in integrator_set
-# ]
+integrator_set = [
+    pytest.param(intg, marks=pytest.mark.implicit) for intg in integrator_set if intg.__implicit__
+] + [
+    pytest.param(intg, marks=pytest.mark.explicit) for intg in integrator_set if not intg.__implicit__
+]
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation):
+    if integrator.__implicit__ and (ffmt.startswith('gdual') or ffmt == 'float16'):
+        pytest.skip("Current implicit integrators are not compatible with {}".format(ffmt))
     if ffmt == 'float16':
-        return
+        pytest.skip("Event detection is unstable with {}".format(ffmt))
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -60,7 +64,7 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
         assert (a.integration_status() == "Integration has not been run.")
 
-        a.integrate(eta=False, events=[time_event, second_time_event, first_y_event])
+        a.integrate(eta=True, events=[time_event, second_time_event, first_y_event])
 
         print(a.events, D.pi / 32, analytic_soln(D.pi/32, y_init), analytic_soln(D.pi/32, y_init)[0] - a.events[0].y)
         try:
@@ -84,8 +88,10 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
 @pytest.mark.parametrize('integrator', integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation):
+    if integrator.__implicit__ and (ffmt.startswith('gdual') or ffmt == 'float16'):
+        pytest.skip("Current implicit integrators are not compatible with {}".format(ffmt))
     if ffmt == 'float16':
-        return
+        pytest.skip("Event detection is unstable with {}".format(ffmt))
 
     D.set_float_fmt(ffmt)
 
@@ -119,7 +125,7 @@ def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation):
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
         assert (a.integration_status() == "Integration has not been run.")
 
-        a.integrate(eta=False, events=time_event)
+        a.integrate(eta=True, events=time_event)
 
         assert (a.integration_status() == "Integration terminated upon finding a triggered event.")
 

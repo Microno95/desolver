@@ -1,7 +1,7 @@
 from .integrator_template import *
 from .integrator_types import *
 from .explicit_integration_schemes import *
-# from .imlicit_integration_schemes import *
+from .implicit_integration_schemes import *
 
 __available_methods = dict()
 
@@ -23,6 +23,22 @@ __explicit_integration_methods__ = [
 ]
 
 __implicit_integration_methods__ = [
+    GaussLegendre4,
+    GaussLegendre6,
+    BackwardEuler,
+    ImplicitMidpoint,
+    LobattoIIIA2,
+    LobattoIIIA4,
+    LobattoIIIB2,
+    LobattoIIIB4,
+    LobattoIIIC2,
+    LobattoIIIC4,
+    CrankNicolson,
+#     DIRK3LStable,
+    RadauIA3,
+    RadauIA5,
+    RadauIIA3,
+    RadauIIA5
 ]
 
 __available_methods.update(dict(

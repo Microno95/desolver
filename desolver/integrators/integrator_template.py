@@ -35,9 +35,9 @@ class IntegratorTemplate(object):
     
     def __repr__(self):
         if D.backend() == 'torch':
-            return "<{}({},{},{},{})>".format(self.__class__.__name__, self.dim, self.dtype, self.rtol, self.atol)
-        else:
             return "<{}({},{},{},{},{})>".format(self.__class__.__name__, self.dim, self.dtype, self.rtol, self.atol, self.device)
+        else:
+            return "<{}({},{},{},{})>".format(self.__class__.__name__, self.dim, self.dtype, self.rtol, self.atol)
 
 
 class RichardsonIntegratorTemplate(IntegratorTemplate):
@@ -91,7 +91,7 @@ class RichardsonIntegratorTemplate(IntegratorTemplate):
         self.dState = dy_z + 0.0
         self.dTime  = D.copy(dt_z)
         
-        new_timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, dt_z)
+        new_timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, dt_z, tol=0.5 if self.__implicit__ else 0.9)
         if self.__symplectic__:
             timestep = dt0
             uppers  = 0

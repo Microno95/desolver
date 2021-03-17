@@ -32,7 +32,7 @@ with open(os.path.join(setup_py_path, "README.rst"), "r") as fh:
     long_description = fh.read()
 
 name    = 'desolver'
-release = '3.1.5'
+release = '4.0.0'
 version = ".".join(release.split(".")[:2])
     
 setup(name=name,
@@ -42,7 +42,7 @@ setup(name=name,
       author_email='ekin.ozturk@mail.utoronto.ca',
       long_description=long_description,
       long_description_content_type="text/x-rst",
-      install_requires=['numpy', 'tqdm', 'scipy>=0.18.0'],
+      install_requires=['numpy>=1.17', 'tqdm', 'scipy>=0.18.0'],
       license='MIT',
       keywords=['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode'],
       url='https://github.com/Microno95/desolver',
@@ -73,7 +73,8 @@ setup(name=name,
           # that you indicate whether you support Python 2, Python 3 or both.
           'Programming Language :: Python :: 3.5',
           'Programming Language :: Python :: 3.6',
-          'Programming Language :: Python :: 3.7'
+          'Programming Language :: Python :: 3.7',
+          'Programming Language :: Python :: 3.8'
       ],
       # these are optional and override conf.py settings
       command_options={

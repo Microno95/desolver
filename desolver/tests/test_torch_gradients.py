@@ -5,12 +5,15 @@ import numpy as np
 
 integrator_set = set(de.available_methods(False).values())
 integrator_set = sorted(integrator_set, key=lambda x: x.__name__)
-# integrator_set = [
-#     intg if intg.__order__ > 2 else pytest.param(intg, marks=pytest.mark.xfail(reason=f"{intg.__name__} is too low order")) for intg in integrator_set
-# ]
+integrator_set = [
+    pytest.param(intg, marks=pytest.mark.implicit) for intg in integrator_set if intg.__implicit__
+] + [
+    pytest.param(intg, marks=pytest.mark.explicit) for intg in integrator_set if not intg.__implicit__
+]
 
 devices_set = ['cpu']
     
+@pytest.mark.torch_gradients
 @pytest.mark.skip(reason="Test too slow, needs refactoring")
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
@@ -69,6 +72,7 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
     print("{} backend test passed successfully!".format(D.backend()))
 
     
+@pytest.mark.torch_gradients
 @pytest.mark.skip(reason="Test too slow, needs refactoring")
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
@@ -131,6 +135,7 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
     print("{} backend test passed successfully!".format(D.backend()))
     
 
+@pytest.mark.torch_gradients
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', integrator_set)

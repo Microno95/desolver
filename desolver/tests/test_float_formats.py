@@ -3,11 +3,21 @@ import desolver.backend as D
 import numpy as np
 import pytest
 
+integrator_set = set(de.available_methods(False).values())
+integrator_set = sorted(integrator_set, key=lambda x: x.__name__)
+integrator_set = [
+    pytest.param(intg, marks=pytest.mark.implicit) for intg in integrator_set if intg.__implicit__
+] + [
+    pytest.param(intg, marks=pytest.mark.explicit) for intg in integrator_set if not intg.__implicit__
+]
+
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
-@pytest.mark.parametrize('integrator', sorted(set(de.available_methods(False).values()), key=lambda x: x.__name__))
+@pytest.mark.parametrize('integrator', integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolation):
+    if integrator.__implicit__ and (ffmt.startswith('gdual') or ffmt == 'float16'):
+        pytest.skip("Current implicit integrators are not compatible with {}".format(ffmt))
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -43,11 +53,11 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
 
         try:
-            a.integrate(callback=kbinterrupt_cb, eta=False)
+            a.integrate(callback=kbinterrupt_cb, eta=True)
         except KeyboardInterrupt as e:
             pass
 
-        a.integrate(eta=False)
+        a.integrate(eta=True)
 
         max_diff = D.max(D.abs(analytic_soln(a.t[-1], y_init) - a.y[-1]))
         if a.integrator.__adaptive__ and max_diff >= method_tolerance:
@@ -62,9 +72,11 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
     
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
-@pytest.mark.parametrize('integrator', sorted(set(de.available_methods(False).values()), key=lambda x: x.__name__))
+@pytest.mark.parametrize('integrator', integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapolation):
+    if integrator.__implicit__ and (ffmt.startswith('gdual') or ffmt == 'float16'):
+        pytest.skip("Current implicit integrators are not compatible with {}".format(ffmt))
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -104,11 +116,11 @@ def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapola
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
 
         try:
-            a.integrate(callback=kbinterrupt_cb, eta=False)
+            a.integrate(callback=kbinterrupt_cb, eta=True)
         except KeyboardInterrupt as e:
             pass
 
-        a.integrate(eta=False)
+        a.integrate(eta=True)
 
         max_diff = D.max(D.abs(analytic_soln(a.t[-1], y_init) - a.y[-1]))
         if a.integrator.__adaptive__ and max_diff >= method_tolerance:

@@ -231,43 +231,39 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
     return b, true_conv
 
 def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000):
-    if jac is None:
-        jac_provided = False
-        jac = utilities.JacobianWrapper(f)
-    else:
-        jac_provided = True
     if tol is None:
         tol = 32 * D.epsilon()
+    if jac is None:
+        jac_provided = False
+        jac = utilities.JacobianWrapper(f, atol=tol, rtol=tol)
+    else:
+        jac_provided = True
     no_dim = len(D.shape(x0)) == 0 or D.shape(x0) == (1,)
     if not no_dim:
-        x0 = D.reshape(x0, (-1,))
+        x = D.reshape(x0, (-1,))
     else:
-        x0 = D.reshape(x0, tuple())
-    k0 = f(x0)
-    dk = D.array(tol*10 + 1)
+        x = D.reshape(x0, tuple())
     w_relax = 0.5
     for iteration in range(maxiter):
         if D.backend() == 'torch' and not jac_provided:
-            _x  = (x0 + k0).detach().clone()
+            _x  = x.detach().clone()
             _x.requires_grad = True
             F0  = f(_x)
             Jf0 = D.jacobian(F0, _x).detach()
             F0  = F0.detach()
         else:
-            F0  = f(x0 + k0)
-            Jf0 = jac(x0 + k0)
+            F0  = f(x)
+            Jf0 = jac(x)
         if no_dim:
-            dk = -D.reshape(F0, tuple()) / D.reshape(Jf0, tuple())
+            dx = -D.reshape(F0, tuple()) / D.reshape(Jf0, tuple())
         else:
-            dk  = D.solve_linear_system(Jf0, -D.reshape(F0, (-1, 1)))
+            dx  = D.solve_linear_system(Jf0, -D.reshape(F0, (-1, 1)))
         if verbose:
-            print(f"[{iteration}]: x = {x0 + k0} k0 = {k0}, dk = {dk}, F = {F0}, Jf = {Jf0}")
+            print(f"[{iteration}]: x = {x}, dx = {dx}, F = {F0}, Jf = {Jf0}")
             print()
-        if D.backend() == 'torch' and not no_dim:
-            k0 = k0 + w_relax * D.reshape(dk, (-1,))
-        else:
-            k0 = k0 + w_relax * dk
-        if D.max(D.abs(dk)) <= tol:
+        x = x+D.reshape(dx, D.shape(x))
+        if D.max(D.abs(dx)) <= tol:
             break
-    return x0 + k0, (D.max(D.abs(dk)) <= tol, iteration, D.max(D.abs(dk)))
+    return x, (D.max(D.abs(dx)) <= tol, iteration, D.max(D.abs(dx)))
+
 
