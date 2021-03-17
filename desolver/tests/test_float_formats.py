@@ -18,6 +18,8 @@ integrator_set = [
 def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolation):
     if integrator.__implicit__ and (ffmt.startswith('gdual') or ffmt == 'float16'):
         pytest.skip("Current implicit integrators are not compatible with {}".format(ffmt))
+    if integrator.__implicit__ and use_richardson_extrapolation:
+        pytest.skip("Implicit methods are unstable with richardson extrapolation")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -77,6 +79,8 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
 def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapolation):
     if integrator.__implicit__ and (ffmt.startswith('gdual') or ffmt == 'float16'):
         pytest.skip("Current implicit integrators are not compatible with {}".format(ffmt))
+    if integrator.__implicit__ and use_richardson_extrapolation:
+        pytest.skip("Implicit methods are unstable with richardson extrapolation")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
