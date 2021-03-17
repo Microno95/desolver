@@ -18,6 +18,7 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     config.addinivalue_line("markers", "implicit: mark test as implicit integrator test")
     config.addinivalue_line("markers", "explicit: mark test as explicit integrator test")
+    config.addinivalue_line("markers", "torch_gradients: mark test as pytorch gradient test")
 
 
 def pytest_collection_modifyitems(config, items):
