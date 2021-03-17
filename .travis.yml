@@ -9,12 +9,14 @@ python:
   - nightly
 
 env:
-  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=false
-  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=true
-  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients'
-  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS=''
-  - PYTEST_FLAGS='--run_implicit'
-  - PYTEST_FLAGS='--run_explicit'
+  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=false                      PYTEST_FLAGS='--run_implicit'
+  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=true                       PYTEST_FLAGS='--run_implicit'
+  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients' PYTEST_FLAGS='--run_implicit'
+  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS=''                      PYTEST_FLAGS='--run_implicit'
+  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=false                      PYTEST_FLAGS='--run_explicit'
+  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=true                       PYTEST_FLAGS='--run_explicit'
+  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients' PYTEST_FLAGS='--run_explicit'
+  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS=''                      PYTEST_FLAGS='--run_explicit'
 
 jobs:
   include:
