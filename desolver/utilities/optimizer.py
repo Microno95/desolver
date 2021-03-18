@@ -232,7 +232,13 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
 
 def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000):
     if tol is None:
-        tol = 32 * D.epsilon()
+        if D.epsilon() <= 1e-5:
+            tol = 32*D.epsilon()
+        else:
+            tol = D.epsilon()
+    if tol < 32*D.epsilon() and D.epsilon() <= 1e-5:
+        tol = 32*D.epsilon()
+    tol = D.to_float(tol)
     if jac is None:
         jac_provided = False
         jac = utilities.JacobianWrapper(f, atol=tol, rtol=tol)
@@ -257,13 +263,19 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000):
         if no_dim:
             dx = -D.reshape(F0, tuple()) / D.reshape(Jf0, tuple())
         else:
-            dx  = D.solve_linear_system(Jf0, -D.reshape(F0, (-1, 1)))
+            if D.backend() == 'numpy':
+                if x.dtype == object:
+                    dx = D.matrix_inv(Jf0, tol=tol)@(-D.reshape(F0, (-1, 1)))
+                else:
+                    dx = D.solve_linear_system(Jf0.astype(D.float64), -D.reshape(F0, (-1, 1)).astype(D.float64))
+            else:
+                dx = D.solve_linear_system(Jf0, -D.reshape(F0, (-1, 1)))
         if verbose:
             print("[{iteration}]: x = {x}, dx = {dx}, F = {F0}, Jf = {Jf0}".format(**locals()))
             print()
         x = x+D.reshape(dx, D.shape(x))
-        if D.max(D.abs(dx)) <= tol:
+        if D.max(D.abs(D.to_float(dx))) <= tol:
             break
-    return x, (D.max(D.abs(dx)) <= tol, iteration, D.max(D.abs(dx)))
+    return x, (D.max(D.abs(D.to_float(dx))) <= tol, iteration, D.max(D.abs(D.to_float(dx))))
 
 

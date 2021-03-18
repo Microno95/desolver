@@ -456,3 +456,5 @@ def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True):
 
 def solve_linear_system(A,b):
     return torch.solve(b,A).solution
+
+matrix_inv = torch.linalg.inv

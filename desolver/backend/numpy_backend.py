@@ -262,5 +262,7 @@ def logical_xor(a, b, out=None, where=True):
 nonzero = numpy.nonzero
 argsort = numpy.argsort
 
-def solve_linear_system(A,b):
-    return numpy.linalg.solve(A,b)
+def solve_linear_system(A,b,overwrite_a=True,overwrite_b=True,check_finite=False):
+    return scipy.linalg.solve(A,b,overwrite_a=overwrite_a,overwrite_b=overwrite_b,check_finite=check_finite)
+
+matrix_inv = numpy.linalg.inv

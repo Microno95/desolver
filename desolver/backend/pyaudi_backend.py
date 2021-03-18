@@ -102,6 +102,60 @@ def logsumexp(x1, *args, **kwargs):
         return log(sum(exp(x1)))
     else:
         return scipy.special.logsumexp(x1, *args, **kwargs)
+    
+def __matrix_inv_helper(A_in, tol=epsilon()):
+    if shape(A_in)[0] != shape(A_in)[1]:
+        raise numpy.linalg.LinAlgError("Matrix is not square, inversion is not possible")
+    detA = numpy.linalg.det(to_float(A_in))
+    if detA == 0:
+        raise numpy.linalg.LinAlgError("Matrix has a determinant of {} which makes it non-invertible".format(detA))
+    A = copy(A_in)
+    I = eye(shape(A)[0], dtype=A.dtype)
+    h = 0 # Initialization of the pivot row
+    k = 0 # Initialization of the pivot column
+
+    while h < shape(A)[0] and k < shape(A)[1]:
+        # Find the k-th pivot: 
+        i_max = h + argmax(abs(to_float(A[h:, k])))
+        if to_float(A[i_max, k]) == 0:
+            # No pivot in this column, pass to next column
+            k = k + 1
+        else:
+            A[h], A[i_max] = copy(A[i_max]), copy(A[h])
+            for i in range(h+1, shape(A)[0]):
+                f = A[i, k] / A[h, k]
+                A[i, :] = A[i, :] - f * A[h, :]
+                I[i, :] = I[i, :] - f * I[h, :]
+            # Increase pivot row and column
+            h = h + 1
+            k = k + 1
+    for k in range(shape(A)[1]-1, -1, -1):
+        I[k, :] = I[k, :] / A[k, k]
+        A[k, :] = A[k, :] / A[k, k]
+        f         = (A[k-1,k] / A[k,k])
+        A[k-1, :] = A[k-1, :] - f*A[k,:]
+        I[k-1, :] = I[k-1, :] - f*I[k, :]
+        
+    Ik = I@A_in
+    for _ in range(10):
+        I  = 2*I - Ik@I
+        Ik = I@A_in
+        if max(abs(to_float(Ik))) - 1 <= tol:
+            break
+    return I
+    
+def __matrix_inv_dispatcher(A, *args, **kwargs):
+    if A.dtype == object:
+        if len(shape(A)) == 2:
+            return __matrix_inv_helper(A, *args, **kwargs)
+        else:
+            return reshape(stack([
+                __matrix_inv_helper(A_batch, *args, **kwargs) for A_batch in reshape(A, (-1, *shape(A)[-2:]))
+            ]), shape(A))
+    else:
+        return numpy.linalg.inv(A, *args, **kwargs)
+
+matrix_inv = __matrix_inv_dispatcher
 
 # gdual_real128 Definitions
 # try:

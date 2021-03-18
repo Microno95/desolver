@@ -870,7 +870,20 @@ def test_gradients_higher_nu():
     a = D.array([1.0], requires_grad=True)
     b = a * a
     assert (D.all(D.jacobian(b, a, nu=2, batch_mode=False) == D.array([2.0])))
+    
 
+@pytest.mark.skipif("gdual_double" not in D.available_float_fmt(), reason="Can't test dispatch without pyaudi overload")
+def test_matrix_inv():
+    A  = D.array([
+        [-1.0,  3/2],
+        [ 1.0, -1.0],
+    ], dtype=D.float64)
+    Ainv = D.matrix_inv(A)
+    assert (D.max(D.abs(D.to_float(Ainv@A - D.eye(2)))) <= 8*D.epsilon())
+    with pytest.raises(np.linalg.LinAlgError):
+        D.matrix_inv(D.zeros((2,3), dtype=D.float64))
+    with pytest.raises(np.linalg.LinAlgError):
+        D.matrix_inv(D.zeros((5,2,3), dtype=D.float64))
 
 class PyAudiTestCase:
     @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_double' not in D.available_float_fmt(), reason="PyAudi Tests")
@@ -884,6 +897,20 @@ class PyAudiTestCase:
         x1 = D.gdual_vdouble([-0.5, -0.5], 'x', 5)
         x2 = D.gdual_vdouble([0.5, 0.5], 'y', 5)
         self.do(x1, x2)
+        
+    @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_double' not in D.available_float_fmt(), reason="PyAudi Tests")
+    def test_gdual_double_matrix(self):
+        A  = D.array([
+            [D.gdual_double(-1.0, 'a11', 5), D.gdual_double( 3/2, 'a12', 5)],
+            [D.gdual_double( 1.0, 'a21', 5), D.gdual_double(-1.0, 'a22', 5)],
+        ])
+        self.do_matrix(A)
+        
+    def do(self, x1, x2):
+        pass
+    
+    def do_matrix(self, A):
+        pass
 
 
 class TestPyAudiFloat(PyAudiTestCase):
@@ -1035,3 +1062,13 @@ class TestPyAudiErfc(PyAudiTestCase):
         import pyaudi as pd
         res = x1.erfc()
         assert (res == 1.0 - pd.erf(x1))
+
+class TestPyAudiMatrixInv(PyAudiTestCase):
+    def do_matrix(self, A):
+        Ainv = D.matrix_inv(A)
+        assert (D.max(D.abs(D.to_float(Ainv@A - D.eye(A.shape[0])))) <= 8*D.epsilon())
+        
+        with pytest.raises(np.linalg.LinAlgError):
+            self.do_matrix(D.zeros((2,3)))
+        with pytest.raises(np.linalg.LinAlgError):
+            self.do_matrix(D.zeros((5,2,3)))

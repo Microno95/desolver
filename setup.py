@@ -32,7 +32,7 @@ with open(os.path.join(setup_py_path, "README.rst"), "r") as fh:
     long_description = fh.read()
 
 name    = 'desolver'
-release = '4.0.0'
+release = '4.1.0'
 version = ".".join(release.split(".")[:2])
     
 setup(name=name,
@@ -49,7 +49,7 @@ setup(name=name,
       packages=['desolver', 'desolver.integrators', 'desolver.exception_types', 'desolver.utilities', 'desolver.backend'],
       extras_require={
         'pyaudi':   ["pyaudi>=1.7", "numpy>=1.17"],
-        'pytorch':  ["torch>=1.3.1", "torchvision>=0.4.2", "numpy>=1.17"],
+        'pytorch':  ["torch>=1.8.0", "torchvision>=0.2.2", "numpy>=1.17"],
       },
       classifiers=[
           # How mature is this project? Common values are

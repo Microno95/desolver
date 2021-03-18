@@ -16,8 +16,6 @@ integrator_set = [
 @pytest.mark.parametrize('integrator', integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation):
-    if integrator.__implicit__ and (ffmt.startswith('gdual') or ffmt == 'float16'):
-        pytest.skip("Current implicit integrators are not compatible with {}".format(ffmt))
     if integrator.__implicit__ and use_richardson_extrapolation:
         pytest.skip("Implicit methods are unstable with richardson extrapolation")
     if ffmt == 'float16':
@@ -90,8 +88,6 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
 @pytest.mark.parametrize('integrator', integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation):
-    if integrator.__implicit__ and (ffmt.startswith('gdual') or ffmt == 'float16'):
-        pytest.skip("Current implicit integrators are not compatible with {}".format(ffmt))
     if integrator.__implicit__ and use_richardson_extrapolation:
         pytest.skip("Implicit methods are unstable with richardson extrapolation")
     if ffmt == 'float16':
