@@ -49,7 +49,7 @@ setup(name=name,
       packages=['desolver', 'desolver.integrators', 'desolver.exception_types', 'desolver.utilities', 'desolver.backend'],
       extras_require={
         'pyaudi':   ["pyaudi>=1.7", "numpy>=1.17"],
-        'pytorch':  [":python_version>='3.6'", "torch>=1.8.0", "torchvision>=0.2.2", "numpy>=1.17"],
+        'pytorch':  ["torch>=1.8.0", "torchvision>=0.2.2", "numpy>=1.17"],
       },
       classifiers=[
           # How mature is this project? Common values are
