@@ -98,6 +98,8 @@ jobs:
       - python -m pip install --upgrade pip
     env: PATH=/c/Python36:/c/Python36/Scripts:$PATH DES_BACKEND=numpy PYAUDI_AVAILABLE=true
   exclude:
+  - python: 3.5
+    env: DES_BACKEND='torch'
   - os: osx
     env: PYAUDI_AVAILABLE=true
   - python: 3.8-dev

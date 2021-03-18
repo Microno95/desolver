@@ -31,7 +31,7 @@ Documentation is now available at `desolver docs <https://desolver.readthedocs.i
 Latest Release
 ==============
 
-**4.0.0-alpha** - Initial implementation of implicit integration schemes that use a basic newton-raphson algorithm to solve for the intermediate states.
+**4.1.0** - Initial release of implicit integration schemes that use a basic newton-raphson algorithm to solve for the intermediate states.
 
 **3.0.0** - PyAudi support has been finalised. It is now possible to do numerical integrations using ``gdual`` variables such as ``gdual_double``\ , ``gdual_vdouble`` and ``gdual_real128`` (only on select platforms, refer to `pyaudi docs <https://darioizzo.github.io/audi/>`_ for more information). Install desolver with pyaudi support using ``pip install desolver[pyaudi]``. Documentation has also been added and is available at `desolver docs <https://desolver.readthedocs.io/>`_.
 
@@ -66,10 +66,10 @@ Adaptive Methods
 Fixed Step Methods
 ^^^^^^^^^^^^^^^^^^
 
-#. Runge-Kutta 4 - The classic RK4 integrator
+#. Symplectic BABs9o7H Method  -- Based on arXiv:1501.04345v2 - BAB's9o7H
+#. Symplectic ABAs5o6HA Method -- Based on arXiv:1501.04345v2 - ABAs5o6H
 #. Runge-Kutta 5 - The 5th order integrator from RK45 with Cash-Karp Coefficients.
-#. BABs9o7H Method  -- Based on arXiv:1501.04345v2 - BAB's9o7H
-#. ABAs5o6HA Method -- Based on arXiv:1501.04345v2 - ABAs5o6H
+#. Runge-Kutta 4 - The classic RK4 integrator
 #. Midpoint Method
 #. Heun's Method
 #. Euler's Method
@@ -77,9 +77,30 @@ Fixed Step Methods
 
 Implicit Methods
 ~~~~~~~~~~~~~~~~
+
+Adaptive Methods
+^^^^^^^^^^^^^^^^
+**NOT IMPLEMENTED YET**
+
+
+Fixed Step Methods
+^^^^^^^^^^^^^^^^^^
+
 #. Backward Euler
 #. Implicit Midpoint
+#. Crank-Nicolson
+#. Lobatto IIIA
+#. Lobatto IIIB
+#. Lobatto IIIC
+#. Radau IA 
+#. Radau IIA
+#. Lobatto IIIA
+#. Lobatto IIIB
+#. Lobatto IIIC
 #. Gauss-Legendre 4
+#. Radau IA 
+#. Radau IIA
+#. Gauss-Legendre 6
 
 Minimal Working Example
 =======================
