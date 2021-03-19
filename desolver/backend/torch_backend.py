@@ -20,7 +20,7 @@ float_fmts.update({
 def to_float(x):
     if not torch.is_tensor(x):
         return torch.tensor(x, dtype=torch.get_default_dtype())
-    return x.to(torch.get_default_dtype())
+    return x.to(torch.get_default_dtype()).clone().detach()
 
 
 def to_type(x, dtype):

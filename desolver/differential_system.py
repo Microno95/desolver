@@ -244,7 +244,7 @@ def rhs_prettifier(equ_repr=None, md_repr=None):
 
 class OdeSystem(object):
     """Ordinary Differential Equation class. Designed to be used with a system of ordinary differential equations."""
-    def __init__(self, equ_rhs, y0, t=(0, 1), dense_output=False, dt=1.0, rtol=1e-6, atol=1e-6, constants=dict()):
+    def __init__(self, equ_rhs, y0, t=(0, 1), dense_output=False, dt=1.0, rtol=None, atol=None, constants=dict()):
         """Initialises the system to the parameters passed or to default values.
 
         Parameters

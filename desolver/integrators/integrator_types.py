@@ -280,19 +280,20 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             else:
                 return D.reshape(auxiliary_states - root_states, tuple())
     
-        nfun_jac = utilities.JacobianWrapper(nfun, flat=True)
-        newton_tol = (self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))))/10
+        if D.backend() != 'torch':
+            nfun_jac   = utilities.JacobianWrapper(nfun, flat=True)
+        else:
+            nfun_jac   = None
             
+        initial_guess = D.to_float((D.zeros_like(self.aux) + self.dState[None, :]))
         try:
-            aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, self.aux + self.dState[None, :], jac=nfun_jac, verbose=False, tol=newton_tol, maxiter=250, sparse=True)
+            aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=250, sparse=True)
             if not success:
                 raise exception_types.FailedIntegrationError("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, newton_tol, num_iter))
         except:
             raise
             
-        self.aux = D.reshape(aux_root, aux_shape)
-        if D.backend() == 'torch':
-            self.aux = self.aux.detach()
+        self.aux = D.to_float(D.reshape(aux_root, aux_shape))
             
         self.dState = D.zeros_like(initial_state)
         for fs, tbl in zip(self.final_state[0][1:], self.tableau):
