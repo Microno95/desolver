@@ -35,7 +35,7 @@ def test_jacobian_wrapper_exact(ffmt):
     
     x = D.array(0.0)
     
-    assert (D.allclose(drhs_exact(x), jac_rhs(x), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
+    assert (D.allclose(D.to_float(drhs_exact(x)), D.to_float(jac_rhs(x)), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
         
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
@@ -47,7 +47,7 @@ def test_jacobian_wrapper_no_adaptive(ffmt):
     
     x = D.array(0.0)
     
-    assert (D.allclose(drhs_exact(x), jac_rhs(x), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
+    assert (D.allclose(D.to_float(drhs_exact(x)), D.to_float(jac_rhs(x)), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
         
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
@@ -58,7 +58,7 @@ def test_jacobian_wrapper_calls_estimate(ffmt):
     
     x = D.array(0.0)
     
-    assert (D.allclose(jac_rhs.estimate(x), jac_rhs(x), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
+    assert (D.allclose(D.to_float(jac_rhs.estimate(x)), D.to_float(jac_rhs(x)), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
 
     
 def test_blocktimer():

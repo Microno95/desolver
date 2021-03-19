@@ -19,7 +19,9 @@ class ExplicitIntegrator(IntegratorTemplate):
         self.atol       = atol
         self.adaptive   = adaptive
         self.dtype      = dtype
-        self.aux        = D.zeros(aux_shape + self.dim, dtype=self.dtype)
+        self.aux        = D.zeros((*aux_shape, *self.dim), dtype=self.dtype)
+        self.dState     = D.zeros(self.dim, dtype=self.dtype)
+        self.dTime      = D.zeros(tuple(), dtype=self.dtype)
         
     def dense_output(self, rhs, initial_time, initial_state):
         return CubicHermiteInterp(
@@ -40,7 +42,9 @@ class ImplicitIntegrator(IntegratorTemplate):
         self.atol       = atol
         self.adaptive   = adaptive
         self.dtype      = dtype
-        self.aux        = D.zeros(aux_shape + self.dim, dtype=self.dtype)
+        self.aux        = D.zeros((*aux_shape, *self.dim), dtype=self.dtype)
+        self.dState     = D.zeros(self.dim, dtype=self.dtype)
+        self.dTime      = D.zeros(tuple(), dtype=self.dtype)
         
     def dense_output(self, rhs, initial_time, initial_state):
         return CubicHermiteInterp(
@@ -96,14 +100,10 @@ class ExplicitRungeKuttaIntegrator(ExplicitIntegrator):
             self.tableau     = D.to_type(self.tableau, dtype)
             self.final_state = D.to_type(self.final_state, dtype)
         
-        if dtype is not None:
-            if D.backend() == 'torch':
-                self.aux = self.aux.to(dtype)
-            else:
-                self.aux = self.aux.astype(dtype)
-        
         if D.backend() == 'torch':
             self.aux         = self.aux.to(device)
+            self.dState      = self.dState.to(device)
+            self.dTime       = self.dTime.to(device)
             self.tableau     = self.tableau.to(device)
             self.final_state = self.final_state.to(device)
             
@@ -184,6 +184,8 @@ class ExplicitSymplecticIntegrator(ExplicitIntegrator):
         self.nmsk = D.logical_not(self.staggered_mask)
         
         if D.backend() == 'torch':
+            self.dState      = self.dState.to(device)
+            self.dTime       = self.dTime.to(device)
             self.tableau     = self.tableau.to(device)
             self.msk  = self.msk.to(self.tableau)
             self.nmsk = self.nmsk.to(self.tableau)
@@ -245,7 +247,7 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
     order = 1
     __symplectic__ = False
 
-    def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None, **kwargs):
+    def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
         super().__init__(sys_dim, (D.shape(self.tableau)[0],), D.shape(self.final_state)[0] == 2, dtype, rtol, atol)
         if dtype is None:
             self.tableau     = D.array(self.tableau)
@@ -254,13 +256,9 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             self.tableau     = D.to_type(self.tableau, dtype)
             self.final_state = D.to_type(self.final_state, dtype)
         
-        if dtype is not None:
-            if D.backend() == 'torch':
-                self.aux = self.aux.to(dtype)
-            else:
-                self.aux = self.aux.astype(dtype)
-        
         if D.backend() == 'torch':
+            self.dState      = self.dState.to(device)
+            self.dTime       = self.dTime.to(device)
             self.aux         = self.aux.to(device)
             self.tableau     = self.tableau.to(device)
             self.final_state = self.final_state.to(device)
@@ -281,11 +279,14 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
                 return D.reshape(auxiliary_states - root_states, (-1,))
             else:
                 return D.reshape(auxiliary_states - root_states, tuple())
-        
+    
+        nfun_jac = utilities.JacobianWrapper(nfun, flat=True)
+        newton_tol = (self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))))/10
+            
         try:
-            aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, D.zeros_like(self.aux), verbose=False, maxiter=250)
+            aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, self.aux + self.dState[None, :], jac=nfun_jac, verbose=False, tol=newton_tol, maxiter=250, sparse=True)
             if not success:
-                raise exception_types.FailedIntegrationError("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, self.atol, num_iter))
+                raise exception_types.FailedIntegrationError("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, newton_tol, num_iter))
         except:
             raise
             

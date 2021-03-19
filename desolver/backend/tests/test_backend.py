@@ -310,7 +310,7 @@ def test_lerp_within_tolerance(ffmt):
 def test_lerp_within_tolerance_out(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
-    out = D.array([pi])
+    out = D.copy(pi)
     D.lerp(pi, pi + 1, 0.5, out=out)
     assert (pi + 0.5 - 2 * D.epsilon() <= out <= pi + 0.5 + 2 * D.epsilon())
 
@@ -334,7 +334,7 @@ def test_addcdiv_error(ffmt):
 def test_addcdiv_within_tolerance_out(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
-    out = D.array([pi])
+    out = D.copy(pi)
     D.addcdiv(pi, D.to_float(3), D.to_float(2), value=1, out=out)
     assert (pi + (1 * (3 / 2)) - 2 * D.epsilon() <= out <= pi + (1 * (3 / 2)) + 2 * D.epsilon())
 
@@ -366,7 +366,7 @@ def test_addcmul_error(ffmt):
 def test_addcmul_within_tolerance_out(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
-    out = D.array([pi])
+    out = D.copy(pi)
     D.addcmul(pi, D.to_float(3), D.to_float(2), value=1, out=out)
     assert (pi + (1 * (3 * 2)) - 2 * D.epsilon() <= out <= pi + (1 * (3 * 2)) + 2 * D.epsilon())
 
@@ -473,7 +473,7 @@ def test_frac_within_tolerance(ffmt):
 def test_frac_within_tolerance_out(ffmt):
     D.set_float_fmt(ffmt)
     pi = D.to_float(D.pi)
-    out = D.array([pi])
+    out = D.copy(pi)
     D.frac(pi, out=out)
     assert (0.141592653589793238 - 2 * D.epsilon() <= out <= 0.141592653589793238 + 2 * D.epsilon())
 

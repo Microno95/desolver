@@ -3,6 +3,8 @@ from .common import *
 import numpy
 import scipy
 import scipy.special
+import scipy.sparse
+import scipy.sparse.linalg
 
 # Datatypes
 bool = numpy.bool
@@ -262,7 +264,10 @@ def logical_xor(a, b, out=None, where=True):
 nonzero = numpy.nonzero
 argsort = numpy.argsort
 
-def solve_linear_system(A,b,overwrite_a=True,overwrite_b=True,check_finite=False):
-    return scipy.linalg.solve(A,b,overwrite_a=overwrite_a,overwrite_b=overwrite_b,check_finite=check_finite)
+def solve_linear_system(A,b,overwrite_a=True,overwrite_b=True,check_finite=False,sparse=False):
+    if sparse:
+        return scipy.sparse.linalg.spsolve(scipy.sparse.csc_matrix(A),b)
+    else:
+        return scipy.linalg.solve(A,b,overwrite_a=overwrite_a,overwrite_b=overwrite_b,check_finite=check_finite)
 
 matrix_inv = numpy.linalg.inv

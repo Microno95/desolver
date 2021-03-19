@@ -207,12 +207,26 @@ class DiffRHS(object):
                 except:
                     self.md_repr = str(self.rhs)
             self.equ_repr = str(self.rhs)
+        if hasattr(self.rhs, 'jac'):
+            self.__jac = self.rhs.jac
+            self.__jac_time = None
+            self.__jac_is_wrapped_rhs = False
+        else:
+            self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(0.0, y, **kwargs), flat=True)
+            self.__jac_time = 0.0
+            self.__jac_is_wrapped_rhs = True
         self.nfev = 0
         
     def __call__(self, t, y, *args, **kwargs):
         called_val = self.rhs(t, y, *args, **kwargs)
         self.nfev += 1
         return called_val
+    
+    def jac(self, t, y, *args, **kwargs):
+        if self.__jac_is_wrapped_rhs and t != self.__jac_time:
+            self.__jac_time = t
+            self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(t, y, **kwargs), flat=True)
+        return self.__jac(y, *args, **kwargs)
 
     def __str__(self):
         return self.equ_repr
@@ -557,11 +571,10 @@ class OdeSystem(object):
     def initialise_integrator(self):
         integrator_kwargs = dict(dtype=self.y[0].dtype, device=self.device)
         
-        if self.method.__adaptive__:
-            integrator_kwargs['atol'] = self.atol
-            integrator_kwargs['rtol'] = self.rtol
+        integrator_kwargs['atol'] = self.atol
+        integrator_kwargs['rtol'] = self.rtol
             
-        if self.method.__symplectic__:
+        if self.method.__symplectic__ and not self.method.__implicit__:
             integrator_kwargs['staggered_mask'] = self.staggered_mask
             
         self.integrator = self.method(self.dim, **integrator_kwargs)

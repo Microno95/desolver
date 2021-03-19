@@ -230,7 +230,7 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
         print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}, conv={true_conv}".format(**locals()))
     return b, true_conv
 
-def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000):
+def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, sparse=False):
     if tol is None:
         if D.epsilon() <= 1e-5:
             tol = 32*D.epsilon()
@@ -267,9 +267,9 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000):
                 if x.dtype == object:
                     dx = D.matrix_inv(Jf0, tol=tol)@(-D.reshape(F0, (-1, 1)))
                 else:
-                    dx = D.solve_linear_system(Jf0.astype(D.float64), -D.reshape(F0, (-1, 1)).astype(D.float64))
+                    dx = D.solve_linear_system(Jf0.astype(D.float64), -D.reshape(F0, (-1, 1)).astype(D.float64), sparse=sparse)
             else:
-                dx = D.solve_linear_system(Jf0, -D.reshape(F0, (-1, 1)))
+                dx = D.solve_linear_system(Jf0, -D.reshape(F0, (-1, 1)), sparse=sparse)
         if verbose:
             print("[{iteration}]: x = {x}, dx = {dx}, F = {F0}, Jf = {Jf0}".format(**locals()))
             print()

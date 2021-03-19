@@ -2,6 +2,7 @@ import numpy
 import pyaudi
 import scipy
 import scipy.special
+import builtins
 
 from .common import *
 from .numpy_backend import *
@@ -76,9 +77,11 @@ float_fmts.update({
 
 
 def to_float(x):
-    if isinstance(numpy.atleast_1d(numpy.asanyarray(x))[0], gdual_vdouble):
+    if isinstance(numpy.asanyarray(x).reshape(-1)[0], gdual_vdouble):
         if numpy.asanyarray(x).ndim > 0:
-            return numpy.stack([i.constant_cf for i in numpy.asanyarray(x)]).astype(float64)
+            unstacked = [to_float(i) for i in numpy.asanyarray(x)]
+            max_dim   = builtins.max(builtins.map(shape, unstacked), key=len)
+            return numpy.stack([numpy.resize(i, max_dim) for i in unstacked]).astype(float64)
         else:
             return numpy.array(numpy.asanyarray(x).item().constant_cf).astype(float64)
     else:
