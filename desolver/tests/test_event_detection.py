@@ -66,7 +66,8 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
 
         a.integrate(eta=True, events=[time_event, second_time_event, first_y_event])
 
-        print(a.events, D.pi / 32, analytic_soln(D.pi/32, y_init), analytic_soln(D.pi/32, y_init)[0] - a.events[0].y)
+        print(a.events)
+        print(D.pi / 32, analytic_soln(D.pi/32, y_init), analytic_soln(D.pi/32, y_init)[0] - a.events[0].y[0])
         try:
             assert (D.abs(a.events[0].y[0] - analytic_soln(D.pi/16, y_init)[0]) <= 10 * (D.epsilon()**0.1))
             assert (D.abs(a.events[1].t - D.pi / 16) <= 10 * D.epsilon())
@@ -74,10 +75,10 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
             assert (D.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon())
             assert (len(a.events) == 3)
         except:
-            print("Event detection with integrator {} failed with t[-1] = {}".format(a.integrator, a.t[-1]))
+            print("Event detection with integrator {} failed with t[-1] = {}, expected = {}, diff = {}".format(a.integrator, a.t[-1], D.pi / 8, a.t[-1] - D.pi / 8))
             raise RuntimeError("Failed to detect event for integrator {}".format(str(method)))
         else:
-            print("Event detection with integrator {} succeeded with t[-1] = {}".format(a.integrator, a.t[-1]))
+            print("Event detection with integrator {} succeeded with t[-1] = {}, expected = {}, diff = {}".format(a.integrator, a.t[-1], D.pi / 8, a.t[-1] - D.pi / 8))
         a.reset()
     print("")
 

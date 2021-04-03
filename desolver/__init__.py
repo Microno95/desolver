@@ -9,11 +9,3 @@ from .integrators import available_methods
 from . import tests
 from .utilities import tests
 from .exception_types import tests
-
-try:
-    # Pytest testing
-    from numpy._pytesttester import PytestTester
-    test = PytestTester(__name__)
-    del PytestTester
-except:
-    pass
