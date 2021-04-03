@@ -57,7 +57,7 @@ class JacobianWrapper(object):
         unravelled_y  = D.reshape(y, (-1,))
         dy_val        = self.rhs(y, **kwargs)
         unravelled_dy = D.reshape(dy_val, (-1,))
-        jacobian_y    = D.zeros((*D.shape(unravelled_y), *D.shape(unravelled_dy)), dtype=unravelled_dy.dtype)
+        jacobian_y    = D.zeros((*D.shape(unravelled_dy), *D.shape(unravelled_y)), dtype=unravelled_dy.dtype)
         if D.backend() == 'torch':
             jacobian_y = jacobian_y.to(y.device)
         for idx,val in enumerate(unravelled_y):
@@ -68,22 +68,22 @@ class JacobianWrapper(object):
 
             # 1*f[i-2]-8*f[i-1]+0*f[i+0]+8*f[i+1]-1*f[i+2]
             y_jac[idx] = val + 2*dy_cur
-            jacobian_y[idx]  = -D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+            jacobian_y[:, idx]  = -D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
             y_jac[idx] = val + dy_cur
-            jacobian_y[idx] += 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+            jacobian_y[:, idx] += 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
             y_jac[idx] = val - 2*dy_cur
-            jacobian_y[idx] += D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+            jacobian_y[:, idx] += D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
             y_jac[idx] = val - dy_cur
-            jacobian_y[idx] -= 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+            jacobian_y[:, idx] -= 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
 
-            jacobian_y[idx] = jacobian_y[idx] / (12*dy_cur)
+            jacobian_y[:, idx] = jacobian_y[:, idx] / (12*dy_cur)
         
         if self.flat:
             if D.shape(jacobian_y) == (1,1):
                 return jacobian_y[0,0]
             return jacobian_y
         else:
-            return jacobian_y.reshape((*D.shape(y), *D.shape(dy_val)))
+            return jacobian_y.reshape((*D.shape(dy_val), *D.shape(y)))
     
     def richardson(self, y, dy=1e-1, factor=2.0, **kwargs):
         A       = [[self.estimate(y, dy=dy * (factor**-m), **kwargs)] for m in range(self.richardson_iter)]
