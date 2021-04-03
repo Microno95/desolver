@@ -76,7 +76,7 @@ def handle_events(sol, events, consts, direction, is_terminal):
     roots, success = root_finder(
         ev_f,
         [t_prev, t_next],
-        tol=4*D.epsilon()
+        tol=D.epsilon()
     )
     
     roots = D.asarray(roots)
@@ -100,7 +100,7 @@ def handle_events(sol, events, consts, direction, is_terminal):
         active_events = D.nonzero(mask)[0]
     else:
         active_events = D.reshape(D.nonzero(mask)[0], (-1,))
-    
+        
     roots     = roots[active_events]
     terminate = False
     
@@ -223,11 +223,24 @@ class DiffRHS(object):
         return called_val
     
     def jac(self, t, y, *args, **kwargs):
-        if self.__jac_is_wrapped_rhs and t != self.__jac_time:
-            self.__jac_time = t
-            self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(t, y, **kwargs), flat=True)
-        return self.__jac(y, *args, **kwargs)
+        if self.__jac_is_wrapped_rhs:
+            if t != self.__jac_time:
+                self.__jac_time = t
+                self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(t, y, **kwargs), flat=True)
+            return self.__jac(y, *args, **kwargs)
+        else:
+            return self.__jac(t, y, *args, **kwargs)
 
+    def hook_jacobian_call(self, jac_fn):
+        self.__jac = jac_fn
+        self.__jac_time = None
+        self.__jac_is_wrapped_rhs = False
+        
+    def unhook_jacobian_call(self):
+        self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(0.0, y, **kwargs), flat=True)
+        self.__jac_time = 0.0
+        self.__jac_is_wrapped_rhs = True
+    
     def __str__(self):
         return self.equ_repr
     
@@ -776,10 +789,10 @@ class OdeSystem(object):
                 dTime  = dTime  + cTime
 
                 self.__y[self.counter+1] = self.__y[self.counter] + dState
-                self.__t[self.counter+1] = self.__t[self.counter] + dTime 
+                self.__t[self.counter+1] = self.__t[self.counter] + dTime
 
-                cState = (self.__y[self.counter] - self.__y[self.counter+1]) + dState
-                cTime  = (self.__t[self.counter] - self.__t[self.counter+1]) + dTime
+                cState = (self.__y[self.counter+1] - self.__y[self.counter]) - dState
+                cTime  = (self.__t[self.counter+1] - self.__t[self.counter]) - dTime
 
                 self.counter += 1
 
@@ -793,27 +806,35 @@ class OdeSystem(object):
                             total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
                             self.__allocate_soln_space(total_steps)
 
-                        prev_time = self.__t[self.counter - 1]
-                        prev_y    = self.__y[self.counter - 1]
+                        prev_time  = self.__t[self.counter - 1]
+                        prev_state = self.__y[self.counter - 1]
+                        
                         self.counter -= 1
 
                         for root in roots:
                             if root != self.__t[self.counter]:
-                                self.__t[self.counter+1] = root
-                                self.__y[self.counter+1] = tsol(root)
-                                self.__events.append(StateTuple(t=self.__t[self.counter+1], y=self.__y[self.counter+1]))
-                                self.counter += 1
+# #                                 _, (new_dTime, new_dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter], self.constants, timestep=root - self.__t[self.counter])
+#                                 self.__t[self.counter+1] = root
+#                                 self.__y[self.counter+1] = tsol(root) # self.__y[self.counter] + new_dState
+#                                 self.__events.append(StateTuple(t=self.__t[self.counter+1], y=self.__y[self.counter+1]))
+#                                 self.counter += 1
+                                prev_dt = self.dt
+                                self.integrate(root)
+                                self.__events.append(StateTuple(t=self.__t[self.counter], y=self.__y[self.counter]))
+                                self.dt = prev_dt
 
                         if end_int:
                             tsol            = self.get_step_interpolant()
                             self.int_status = 2
                             self.success    = True
                         else:
-                            self.__t[self.counter+1] = prev_time + dTime
-                            self.__y[self.counter+1] = prev_y    + dState
+                            if self.counter+len(roots)+1 >= len(self.__y):
+                                total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
+                                self.__allocate_soln_space(total_steps)
+                            self.__t[self.counter+1] = prev_time  + dTime 
+                            self.__y[self.counter+1] = prev_state + dState
                             self.counter += 1
-
-                    if self.__dense_output:
+                    elif self.__dense_output:
                         self.sol.add_interpolant(self.__t[self.counter], tsol)
 
                 if tqdm_progress_bar is not None:
