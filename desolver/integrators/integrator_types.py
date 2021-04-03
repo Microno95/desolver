@@ -15,8 +15,8 @@ class ExplicitIntegrator(IntegratorTemplate):
     
     def __init__(self, sys_dim, aux_shape, adaptive, dtype=None, rtol=None, atol=None):
         self.dim        = sys_dim
-        self.rtol       = rtol
-        self.atol       = atol
+        self.rtol       = rtol if rtol is not None else 32 * D.epsilon()
+        self.atol       = atol if atol is not None else 32 * D.epsilon()
         self.adaptive   = adaptive
         self.dtype      = dtype
         self.aux        = D.zeros((*aux_shape, *self.dim), dtype=self.dtype)
@@ -38,8 +38,8 @@ class ImplicitIntegrator(IntegratorTemplate):
     
     def __init__(self, sys_dim, aux_shape, adaptive, dtype=None, rtol=None, atol=None):
         self.dim        = sys_dim
-        self.rtol       = rtol
-        self.atol       = atol
+        self.rtol       = rtol if rtol is not None else 32 * D.epsilon()
+        self.atol       = atol if atol is not None else 32 * D.epsilon()
         self.adaptive   = adaptive
         self.dtype      = dtype
         self.aux        = D.zeros((*aux_shape, *self.dim), dtype=self.dtype)
@@ -288,8 +288,8 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
         initial_guess = D.to_float((D.zeros_like(self.aux) + self.dState[None, :]))
         try:
             aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=250, sparse=True)
-            if not success:
-                raise exception_types.FailedIntegrationError("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, newton_tol, num_iter))
+            if not success and prec > self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))):
+                raise exception_types.FailedIntegrationError("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, 32*D.epsilon(), num_iter))
         except:
             raise
             
