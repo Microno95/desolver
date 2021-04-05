@@ -32,7 +32,7 @@ with open(os.path.join(setup_py_path, "README.rst"), "r") as fh:
     long_description = fh.read()
 
 name    = 'desolver'
-release = '4.1.3'
+release = '4.2.0'
 version = ".".join(release.split(".")[:2])
     
 setup(name=name,
@@ -42,14 +42,14 @@ setup(name=name,
       author_email='ekin.ozturk@mail.utoronto.ca',
       long_description=long_description,
       long_description_content_type="text/x-rst",
-      install_requires=['numpy>=1.17', 'tqdm', 'scipy>=0.18.0'],
+      install_requires=['numpy>=1.18', 'tqdm>=4.47.0', 'scipy>=1.4.1'],
       license='MIT',
       keywords=['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode'],
       url='https://github.com/Microno95/desolver',
       packages=['desolver', 'desolver.integrators', 'desolver.exception_types', 'desolver.utilities', 'desolver.backend'],
       extras_require={
-        'pyaudi':   ["pyaudi>=1.7", "numpy>=1.17"],
-        'pytorch':  ["torch>=1.8.0", "torchvision>=0.2.2", "numpy>=1.17"],
+        'pyaudi':   ["pyaudi>=1.7", "numpy>=1.18"],
+        'pytorch':  ["torch>=1.8.0", "torchvision>=0.2.2", "numpy>=1.18"],
       },
       classifiers=[
           # How mature is this project? Common values are
