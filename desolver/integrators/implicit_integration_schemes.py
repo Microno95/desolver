@@ -17,8 +17,7 @@ class GaussLegendre4(ImplicitRungeKuttaIntegrator):
     )
 
     final_state = numpy.array(
-        [[0,    0.5,       0.5],
-         [0,    0.5 + s/2, 0.5 - s/2]], dtype=numpy.float64
+        [[0,    0.5,       0.5]], dtype=numpy.float64
     )
     
     del s
@@ -38,8 +37,7 @@ class GaussLegendre6(ImplicitRungeKuttaIntegrator):
     )
 
     final_state = numpy.array(
-        [[0,  5/18, 4/9,  5/18],
-         [0, -5/6,  8/3, -5/6]], dtype=numpy.float64
+        [[0,  5/18, 4/9,  5/18]], dtype=numpy.float64
     )
     
     del s
@@ -56,8 +54,7 @@ class LobattoIIIA2(ImplicitRungeKuttaIntegrator):
     )
 
     final_state = numpy.array(
-        [[0,    0.5,    0.5],
-         [0,    1.0,    0.0]], dtype=numpy.float64
+        [[0,    0.5,    0.5]], dtype=numpy.float64
     )
     
 class LobattoIIIA4(ImplicitRungeKuttaIntegrator):
@@ -73,8 +70,7 @@ class LobattoIIIA4(ImplicitRungeKuttaIntegrator):
     )
 
     final_state = numpy.array(
-        [[0, 1/6,  2/3,  1/6],
-         [0, -0.5, 2.0, -0.5]], dtype=numpy.float64
+        [[0, 1/6,  2/3,  1/6]], dtype=numpy.float64
     )
     
 class LobattoIIIB2(ImplicitRungeKuttaIntegrator):
@@ -105,8 +101,7 @@ class LobattoIIIB4(ImplicitRungeKuttaIntegrator):
     )
 
     final_state = numpy.array(
-        [[0, 1/6,  2/3,  1/6],
-         [0, -0.5, 2.0, -0.5]], dtype=numpy.float64
+        [[0, 1/6,  2/3,  1/6]], dtype=numpy.float64
     )
     
 class LobattoIIIC2(ImplicitRungeKuttaIntegrator):
@@ -121,8 +116,7 @@ class LobattoIIIC2(ImplicitRungeKuttaIntegrator):
     )
 
     final_state = numpy.array(
-        [[0,    0.5,    0.5],
-         [0,    1.0,    0.0]], dtype=numpy.float64
+        [[0,    0.5,    0.5]], dtype=numpy.float64
     )
     
 class LobattoIIIC4(ImplicitRungeKuttaIntegrator):
@@ -214,8 +208,7 @@ class RadauIA3(ImplicitRungeKuttaIntegrator):
     )
 
     final_state = numpy.array(
-        [[0, 1/4, 3/4],
-         [0, 1,   0  ]], dtype=numpy.float64
+        [[0, 1/4, 3/4]], dtype=numpy.float64
     )
     
     
@@ -234,8 +227,7 @@ class RadauIA5(ImplicitRungeKuttaIntegrator):
     )
 
     final_state = numpy.array(
-        [[0, 1/9, 4/9+s/36, 4/9-s/36],
-         [0, -1,  1+7*s/13, 1-7*s/13]], dtype=numpy.float64
+        [[0, 1/9, 4/9+s/36, 4/9-s/36]], dtype=numpy.float64
     )
     
     del s
@@ -253,8 +245,7 @@ class RadauIIA3(ImplicitRungeKuttaIntegrator):
     )
 
     final_state = numpy.array(
-        [[0, 3/4,  1/4],
-         [0, 3/2, -1/2]], dtype=numpy.float64
+        [[0, 3/4,  1/4]], dtype=numpy.float64
     )
     
 class RadauIIA5(ImplicitRungeKuttaIntegrator):
