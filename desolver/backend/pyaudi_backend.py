@@ -114,6 +114,7 @@ def __matrix_inv_helper(A_in, tol=epsilon()):
         raise numpy.linalg.LinAlgError("Matrix has a determinant of {} which makes it non-invertible".format(detA))
     A = copy(A_in)
     I = eye(shape(A)[0], dtype=A.dtype)
+    P = eye(shape(A)[0], dtype=A.dtype)
     h = 0 # Initialization of the pivot row
     k = 0 # Initialization of the pivot column
 
@@ -125,6 +126,7 @@ def __matrix_inv_helper(A_in, tol=epsilon()):
             k = k + 1
         else:
             A[h], A[i_max] = copy(A[i_max]), copy(A[h])
+            P[h], P[i_max] = copy(P[i_max]), copy(P[h])
             for i in range(h+1, shape(A)[0]):
                 f = A[i, k] / A[h, k]
                 A[i, :] = A[i, :] - f * A[h, :]
@@ -135,12 +137,15 @@ def __matrix_inv_helper(A_in, tol=epsilon()):
     for k in range(shape(A)[1]-1, -1, -1):
         I[k, :] = I[k, :] / A[k, k]
         A[k, :] = A[k, :] / A[k, k]
-        f         = (A[k-1,k] / A[k,k])
-        A[k-1, :] = A[k-1, :] - f*A[k,:]
-        I[k-1, :] = I[k-1, :] - f*I[k, :]
+        for i in range(k):
+            f       = (A[i,k] / A[k,k])
+            A[i, :] = A[i, :] - f*A[k,:]
+            I[i, :] = I[i, :] - f*I[k, :]
+        
+    I = I@P
         
     Ik = I@A_in
-    for _ in range(10):
+    for _ in range(25):
         I  = 2*I - Ik@I
         Ik = I@A_in
         if max(abs(to_float(Ik))) - 1 <= tol:

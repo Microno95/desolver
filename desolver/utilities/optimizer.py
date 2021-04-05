@@ -250,6 +250,7 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
     else:
         x = D.reshape(x0, tuple())
     w_relax = 0.5
+    prec    = numpy.inf
     for iteration in range(maxiter):
         if D.backend() == 'torch' and not jac_provided:
             _x  = x.detach().clone()
@@ -264,7 +265,7 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
             dx = -D.reshape(F0, tuple()) / D.reshape(Jf0, tuple())
         else:
             if D.backend() == 'numpy':
-                if x.dtype == object:
+                if F0.dtype == object or Jf0.dtype == object:
                     dx = D.matrix_inv(Jf0, tol=tol)@(-D.reshape(F0, (-1, 1)))
                 else:
                     dx = D.solve_linear_system(Jf0.astype(D.float64), -D.reshape(F0, (-1, 1)).astype(D.float64), sparse=sparse)
@@ -274,8 +275,9 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
             print("[{iteration}]: x = {x}, dx = {dx}, F = {F0}, Jf = {Jf0}".format(**locals()))
             print()
         x = x+D.reshape(dx, D.shape(x))
-        if D.max(D.abs(D.to_float(dx))) <= tol:
+        prec = D.max(D.to_float(D.abs(dx)))
+        if prec <= tol:
             break
-    return x, (D.max(D.abs(D.to_float(dx))) <= tol, iteration, D.max(D.abs(D.to_float(dx))))
+    return x, (prec <= tol, iteration, prec)
 
 

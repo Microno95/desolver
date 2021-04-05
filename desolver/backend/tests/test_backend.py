@@ -885,6 +885,18 @@ def test_matrix_inv():
     with pytest.raises(np.linalg.LinAlgError):
         D.matrix_inv(D.zeros((5,2,3), dtype=D.float64))
 
+@pytest.mark.skipif("gdual_double" not in D.available_float_fmt(), reason="Can't test dispatch without pyaudi overload")
+def test_matrix_inv_bigger():
+    for diag_size in range(2, 251):
+        np.random.seed(15)
+        for trial in range(5):
+            A = np.random.normal(size=(diag_size,diag_size))
+            while np.abs(np.linalg.det(D.to_float(A))) <= 1e-5:
+                A = np.random.normal(size=(diag_size,diag_size), std=250.0)
+            A = D.array(D.cast_to_float_fmt(A))
+            Ainv = D.matrix_inv(A)
+            assert (D.max(D.abs(D.to_float(Ainv@A - D.eye(diag_size)))) <= 4*D.epsilon()**0.5), "Matrix inversion failed for diagonal with size: " + str(diag_size)
+
 class PyAudiTestCase:
     @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_double' not in D.available_float_fmt(), reason="PyAudi Tests")
     def test_gdual_double(self):
