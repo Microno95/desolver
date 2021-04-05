@@ -38,6 +38,9 @@ class ImplicitIntegrator(IntegratorTemplate):
     
     def __init__(self, sys_dim, aux_shape, adaptive, dtype=None, rtol=None, atol=None):
         self.dim        = sys_dim
+        self.numel      = 1
+        for i in self.dim:
+            self.numel *= int(i)
         self.rtol       = rtol if rtol is not None else 32 * D.epsilon()
         self.atol       = atol if atol is not None else 32 * D.epsilon()
         self.adaptive   = adaptive
@@ -114,23 +117,22 @@ class ExplicitRungeKuttaIntegrator(ExplicitIntegrator):
             tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (self.aux.ndim - 1))
 
             for stage in range(D.shape(self.aux)[0]):
-                current_state   = initial_state    + D.sum(self.tableau[stage][tableau_idx_expand] * self.aux, axis=0)
-                self.aux[stage] = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants) * timestep
+                current_state   = initial_state    + D.sum(timestep * self.tableau[stage][tableau_idx_expand] * self.aux, axis=0)
+                self.aux[stage] = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants)
                 
-                           
-            self.dState = D.sum(self.final_state[0][tableau_idx_expand] * self.aux, axis=0)
+            self.dState = timestep * D.sum(self.final_state[0][tableau_idx_expand] * self.aux, axis=0)
             self.dTime  = D.copy(timestep)
             
             if self.adaptive:
-                diff = self.get_error_estimate(self.dState, self.dTime, self.aux, tableau_idx_expand)
+                diff = timestep * self.get_error_estimate(tableau_idx_expand)
                 timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, timestep)
                 if redo_step:
                     timestep, (self.dTime, self.dState) = self(rhs, initial_time, initial_state, constants, timestep)
             
             return timestep, (self.dTime, self.dState)
         
-    def get_error_estimate(self, dState, dTime, aux, tableau_idx_expand):
-        return dState - D.sum(self.final_state[1][tableau_idx_expand] * aux, axis=0)
+    def get_error_estimate(self, tableau_idx_expand):
+        return D.sum((self.final_state[1] - self.final_state[0])[tableau_idx_expand] * self.aux, axis=0)
 
     __call__ = forward
 
@@ -261,7 +263,7 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             self.dTime       = self.dTime.to(device)
             self.aux         = self.aux.to(device)
             self.tableau     = self.tableau.to(device)
-            self.final_state = self.final_state.to(device)
+            self.final_state = self.final_state.to(device)        
             
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
         if self.tableau is None:
@@ -270,24 +272,50 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (self.aux.ndim - 1))
 
         aux_shape = self.aux.shape
+        
         def nfun(next_state):
-            auxiliary_states = D.reshape(next_state, aux_shape)
-            root_states      = D.stack([
-                rhs(initial_time + tbl[0] * timestep, initial_state + timestep * D.sum(tbl[tableau_idx_expand] * auxiliary_states, axis=0), **constants) for tbl in self.tableau
+            __aux_states = D.reshape(next_state, aux_shape)
+            __rhs_states = D.stack([
+                rhs(initial_time + tbl[0] * timestep, initial_state + timestep * D.sum(tbl[tableau_idx_expand] * __aux_states, axis=0), **constants) for tbl in self.tableau
             ])
-            if len(aux_shape) > 1 or aux_shape[0] > 1:
-                return D.reshape(auxiliary_states - root_states, (-1,))
-            else:
-                return D.reshape(auxiliary_states - root_states, tuple())
-    
-        if D.backend() != 'torch':
-            nfun_jac   = utilities.JacobianWrapper(nfun, flat=True)
-        else:
-            nfun_jac   = None
+            __states =  D.reshape(__aux_states - __rhs_states, (-1,))
+            if __states.dtype == object:
+                __states = D.to_float(__states)
+            return __states
+        
+        def __nfun_jac(next_state):
+            nonlocal self
+            __aux_states = D.reshape(next_state, aux_shape)
+            __step       = self.numel
+            __jac        = D.eye(self.tableau.shape[0]*__step)
+            __prev_idx   = -1
+            __rhs_jac = D.stack([
+                rhs.jac(initial_time + tbl[0] * timestep, initial_state + timestep * D.sum(tbl[tableau_idx_expand] * __aux_states, axis=0), **constants) for tbl in self.tableau
+            ])
+            for idx in range(0,__jac.shape[0],__step):
+                for jdx in range(0,__jac.shape[1],__step):
+                    __jac[idx:idx+__step, jdx:jdx+__step] -= timestep * self.tableau[idx//__step, 1+jdx//__step]*__rhs_jac[idx//__step]
+            if __jac.shape[0] == 1 and __jac.shape[1] == 1:
+                __jac = D.reshape(__jac, tuple())
+            if __jac.dtype == object:
+                __jac = D.to_float(__jac)
+            return __jac
             
-        initial_guess = D.to_float((D.zeros_like(self.aux) + self.dState[None, :]))
+        initial_guess = D.to_float((D.zeros_like(self.aux) + self.dState[None]))
+        if rhs.jac_is_wrapped_rhs:
+            if D.backend() != 'torch':
+                nfun_jac = utilities.JacobianWrapper(nfun, flat=True)
+                sparsity = 1.0 - D.sum(D.abs(D.to_float(nfun_jac(initial_guess))) > 0) / (self.tableau.shape[0]*self.numel)**2
+            else:
+                nfun_jac = None
+                initial_guess.requires_grad = True
+                sparsity = 1.0 - D.sum(D.jacobian(nfun(initial_guess), initial_guess) > 0) / (self.tableau.shape[0]*self.numel)**2
+        else:
+            nfun_jac = __nfun_jac
+            sparsity = 1.0 - D.sum(D.abs(D.to_float(nfun_jac(initial_guess))) > 0) / (self.tableau.shape[0]*self.numel)**2
+            
         try:
-            aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=250, sparse=True)
+            aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=250, sparse=sparsity >= 0.7)
             if not success and prec > self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))):
                 raise exception_types.FailedIntegrationError("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, 32*D.epsilon(), num_iter))
         except:
@@ -302,24 +330,12 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
         self.dTime  = D.copy(timestep)
         
         if self.adaptive:
-            diff = timestep * self.get_error_estimate(tableau_idx_expand)
+            diff =  timestep * self.get_error_estimate(tableau_idx_expand)
             timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, timestep)
             if redo_step:
                 timestep, (self.dTime, self.dState) = self(rhs, initial_time, initial_state, constants, timestep)
 
         return timestep, (self.dTime, self.dState)
-    
-    def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.8):
-        err_estimate = D.max(D.abs(D.to_float(diff)))
-        relerr       = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state) + self.rtol * D.abs(dState / timestep)))
-        if err_estimate != 0:
-            corr = timestep * tol * (relerr / err_estimate) ** (1.0 / self.order)
-            if corr != 0:
-                timestep = corr
-        if err_estimate > relerr:
-            return timestep, True
-        else:
-            return timestep, False
         
     def get_error_estimate(self, tableau_idx_expand):
         return D.sum((self.final_state[1] - self.final_state[0])[tableau_idx_expand] * self.aux, axis=0)
