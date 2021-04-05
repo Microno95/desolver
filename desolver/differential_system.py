@@ -212,34 +212,57 @@ class DiffRHS(object):
             self.__jac_time = None
             self.__jac_is_wrapped_rhs = False
         else:
-            self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(0.0, y, **kwargs), flat=True)
+            self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(0.0, y, **kwargs), flat=True)
             self.__jac_time = 0.0
             self.__jac_is_wrapped_rhs = True
         self.nfev = 0
+        self.njev = 0
         
     def __call__(self, t, y, *args, **kwargs):
+        """Calls the equation represented by self.rhs with the given arguments.
+        Tracks number of function evaluations.
+        """
         called_val = self.rhs(t, y, *args, **kwargs)
         self.nfev += 1
         return called_val
     
     def jac(self, t, y, *args, **kwargs):
+        """Returns the jacobian of self.rhs at a given time (t) and state (y).
+        Tracks number of jacobian evaluations.
+        
+        Uses a Richardson Extrapolated 5th order central finite differencing method
+        when a jacobian is not defined as self.rhs.jac or by self.hook_jacobian_call
+        """
         if self.__jac_is_wrapped_rhs:
             if t != self.__jac_time:
                 self.__jac_time = t
-                self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(t, y, **kwargs), flat=True)
-            return self.__jac(y, *args, **kwargs)
+                self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(t, y, **kwargs), flat=True)
+            called_val = self.__jac(y, *args, **kwargs)
         else:
-            return self.__jac(t, y, *args, **kwargs)
-
+            called_val = self.__jac(t, y, *args, **kwargs)
+        self.njev += 1
+        return called_val
+    
+    @property
+    def jac_is_wrapped_rhs(self):
+        return self.__jac_is_wrapped_rhs
+        
     def hook_jacobian_call(self, jac_fn):
+        """Attaches a function, jac_fn, that returns the jacobian of self.rhs
+        as an array with shape (state.numel(), rhs.numel()).
+        """
         self.__jac = jac_fn
         self.__jac_time = None
         self.__jac_is_wrapped_rhs = False
         
     def unhook_jacobian_call(self):
-        self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(0.0, y, **kwargs), flat=True)
-        self.__jac_time = 0.0
-        self.__jac_is_wrapped_rhs = True
+        """Detaches the jacobian function and replaces it with a finite difference
+        estimate if a jacobian function was originally attached.
+        """
+        if not self.__jac_is_wrapped_rhs:
+            self.__jac                = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(0.0, y, **kwargs), flat=True)
+            self.__jac_time           = 0.0
+            self.__jac_is_wrapped_rhs = True
     
     def __str__(self):
         return self.equ_repr
@@ -249,6 +272,19 @@ class DiffRHS(object):
 
     def __repr__(self):
         return "<DiffRHS({},{},{})>".format(repr(self.rhs), self.equ_repr, self.md_repr)
+    
+    def __copy__(self):
+        __new_diff_rhs = DiffRHS(self.rhs, self.equ_repr, self.md_repr)
+        if not self.jac_is_wrapped_rhs:
+            __new_diff_rhs.hook_jacobian_call(self.__jac)
+        return __new_diff_rhs
+    
+    def __deepcopy__(self, memo):
+        import copy
+        __new_diff_rhs = DiffRHS(copy.deepcopy(self.rhs, memo), copy.deepcopy(self.equ_repr, memo), copy.deepcopy(self.md_repr, memo))
+        if not self.jac_is_wrapped_rhs:
+            __new_diff_rhs.hook_jacobian_call(copy.deepcopy(self.__jac, memo))
+        return __new_diff_rhs
 
 def rhs_prettifier(equ_repr=None, md_repr=None):
     def rhs_wrapper(rhs):
@@ -295,10 +331,14 @@ class OdeSystem(object):
         if not callable(equ_rhs):
             raise TypeError("equ_rhs is not callable, please pass a callable object for the right hand side.")
             
-        if hasattr(equ_rhs, "equ_repr"):
-            self.equ_rhs     = DiffRHS(equ_rhs.rhs, equ_rhs.equ_repr, equ_rhs.md_repr)
+        if isinstance(equ_rhs, DiffRHS):
+            import copy
+            self.equ_rhs = copy.copy(equ_rhs)
         else:
-            self.equ_rhs     = DiffRHS(equ_rhs)
+            if hasattr(equ_rhs, "equ_repr"):
+                self.equ_rhs     = DiffRHS(equ_rhs.rhs, equ_rhs.equ_repr, equ_rhs.md_repr)
+            else:
+                self.equ_rhs     = DiffRHS(equ_rhs)
             
         self.__rtol      = rtol
         self.__atol      = atol
@@ -377,6 +417,12 @@ class OdeSystem(object):
         """The number of function evaluations used during the numerical integration
         """
         return self.equ_rhs.nfev
+    
+    @property
+    def njev(self):
+        """The number of jacobian evaluations used during the numerical integration
+        """
+        return self.equ_rhs.njev
 
     @property
     def constants(self):
