@@ -13,10 +13,19 @@ implicit_integrator_set = [
 ]
 
 
+if D.backend() == 'torch':
+    devices_set = ['cpu']
+    import torch
+    if torch.cuda.is_available():
+        devices_set.insert(0, 'cuda')
+else:
+    devices_set = [None]
+
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
-def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation):
+@pytest.mark.parametrize('device', devices_set)
+def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation, device):
     if integrator.__implicit__ and use_richardson_extrapolation:
         pytest.skip("Implicit methods are unstable with richardson extrapolation")
     if ffmt == 'float16':
@@ -29,6 +38,8 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
         torch.set_printoptions(precision=17)
 
         torch.autograd.set_detect_anomaly(True)
+        
+        device = torch.device(device)
 
     print("Testing event detection for float format {}".format(D.float_fmt()))
 
@@ -36,11 +47,20 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
 
     de_mat, rhs, analytic_soln, y_init, dt, _ = set_up_basic_system(integrator, hook_jacobian=True)
 
+    if D.backend() == 'torch':
+        y_init = y_init.to(device)
+
     def time_event(t, y, **kwargs):
-        return t - D.pi / 8
+        out = D.array(t - D.pi / 8)
+        if D.backend() == 'torch':
+            out = out.to(device)
+        return out
 
     def second_time_event(t, y, **kwargs):
-        return t - D.pi / 16
+        out = D.array(t - D.pi / 16)
+        if D.backend() == 'torch':
+            out = out.to(device)
+        return out
 
     def first_y_event(t, y, **kwargs):
         return y[0] - analytic_soln(D.pi / 32, y_init)[0]
@@ -52,8 +72,8 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
     first_y_event.is_terminal = False
     first_y_event.direction = 0
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=0.01, rtol=D.epsilon() ** 0.5,
-                     atol=D.epsilon() ** 0.5)
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=D.pi / 64, rtol=min(1e-3, D.epsilon()**0.5),
+                     atol=min(1e-3, D.epsilon()**0.5))
     a.set_kick_vars(D.array([0,1],dtype=D.bool))
 
     method = integrator
@@ -69,17 +89,12 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
 
         print(a.events)
         print(D.pi / 32, analytic_soln(D.pi/32, y_init), analytic_soln(D.pi/32, y_init)[0] - a.events[0].y[0])
-        try:
-            assert (D.abs(a.events[0].y[0] - analytic_soln(D.pi/16, y_init)[0]) <= 10 * (D.epsilon()**0.1))
-            assert (D.abs(a.events[1].t - D.pi / 16) <= 10 * D.epsilon())
-            assert (D.abs(a.events[2].t - D.pi / 8) <= 10 * D.epsilon())
-            assert (D.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon())
-            assert (len(a.events) == 3)
-        except:
-            print("Event detection with integrator {} failed with t[-1] = {}, expected = {}, diff = {}".format(a.integrator, a.t[-1], D.pi / 8, a.t[-1] - D.pi / 8))
-            raise RuntimeError("Failed to detect event for integrator {}".format(str(method)))
-        else:
-            print("Event detection with integrator {} succeeded with t[-1] = {}, expected = {}, diff = {}".format(a.integrator, a.t[-1], D.pi / 8, a.t[-1] - D.pi / 8))
+        assert (D.abs(a.events[0].y[0] - D.array(analytic_soln(D.pi/32, y_init)[0])) <= 10 * (D.epsilon()**0.1))
+        assert (D.abs(a.events[1].t - D.array(D.pi / 16)) <= 10 * D.epsilon())
+        assert (D.abs(a.events[2].t - D.array(D.pi / 8)) <= 10 * D.epsilon())
+        assert (D.abs(a.t[-1] - D.array(D.pi / 8)) <= 10 * D.epsilon())
+        assert (len(a.events) == 3)
+        print("Event detection with integrator {} succeeded with t[-1] = {}, expected = {}, diff = {}".format(a.integrator, a.t[-1], D.pi / 8, a.t[-1] - D.pi / 8))
         a.reset()
     print("")
 
@@ -89,7 +104,8 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
-def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation):
+@pytest.mark.parametrize('device', devices_set)
+def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation, device):
     if integrator.__implicit__ and use_richardson_extrapolation:
         pytest.skip("Implicit methods are unstable with richardson extrapolation")
     if ffmt == 'float16':
@@ -103,20 +119,28 @@ def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation):
         torch.set_printoptions(precision=17)
 
         torch.autograd.set_detect_anomaly(True)
+        
+        device = torch.device(device)
 
     print("Testing event detection for float format {}".format(D.float_fmt()))
     from .common import set_up_basic_system
 
     de_mat, rhs, analytic_soln, y_init, dt, _ = set_up_basic_system(integrator, hook_jacobian=True)
 
+    if D.backend() == 'torch':
+        y_init = y_init.to(device)
+
     def time_event(t, y, **kwargs):
-        return t - D.pi / 8
+        out = D.array(t - D.pi / 8)
+        if D.backend() == 'torch':
+            out = out.to(device)
+        return out
 
     time_event.is_terminal = True
     time_event.direction = 0
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=0.01, rtol=D.epsilon() ** 0.5,
-                     atol=D.epsilon() ** 0.5)
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=D.pi / 64, rtol=min(1e-3, D.epsilon()**0.5),
+                     atol=min(1e-3, D.epsilon()**0.5))
 
     method = integrator
     if use_richardson_extrapolation:
@@ -131,14 +155,9 @@ def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation):
 
         assert (a.integration_status() == "Integration terminated upon finding a triggered event.")
 
-        try:
-            assert (D.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon())
-            assert (len(a.events) == 1)
-        except:
-            print("Event detection with integrator {} failed with t[-1] = {}".format(a.integrator, a.t[-1]))
-            raise RuntimeError("Failed to detect event for integrator {}".format(str(method)))
-        else:
-            print("Event detection with integrator {} succeeded with t[-1] = {}".format(a.integrator, a.t[-1]))
+        assert (D.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon())
+        assert (len(a.events) == 1)
+        print("Event detection with integrator {} succeeded with t[-1] = {}".format(a.integrator, a.t[-1]))
         a.reset()
     print("")
 

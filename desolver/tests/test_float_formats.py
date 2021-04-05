@@ -1,7 +1,7 @@
+import pytest
 import desolver as de
 import desolver.backend as D
 import numpy as np
-import pytest
 
 integrator_set = set(de.available_methods(False).values())
 integrator_set = sorted(integrator_set, key=lambda x: x.__name__)
@@ -13,10 +13,19 @@ implicit_integrator_set = [
 ]
 
 
+if D.backend() == 'torch':
+    devices_set = ['cpu']
+    import torch
+    if torch.cuda.is_available():
+        devices_set.insert(0, 'cuda')
+else:
+    devices_set = [None]
+
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
-def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolation):
+@pytest.mark.parametrize('device', devices_set)
+def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolation, device):
     if integrator.__implicit__ and use_richardson_extrapolation:
         pytest.skip("Implicit methods are unstable with richardson extrapolation")
     D.set_float_fmt(ffmt)
@@ -27,6 +36,8 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
         torch.set_printoptions(precision=17)
 
         torch.autograd.set_detect_anomaly(True)
+        
+        device = torch.device(device)
 
     print("Testing {} float format".format(D.float_fmt()))
 
@@ -34,11 +45,10 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
 
     de_mat, rhs, analytic_soln, y_init, dt, _ = set_up_basic_system(integrator)
 
-    def kbinterrupt_cb(ode_sys):
-        if ode_sys[-1][0] > D.pi:
-            raise KeyboardInterrupt("Test Interruption and Catching")
-
     y_init = D.array([1., 0.])
+    
+    if D.backend() == 'torch':
+        y_init = y_init.to(device)
 
     a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=0.01, rtol=D.epsilon() ** 0.5,
                      atol=D.epsilon() ** 0.5)
@@ -54,11 +64,6 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
         a.set_method(method)
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
-
-        try:
-            a.integrate(callback=kbinterrupt_cb, eta=True)
-        except KeyboardInterrupt as e:
-            pass
 
         a.integrate(eta=True)
 
@@ -78,7 +83,8 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
-def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapolation):
+@pytest.mark.parametrize('device', devices_set)
+def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapolation, device):
     if integrator.__implicit__ and use_richardson_extrapolation:
         pytest.skip("Implicit methods are unstable with richardson extrapolation")
     D.set_float_fmt(ffmt)
@@ -89,6 +95,8 @@ def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapola
         torch.set_printoptions(precision=17)
 
         torch.autograd.set_detect_anomaly(True)
+        
+        device = torch.device(device)
 
     print("Testing {} float format".format(D.float_fmt()))
 
@@ -98,16 +106,20 @@ def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapola
     
     @de.rhs_prettifier("""[vx, -x+t]""")
     def rhs(t, state, **kwargs):
-        return D.sum(de_mat[:, :, None, None, None] * state, axis=1) + D.array([0.0, t])[:, None, None, None]
-
-    def kbinterrupt_cb(ode_sys):
-        if ode_sys[-1][0] > D.pi:
-            raise KeyboardInterrupt("Test Interruption and Catching")
+        nonlocal de_mat
+        extra = D.array([0.0, t])
+        if D.backend() == 'torch':
+            de_mat = de_mat.to(state.device)
+            extra  = extra.to(state.device)
+        return D.sum(de_mat[:, :, None, None, None] * state, axis=1) + extra[:, None, None, None]
 
     y_init = D.array([[[[1., 0.]]*1]*1]*3).T
+    
+    if D.backend() == 'torch':
+        y_init = y_init.to(device)
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=0.01, rtol=D.epsilon() ** 0.5,
-                     atol=D.epsilon() ** 0.5)
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=0.01, rtol=D.epsilon()**0.5,
+                     atol=D.epsilon()**0.5)
     if a.integrator.__implicit__:
         a.rtol = a.atol = D.epsilon()**0.25
 
@@ -120,11 +132,6 @@ def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapola
     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
         a.set_method(method)
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
-
-        try:
-            a.integrate(callback=kbinterrupt_cb, eta=True)
-        except KeyboardInterrupt as e:
-            pass
 
         a.integrate(eta=True)
 
@@ -142,7 +149,8 @@ def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapola
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', implicit_integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
-def test_float_formats_test_jacobian_is_called(ffmt, integrator, use_richardson_extrapolation):
+@pytest.mark.parametrize('device', devices_set)
+def test_float_formats_test_jacobian_is_called(ffmt, integrator, use_richardson_extrapolation, device):
     if integrator.__implicit__ and use_richardson_extrapolation:
         pytest.skip("Implicit methods are unstable with richardson extrapolation")
     D.set_float_fmt(ffmt)
@@ -153,6 +161,8 @@ def test_float_formats_test_jacobian_is_called(ffmt, integrator, use_richardson_
         torch.set_printoptions(precision=17)
 
         torch.autograd.set_detect_anomaly(True)
+        
+        device = torch.device(device)
 
     print("Testing {} float format".format(D.float_fmt()))
 
@@ -160,12 +170,11 @@ def test_float_formats_test_jacobian_is_called(ffmt, integrator, use_richardson_
 
     de_mat, rhs, analytic_soln, y_init, dt, _ = set_up_basic_system(integrator, hook_jacobian=True)
 
-    def kbinterrupt_cb(ode_sys):
-        if ode_sys[-1][0] > D.pi:
-            raise KeyboardInterrupt("Test Interruption and Catching")
-
     y_init = D.array([1., 0.])
 
+    if D.backend() == 'torch':
+        y_init = y_init.to(device)
+        
     a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=0.01, rtol=D.epsilon() ** 0.5,
                      atol=D.epsilon() ** 0.5)
     if a.integrator.__implicit__:
@@ -180,11 +189,6 @@ def test_float_formats_test_jacobian_is_called(ffmt, integrator, use_richardson_
     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
         a.set_method(method)
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
-
-        try:
-            a.integrate(callback=kbinterrupt_cb, eta=True)
-        except KeyboardInterrupt as e:
-            pass
 
         a.integrate(eta=True)
 

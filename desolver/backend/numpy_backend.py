@@ -7,7 +7,7 @@ import scipy.sparse
 import scipy.sparse.linalg
 
 # Datatypes
-bool = numpy.bool
+bool = bool
 float16 = numpy.float16
 float32 = numpy.float32
 float64 = numpy.float64

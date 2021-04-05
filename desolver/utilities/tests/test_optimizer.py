@@ -136,7 +136,7 @@ def test_brentsrootvec(ffmt, tol):
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
-@pytest.mark.parametrize('tol',  [None, 4, 1e-1])
+@pytest.mark.parametrize('tol',  [None, 40, 1])
 def test_newtonraphson(ffmt, tol):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
@@ -175,7 +175,7 @@ def test_newtonraphson(ffmt, tol):
 
         root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=jac, tol=tol, verbose=True, maxiter=50)
 
-        print(root, gt_root, x0, root - gt_root, 32*D.epsilon(), num_iter, prec)
+        print(success, prec <= tol if tol is not None else D.epsilon(), tol, root, gt_root, x0, root - gt_root, 32*D.epsilon(), num_iter, prec)
         
         assert (success)
         assert (np.allclose(D.to_numpy(D.to_float(gt_root)), D.to_numpy(D.to_float(root)), 32 * D.epsilon(),
@@ -183,7 +183,7 @@ def test_newtonraphson(ffmt, tol):
         assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32 * D.epsilon())
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
-@pytest.mark.parametrize('tol',  [None, 4, 1e-1])
+@pytest.mark.parametrize('tol',  [None, 40, 1])
 def test_newtonraphson_estimated_jac(ffmt, tol):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)

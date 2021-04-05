@@ -13,7 +13,7 @@ __all__ = [
 class ExplicitIntegrator(IntegratorTemplate):
     __implicit__ = False
     
-    def __init__(self, sys_dim, aux_shape, adaptive, dtype=None, rtol=None, atol=None):
+    def __init__(self, sys_dim, aux_shape, adaptive, dtype=None, rtol=None, atol=None, device=None):
         self.dim        = sys_dim
         self.rtol       = rtol if rtol is not None else 32 * D.epsilon()
         self.atol       = atol if atol is not None else 32 * D.epsilon()
@@ -22,6 +22,7 @@ class ExplicitIntegrator(IntegratorTemplate):
         self.aux        = D.zeros((*aux_shape, *self.dim), dtype=self.dtype)
         self.dState     = D.zeros(self.dim, dtype=self.dtype)
         self.dTime      = D.zeros(tuple(), dtype=self.dtype)
+        self.device     = device
         
     def dense_output(self, rhs, initial_time, initial_state):
         return CubicHermiteInterp(
@@ -36,7 +37,7 @@ class ExplicitIntegrator(IntegratorTemplate):
 class ImplicitIntegrator(IntegratorTemplate):
     __implicit__ = True
     
-    def __init__(self, sys_dim, aux_shape, adaptive, dtype=None, rtol=None, atol=None):
+    def __init__(self, sys_dim, aux_shape, adaptive, dtype=None, rtol=None, atol=None, device=None):
         self.dim        = sys_dim
         self.numel      = 1
         for i in self.dim:
@@ -48,6 +49,7 @@ class ImplicitIntegrator(IntegratorTemplate):
         self.aux        = D.zeros((*aux_shape, *self.dim), dtype=self.dtype)
         self.dState     = D.zeros(self.dim, dtype=self.dtype)
         self.dTime      = D.zeros(tuple(), dtype=self.dtype)
+        self.device     = device
         
     def dense_output(self, rhs, initial_time, initial_state):
         return CubicHermiteInterp(
@@ -95,7 +97,7 @@ class ExplicitRungeKuttaIntegrator(ExplicitIntegrator):
     __symplectic__ = False
 
     def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
-        super().__init__(sys_dim, (D.shape(self.tableau)[0],), D.shape(self.final_state)[0] == 2, dtype, rtol, atol)
+        super().__init__(sys_dim, (D.shape(self.tableau)[0],), D.shape(self.final_state)[0] == 2, dtype, rtol, atol, device)
         if dtype is None:
             self.tableau     = D.array(self.tableau)
             self.final_state = D.array(self.final_state)
@@ -104,11 +106,11 @@ class ExplicitRungeKuttaIntegrator(ExplicitIntegrator):
             self.final_state = D.to_type(self.final_state, dtype)
         
         if D.backend() == 'torch':
-            self.aux         = self.aux.to(device)
-            self.dState      = self.dState.to(device)
-            self.dTime       = self.dTime.to(device)
-            self.tableau     = self.tableau.to(device)
-            self.final_state = self.final_state.to(device)
+            self.aux         = self.aux.to(self.device)
+            self.dState      = self.dState.to(self.device)
+            self.dTime       = self.dTime.to(self.device)
+            self.tableau     = self.tableau.to(self.device)
+            self.final_state = self.final_state.to(self.device)
             
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
         if self.tableau is None:
@@ -169,7 +171,7 @@ class ExplicitSymplecticIntegrator(ExplicitIntegrator):
     __symplectic__ = True
 
     def __init__(self, sys_dim, dtype=None, staggered_mask=None, rtol=None, atol=None, device=None):
-        super().__init__(sys_dim, (D.shape(self.tableau)[0],), False, dtype, rtol, atol)
+        super().__init__(sys_dim, (D.shape(self.tableau)[0],), False, dtype, rtol, atol, device)
         if staggered_mask is None:
             staggered_mask      = D.arange(sys_dim[0]//2, sys_dim[0], dtype=D.int64)
             self.staggered_mask = D.zeros(sys_dim, dtype=D.bool)
@@ -186,11 +188,11 @@ class ExplicitSymplecticIntegrator(ExplicitIntegrator):
         self.nmsk = D.logical_not(self.staggered_mask)
         
         if D.backend() == 'torch':
-            self.dState      = self.dState.to(device)
-            self.dTime       = self.dTime.to(device)
-            self.tableau     = self.tableau.to(device)
-            self.msk  = self.msk.to(self.tableau)
-            self.nmsk = self.nmsk.to(self.tableau)
+            self.dState  = self.dState.to(self.device)
+            self.dTime   = self.dTime.to(self.device)
+            self.tableau = self.tableau.to(self.device)
+            self.msk     = self.msk.to(self.tableau)
+            self.nmsk    = self.nmsk.to(self.tableau)
 
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
         if self.tableau is None:
@@ -201,7 +203,7 @@ class ExplicitSymplecticIntegrator(ExplicitIntegrator):
 
             current_time  = D.copy(initial_time)
             current_state = D.copy(initial_state)
-            self.dState   = D.zeros_like(current_state)
+            self.dState  *= 0.0
 
             for stage in range(D.shape(self.tableau)[0]):
                 aux          = rhs(current_time, initial_state + self.dState, **constants) * timestep
@@ -250,7 +252,7 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
     __symplectic__ = False
 
     def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
-        super().__init__(sys_dim, (D.shape(self.tableau)[0],), D.shape(self.final_state)[0] == 2, dtype, rtol, atol)
+        super().__init__(sys_dim, (D.shape(self.tableau)[0],), D.shape(self.final_state)[0] == 2, dtype, rtol, atol, device)
         if dtype is None:
             self.tableau     = D.array(self.tableau)
             self.final_state = D.array(self.final_state)
@@ -259,11 +261,11 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             self.final_state = D.to_type(self.final_state, dtype)
         
         if D.backend() == 'torch':
-            self.dState      = self.dState.to(device)
-            self.dTime       = self.dTime.to(device)
-            self.aux         = self.aux.to(device)
-            self.tableau     = self.tableau.to(device)
-            self.final_state = self.final_state.to(device)        
+            self.dState      = self.dState.to(self.device)
+            self.dTime       = self.dTime.to(self.device)
+            self.aux         = self.aux.to(self.device)
+            self.tableau     = self.tableau.to(self.device)
+            self.final_state = self.final_state.to(self.device)        
             
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
         if self.tableau is None:
@@ -287,14 +289,17 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             nonlocal self
             __aux_states = D.reshape(next_state, aux_shape)
             __step       = self.numel
-            __jac        = D.eye(self.tableau.shape[0]*__step)
+            if D.backend() == 'torch':
+                __jac        = D.eye(self.tableau.shape[0]*__step, device=__aux_states.device, dtype=__aux_states.dtype)
+            else:
+                __jac        = D.eye(self.tableau.shape[0]*__step)
             __prev_idx   = -1
             __rhs_jac = D.stack([
                 rhs.jac(initial_time + tbl[0] * timestep, initial_state + timestep * D.sum(tbl[tableau_idx_expand] * __aux_states, axis=0), **constants) for tbl in self.tableau
             ])
             for idx in range(0,__jac.shape[0],__step):
                 for jdx in range(0,__jac.shape[1],__step):
-                    __jac[idx:idx+__step, jdx:jdx+__step] -= timestep * self.tableau[idx//__step, 1+jdx//__step]*__rhs_jac[idx//__step]
+                    __jac[idx:idx+__step, jdx:jdx+__step] -= timestep * self.tableau[idx//__step, 1+jdx//__step]*__rhs_jac[idx//__step].reshape(__step, __step)
             if __jac.shape[0] == 1 and __jac.shape[1] == 1:
                 __jac = D.reshape(__jac, tuple())
             if __jac.dtype == object:
@@ -302,14 +307,10 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             return __jac
             
         initial_guess = D.to_float((D.zeros_like(self.aux) + self.dState[None]))
-        if rhs.jac_is_wrapped_rhs:
-            if D.backend() != 'torch':
-                nfun_jac = utilities.JacobianWrapper(nfun, flat=True)
-                sparsity = 1.0 - D.sum(D.abs(D.to_float(nfun_jac(initial_guess))) > 0) / (self.tableau.shape[0]*self.numel)**2
-            else:
-                nfun_jac = None
-                initial_guess.requires_grad = True
-                sparsity = 1.0 - D.sum(D.jacobian(nfun(initial_guess), initial_guess) > 0) / (self.tableau.shape[0]*self.numel)**2
+        if rhs.jac_is_wrapped_rhs and D.backend() == 'torch':
+            nfun_jac = None
+            initial_guess.requires_grad = True
+            sparsity = 1.0 - D.sum(D.jacobian(nfun(initial_guess), initial_guess) > 0) / (self.tableau.shape[0]*self.numel)**2
         else:
             nfun_jac = __nfun_jac
             sparsity = 1.0 - D.sum(D.abs(D.to_float(nfun_jac(initial_guess))) > 0) / (self.tableau.shape[0]*self.numel)**2
@@ -370,14 +371,13 @@ def generate_richardson_integrator(basis_integrator):
         __implicit__   = basis_integrator.__implicit__
 
         def __init__(self, sys_dim, richardson_iter=8, **kwargs):
-            super().__init__(sys_dim, (richardson_iter, richardson_iter), True, kwargs.get('dtype'), kwargs.get('rtol', 1e-3), kwargs.get('atol', 1e-3))
+            super().__init__(sys_dim, (richardson_iter, richardson_iter), True, kwargs.get('dtype'), kwargs.get('rtol', 1e-3), kwargs.get('atol', 1e-3), kwargs.get('device', None))
             self.richardson_iter      = richardson_iter
             self.basis_integrators = [basis_integrator(sys_dim, **kwargs) for _ in range(self.richardson_iter)]
             for integrator in self.basis_integrators:
                 integrator.adaptive = False
             self.basis_order       = basis_integrator.order
             self.order             = self.basis_order + 3
-            self.device            = kwargs.get('device')
             if 'staggered_mask' in kwargs:
                 if kwargs['staggered_mask'] is None:
                     staggered_mask      = D.arange(sys_dim[0]//2, sys_dim[0], dtype=D.int64)

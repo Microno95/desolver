@@ -7,18 +7,26 @@ def set_up_basic_system(integrator=None, hook_jacobian=False):
 
     @de.rhs_prettifier("""[vx, -x+t]""")
     def rhs(t, state, **kwargs):
-        return de_mat @ state + D.array([0.0, t])
+        nonlocal de_mat
+        extra = D.array([0.0, t])
+        if D.backend() == 'torch':
+            de_mat = de_mat.to(state.device)
+            extra  = extra.to(state.device)
+        return de_mat @ state + extra
     
     if hook_jacobian:
         def rhs_jac(t, state, **kwargs):
+            nonlocal de_mat
             rhs.analytic_jacobian_called = True
+            if D.backend() == 'torch':
+                de_mat = de_mat.to(state.device)
             return de_mat
 
         rhs.hook_jacobian_call(rhs_jac)
 
     def analytic_soln(t, initial_conditions):
         c1 = initial_conditions[0]
-        c2 = initial_conditions[1] - 1
+        c2 = initial_conditions[1] - 1.0
 
         return D.stack([
             c2 * D.sin(D.to_float(D.asarray(t))) + c1 * D.cos(D.to_float(D.asarray(t))) + D.asarray(t),

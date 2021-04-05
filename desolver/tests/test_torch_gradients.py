@@ -14,6 +14,10 @@ implicit_integrator_set = [
 
 
 devices_set = ['cpu']
+if D.backend() == 'torch':
+    import torch
+    if torch.cuda.is_available():
+        devices_set.insert(0, 'cuda')
     
 @pytest.mark.torch_gradients
 @pytest.mark.skip(reason="Test too slow, needs refactoring")
@@ -34,8 +38,6 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
 
     torch.set_printoptions(precision=17)
     
-    if device == 'cuda' and not torch.cuda.is_available():
-        pytest.skip("CUDA device unavailable")
     device = torch.device(device)
 
     torch.autograd.set_detect_anomaly(True)
@@ -60,6 +62,8 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
         y_init = y_init * 5.
 
         a = de.OdeSystem(rhs, y_init, t=(0, 0.0025), dt=1e-5, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5, constants=csts)
+        print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
+        
         a.set_method(method)
         if a.integrator.__implicit__:
             a.rtol = a.atol = D.epsilon()**0.25
@@ -69,7 +73,7 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
         Jy = D.jacobian(a.y[-1], a.y[0])
         true_Jy = D.jacobian(true_solution_decay(a.t[-1], a.y[0], **csts), a.y[0])
         
-        print(true_Jy, Jy, D.norm(true_Jy - Jy), D.epsilon() ** 0.5)
+        print(D.norm(true_Jy - Jy), D.epsilon() ** 0.5)
 
         assert (D.allclose(true_Jy, Jy, rtol=4 * a.rtol, atol=4 * a.atol))
         print("{} method test succeeded!".format(a.integrator))
@@ -96,8 +100,6 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
 
     torch.set_printoptions(precision=17)
     
-    if device == 'cuda' and not torch.cuda.is_available():
-        pytest.skip("CUDA device unavailable")
     device = torch.device(device)
 
     torch.autograd.set_detect_anomaly(True)
@@ -128,6 +130,8 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
         y_init = D.array([1., 1.], requires_grad=True).to(device)
 
         a = de.OdeSystem(rhs, y_init, t=(0, T/100), dt=1e-5, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5, constants=csts)
+        print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
+        
         a.set_method(method)
         if a.integrator.__implicit__:
             a.rtol = a.atol = D.epsilon()**0.25
@@ -162,8 +166,6 @@ def test_gradients_complex(ffmt, integrator, use_richardson_extrapolation, devic
 
     torch.set_printoptions(precision=17)
     
-    if device == 'cuda' and not torch.cuda.is_available():
-        pytest.skip("CUDA device unavailable")
     device = torch.device(device)
 
     torch.autograd.set_detect_anomaly(True)
@@ -229,6 +231,8 @@ def test_gradients_complex(ffmt, integrator, use_richardson_extrapolation, devic
         df = SimpleODE(k=1.0)
 
         a = de.OdeSystem(df, yi1, t=(0, 0.1), dt=0.025, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
+        print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
+        
         a.set_method(method)
         if a.integrator.__implicit__:
             a.rtol = a.atol = D.epsilon()**0.25

@@ -89,9 +89,13 @@ def handle_events(sol, events, consts, direction, is_terminal):
     g     = D.stack(g)
     g_new = D.stack(g_new)
     
+    if D.backend() == 'torch':
+        direction = direction.to(g.device)
+    
     up     = (g <= 0) & (g_new >= 0)
     down   = (g >= 0) & (g_new <= 0)
     either = up | down
+    
     mask   = (up     & (direction > 0) |
               down   & (direction < 0) |
               either & (direction == 0))
@@ -817,7 +821,7 @@ class OdeSystem(object):
         cTime   = D.zeros_like(self.__t[self.counter])        
         self.__allocate_soln_space(total_steps)
         try:
-            while self.dt != 0 and D.abs(tf - self.__t[self.counter]) > 4 * D.epsilon() and not end_int:
+            while self.dt != 0 and D.abs(tf - self.__t[self.counter]) >= D.epsilon() and not end_int:
                 if D.abs(self.dt + self.__t[self.counter]) > D.abs(tf):
                     self.dt = (tf - self.__t[self.counter])
                 self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter], self.constants, timestep=self.dt)

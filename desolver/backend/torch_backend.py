@@ -182,17 +182,17 @@ def logspace(start, end, num=50, out=None, dtype=None):
 
 
 @type_reg
-def eye(N, M=None, out=None, dtype=None):
+def eye(N, M=None, out=None, dtype=None, device=None):
     if out is None:
         if M is None:
-            return torch.eye(N, dtype=dtype)
+            return torch.eye(N, dtype=dtype, device=device)
         else:
-            return torch.eye(N, m=M, dtype=dtype)
+            return torch.eye(N, m=M, dtype=dtype, device=device)
     else:
         if M is None:
-            torch.eye(N, dtype=dtype, out=out)
+            torch.eye(N, dtype=dtype, out=out, device=device)
         else:
-            torch.eye(N, m=M, dtype=dtype, out=out)
+            torch.eye(N, m=M, dtype=dtype, out=out, device=device)
         return out
 
 
@@ -250,7 +250,15 @@ def min(x, axis=None, keepdims=False, out=None):
 any = torch.any
 all = torch.all
 
-array = type_reg(torch.tensor)
+@type_reg
+def array(x, dtype=None, device=None, requires_grad=False):
+    if not torch.is_tensor(x):
+        return torch.tensor(x, dtype=dtype, device=device, requires_grad=requires_grad)
+    out = x.detach().clone().to(dtype=dtype, device=device)
+    out.requires_grad = requires_grad
+    return out
+
+# array = type_reg(torch.tensor)
 zeros = type_reg(torch.zeros)
 ones  = type_reg(torch.ones)
 empty = type_reg(torch.empty)
@@ -417,10 +425,10 @@ def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True):
         return out_tensor
     if out_tensor.requires_grad == False:
         if batch_mode:
-            temp = torch.zeros(out_tensor.shape + in_tensor.shape[1:], dtype=in_tensor.dtype, device=in_tensor.device,
+            temp = torch.zeros(out_tensor.shape + in_tensor.shape[1:], dtype=in_tensor.dtype, device=out_tensor.device,
                                requires_grad=False)
         else:
-            temp = torch.zeros(out_tensor.shape + in_tensor.shape, dtype=in_tensor.dtype, device=in_tensor.device,
+            temp = torch.zeros(out_tensor.shape + in_tensor.shape, dtype=in_tensor.dtype, device=out_tensor.device,
                                requires_grad=False)
     else:
         if batch_mode:
@@ -452,7 +460,7 @@ def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True):
         temp = temp.view(final_shape)
     if nu > 1:
         temp = jacobian(temp, in_tensor, create_graph=create_graph, nu=nu - 1, batch_mode=batch_mode)
-    return temp
+    return temp.to(out_tensor.device)
 
 def solve_linear_system(A,b,sparse=False):
     return torch.solve(b,A).solution

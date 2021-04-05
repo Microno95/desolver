@@ -140,14 +140,22 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
     tol = D.to_float(tol)
     a,b = D.stack([lower_bound for _ in range(len(f))]), D.stack([upper_bound for _ in range(len(f))])
     
+    zero_elem = D.array(0.0)
+    
+    if D.backend() == 'torch':
+        device = a.device
+        zero_elem = zero_elem.to(device)
+    
     def _f(x, msk=None):
         if msk is None:
-            if verbose:
-                print([f[i](x[i]) for i in range(len(f))])
-                print(f[0](x[0]), f[1](x[1]))
-            return D.stack([f[i](x[i]) for i in range(len(f))])
+            out = [f[i](x[i]) for i in range(len(f))]
         else:
-            return D.stack([f[i](x[i]) if msk[i] else D.to_float(0.0) for i in range(len(f))])
+            out = [f[i](x[i]) if msk[i] else zero_elem for i in range(len(f))]
+        if verbose:
+            print(msk)
+            print(out)
+            print(f[0](x[0]), f[1](x[1]))
+        return D.stack(out)
     
     if verbose:
         print(_f(a))
@@ -222,7 +230,7 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
         
         conv               = D.logical_not(D.logical_or(D.logical_or(fb == 0, fs == 0), D.abs(b - a) < tol))
         not_conv           = D.logical_not(conv)
-        true_conv          = D.abs(_f(b)) <= tol
+        true_conv          = D.abs(fb) <= tol
         
         if D.any(numiter > 1000):
             break
@@ -268,7 +276,7 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
                 if F0.dtype == object or Jf0.dtype == object:
                     dx = D.matrix_inv(Jf0, tol=tol)@(-D.reshape(F0, (-1, 1)))
                 else:
-                    dx = D.solve_linear_system(Jf0.astype(D.float64), -D.reshape(F0, (-1, 1)).astype(D.float64), sparse=sparse)
+                    dx = D.solve_linear_system(Jf0.astype(D.float64), -D.reshape(F0, (-1, 1)).astype(D.float64), sparse=sparse).astype(x.dtype)
             else:
                 dx = D.solve_linear_system(Jf0, -D.reshape(F0, (-1, 1)), sparse=sparse)
         if verbose:
@@ -276,7 +284,7 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
             print()
         x = x+D.reshape(dx, D.shape(x))
         prec = D.max(D.to_float(D.abs(dx)))
-        if prec <= tol:
+        if prec < tol:
             break
     return x, (prec <= tol, iteration, prec)
 
