@@ -5,15 +5,16 @@ import pytest
 
 integrator_set = set(de.available_methods(False).values())
 integrator_set = sorted(integrator_set, key=lambda x: x.__name__)
-integrator_set = [
-    pytest.param(intg, marks=pytest.mark.implicit) for intg in integrator_set if intg.__implicit__
-] + [
+explicit_integrator_set = [
     pytest.param(intg, marks=pytest.mark.explicit) for intg in integrator_set if not intg.__implicit__
+]
+implicit_integrator_set = [
+    pytest.param(intg, marks=pytest.mark.implicit) for intg in integrator_set if intg.__implicit__
 ]
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
-@pytest.mark.parametrize('integrator', integrator_set)
+@pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation):
     if integrator.__implicit__ and use_richardson_extrapolation:
@@ -33,7 +34,7 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
 
     from .common import set_up_basic_system
 
-    de_mat, rhs, analytic_soln, y_init, dt, _ = set_up_basic_system(integrator)
+    de_mat, rhs, analytic_soln, y_init, dt, _ = set_up_basic_system(integrator, hook_jacobian=True)
 
     def time_event(t, y, **kwargs):
         return t - D.pi / 8
@@ -86,7 +87,7 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
-@pytest.mark.parametrize('integrator', integrator_set)
+@pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
 @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation):
     if integrator.__implicit__ and use_richardson_extrapolation:
@@ -106,7 +107,7 @@ def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation):
     print("Testing event detection for float format {}".format(D.float_fmt()))
     from .common import set_up_basic_system
 
-    de_mat, rhs, analytic_soln, y_init, dt, _ = set_up_basic_system(integrator)
+    de_mat, rhs, analytic_soln, y_init, dt, _ = set_up_basic_system(integrator, hook_jacobian=True)
 
     def time_event(t, y, **kwargs):
         return t - D.pi / 8
