@@ -8,11 +8,11 @@ def set_up_basic_system(integrator=None, hook_jacobian=False):
     @de.rhs_prettifier("""[vx, -x+t]""")
     def rhs(t, state, **kwargs):
         nonlocal de_mat
-        extra = D.array([0.0, t])
         if D.backend() == 'torch':
             de_mat = de_mat.to(state.device)
-            extra  = extra.to(state.device)
-        return de_mat @ state + extra
+        out = de_mat @ state
+        out[1] += t
+        return out
     
     if hook_jacobian:
         def rhs_jac(t, state, **kwargs):

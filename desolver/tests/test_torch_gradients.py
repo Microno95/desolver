@@ -20,7 +20,6 @@ if D.backend() == 'torch':
         devices_set.insert(0, 'cuda')
     
 @pytest.mark.torch_gradients
-@pytest.mark.skip(reason="Test too slow, needs refactoring")
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
@@ -40,7 +39,7 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
     
     device = torch.device(device)
 
-    torch.autograd.set_detect_anomaly(True)
+    torch.autograd.set_detect_anomaly(False) # Enable if a test fails
 
     def rhs(t, state, k, **kwargs):
         return -k*state
@@ -83,7 +82,6 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
 
     
 @pytest.mark.torch_gradients
-@pytest.mark.skip(reason="Test too slow, needs refactoring")
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
@@ -102,8 +100,8 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
     
     device = torch.device(device)
 
-    torch.autograd.set_detect_anomaly(True)
-
+    torch.autograd.set_detect_anomaly(False) # Enable if a test fails
+    
     def rhs(t, state, k, m, **kwargs):
         return D.array([[0.0, 1.0], [-k/m,  0.0]], device=device)@state
     
@@ -168,7 +166,7 @@ def test_gradients_complex(ffmt, integrator, use_richardson_extrapolation, devic
     
     device = torch.device(device)
 
-    torch.autograd.set_detect_anomaly(True)
+    torch.autograd.set_detect_anomaly(False) # Enable if a test fails
 
     class NNController(torch.nn.Module):
 

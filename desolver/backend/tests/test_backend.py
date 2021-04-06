@@ -887,9 +887,9 @@ def test_matrix_inv():
 
 @pytest.mark.skipif("gdual_double" not in D.available_float_fmt(), reason="Can't test dispatch without pyaudi overload")
 def test_matrix_inv_bigger():
-    for diag_size in range(2, 251):
+    for diag_size in range(2, 101):
         np.random.seed(15)
-        for trial in range(5):
+        for trial in range(3):
             A = np.random.normal(size=(diag_size,diag_size))
             while np.abs(np.linalg.det(D.to_float(A))) <= 1e-5:
                 A = np.random.normal(size=(diag_size,diag_size), std=250.0)

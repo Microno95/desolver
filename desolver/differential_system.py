@@ -19,7 +19,7 @@ __all__ = [
     'OdeSystem'
 ]
 
-StateTuple = collections.namedtuple('StateTuple', ['t', 'y'])
+StateTuple = collections.namedtuple('StateTuple', ['t', 'y', 'event'])
 
 ##### Code adapted from https://github.com/scipy/scipy/blob/v1.3.2/scipy/integrate/_ivp/ivp.py#L28 #####
 def prepare_events(events):
@@ -81,10 +81,8 @@ def handle_events(sol, events, consts, direction, is_terminal):
     
     roots = D.asarray(roots)
     
-    int_dir = D.sign(t_next - t_prev)
-    
-    g     = [events[idx]((1.9*t_root + 0.1*t_prev)/2, sol((1.9*t_root + 0.1*t_prev)/2), **consts) for idx, t_root in enumerate(roots)]
-    g_new = [events[idx]((1.9*t_root + 0.1*t_next)/2, sol((1.9*t_root + 0.1*t_next)/2), **consts) for idx, t_root in enumerate(roots)]
+    g     = [ev_f[idx]((1.8*t_root + 0.2*t_prev)/2) for idx, t_root in enumerate(roots)]
+    g_new = [ev_f[idx]((1.8*t_root + 0.2*t_next)/2) for idx, t_root in enumerate(roots)]
     
     g     = D.stack(g)
     g_new = D.stack(g_new)
@@ -106,20 +104,23 @@ def handle_events(sol, events, consts, direction, is_terminal):
         active_events = D.reshape(D.nonzero(mask)[0], (-1,))
         
     roots     = roots[active_events]
+    evs       = [events[idx] for idx in active_events]
     terminate = False
     
     if len(active_events) > 0:
-        order = D.argsort(D.sign(t_next - t_prev) * roots)
+        order         = D.argsort(D.sign(t_next - t_prev) * roots)
         active_events = active_events[order]
         roots         = roots[order]
+        evs           = [evs[idx] for idx in order]
         
         if D.any(is_terminal[active_events]):
             t             = D.nonzero(is_terminal[active_events])[0][0]
             active_events = active_events[:t + 1]
             roots         = roots[:t + 1]
+            evs           = evs[:t + 1]
             terminate     = True
             
-    return active_events, roots, terminate
+    return active_events, roots, terminate, evs
 
 class DenseOutput(object):
     """Dense Output class for storing the dense output from a numerical integration.
@@ -215,10 +216,18 @@ class DiffRHS(object):
             self.__jac = self.rhs.jac
             self.__jac_time = None
             self.__jac_is_wrapped_rhs = False
-        else:
+        elif D.backend() != 'torch':
             self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(0.0, y, **kwargs), flat=True)
             self.__jac_time = 0.0
             self.__jac_is_wrapped_rhs = True
+        else:
+            def __jac(t,y,*args,**kwargs):
+                y_in = y.clone().detach()
+                y_in.requires_grad = True
+                return D.jacobian(self(t,y_in,*args,**kwargs), y_in)
+            self.__jac = __jac
+            self.__jac_time = None
+            self.__jac_is_wrapped_rhs = False
         self.nfev = 0
         self.njev = 0
         
@@ -391,10 +400,7 @@ class OdeSystem(object):
         (StateTuple(t=..., y=...), StateTuple(t=..., y=...), StateTuple(t=..., y=...), ...)
         
         """
-        if self.__events:
-            return tuple(self.__events)
-        else:
-            return
+        return tuple(self.__events)
     
     @property
     def y(self):
@@ -850,7 +856,7 @@ class OdeSystem(object):
                     tsol = self.get_step_interpolant()
 
                     if events is not None:
-                        active_events, roots, end_int = handle_events(tsol, events, self.constants, direction, is_terminal)
+                        active_events, roots, end_int, evs = handle_events(tsol, events, self.constants, direction, is_terminal)
 
                         if self.counter+len(roots)+1 >= len(self.__y):
                             total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
@@ -861,16 +867,11 @@ class OdeSystem(object):
                         
                         self.counter -= 1
 
-                        for root in roots:
+                        for root,ev in zip(roots, evs):
                             if root != self.__t[self.counter]:
-# #                                 _, (new_dTime, new_dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter], self.constants, timestep=root - self.__t[self.counter])
-#                                 self.__t[self.counter+1] = root
-#                                 self.__y[self.counter+1] = tsol(root) # self.__y[self.counter] + new_dState
-#                                 self.__events.append(StateTuple(t=self.__t[self.counter+1], y=self.__y[self.counter+1]))
-#                                 self.counter += 1
                                 prev_dt = self.dt
                                 self.integrate(root)
-                                self.__events.append(StateTuple(t=self.__t[self.counter], y=self.__y[self.counter]))
+                                self.__events.append(StateTuple(t=self.__t[self.counter], y=self.__y[self.counter], event=ev))
                                 self.dt = prev_dt
 
                         if end_int:
@@ -980,7 +981,7 @@ class OdeSystem(object):
             if index > self.counter:
                 raise IndexError("index {} out of bounds for integrations with {} steps".format(index, self.counter+1))
             else:
-                return StateTuple(t=self.t[index], y=self.y[index])
+                return StateTuple(t=self.t[index], y=self.y[index], event=None)
         elif isinstance(index, slice):
             if index.start is not None:
                 start_idx = deutil.search_bisection(self.t[:self.counter+1], index.start)
@@ -994,13 +995,13 @@ class OdeSystem(object):
                 step      = index.step
             else:
                 step      = 1
-            return StateTuple(t=self.t[start_idx:end_idx:step], y=self.y[start_idx:end_idx:step])
+            return StateTuple(t=self.t[start_idx:end_idx:step], y=self.y[start_idx:end_idx:step], event=None)
         else:
             if self.__dense_output and self.sol is not None:
-                return StateTuple(t=index, y=self.sol(index))
+                return StateTuple(t=index, y=self.sol(index), event=None)
             else:
                 nearest_idx = deutil.search_bisection(self.__t, index)
-                return StateTuple(t=self.t[nearest_idx], y=self.y[nearest_idx])
+                return StateTuple(t=self.t[nearest_idx], y=self.y[nearest_idx], event=None)
             
     def __len__(self):
         return self.counter + 1

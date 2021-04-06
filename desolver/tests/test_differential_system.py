@@ -182,7 +182,7 @@ def test_no_events(ffmt):
 
     a.integrate()
 
-    assert (a.events is None)
+    assert (len(a.events) == 0)
 
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
