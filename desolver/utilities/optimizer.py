@@ -40,15 +40,15 @@ def brentsroot(f, bounds, tol=None, verbose=False):
     """
     lower_bound, upper_bound = bounds
     if tol is None:
-        tol = D.epsilon()
+        tol = 16*D.epsilon()
     if tol < D.epsilon():
-        tol = D.epsilon()
+        tol = 16*D.epsilon()
     tol = D.to_float(tol)
     a,b = D.to_float(lower_bound), D.to_float(upper_bound)
     fa = f(a)
     fb = f(b)
     
-    if fa*fb >= 0:
+    if fa*fb >= D.epsilon():
         return D.to_float(numpy.inf), False
     if D.abs(fa) < D.abs(fb):
         a,b = b,a
@@ -261,7 +261,7 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
     prec    = numpy.inf
     for iteration in range(maxiter):
         if D.backend() == 'torch' and not jac_provided:
-            _x  = x.detach().clone()
+            _x  = x.clone().detach()
             _x.requires_grad = True
             F0  = f(_x)
             Jf0 = D.jacobian(F0, _x).detach()
@@ -284,7 +284,7 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
             print()
         x = x+D.reshape(dx, D.shape(x))
         prec = D.max(D.to_float(D.abs(dx)))
-        if prec < tol:
+        if prec < tol or not D.all(D.isfinite(x)):
             break
     return x, (prec <= tol, iteration, prec)
 

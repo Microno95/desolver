@@ -867,9 +867,9 @@ class OdeSystem(object):
                         
                         self.counter -= 1
 
-                        for root,ev in zip(roots, evs):
-                            if root != self.__t[self.counter]:
-                                prev_dt = self.dt
+                        for ev_idx,(root,ev) in enumerate(zip(roots, evs)):
+                            if root != self.__t[self.counter] and prev_time <= root <= prev_time + dTime:
+                                prev_dt = self.dt/2
                                 self.integrate(root)
                                 self.__events.append(StateTuple(t=self.__t[self.counter], y=self.__y[self.counter], event=ev))
                                 self.dt = prev_dt

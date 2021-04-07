@@ -68,13 +68,13 @@ class JacobianWrapper(object):
 
             # 1*f[i-2]-8*f[i-1]+0*f[i+0]+8*f[i+1]-1*f[i+2]
             y_jac[idx] = val + 2*dy_cur
-            jacobian_y[:, idx]  = -D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+            jacobian_y[:, idx] = -D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
             y_jac[idx] = val + dy_cur
-            jacobian_y[:, idx] += 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+            jacobian_y[:, idx] = jacobian_y[:, idx] + 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
             y_jac[idx] = val - 2*dy_cur
-            jacobian_y[:, idx] += D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+            jacobian_y[:, idx] = jacobian_y[:, idx] + D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
             y_jac[idx] = val - dy_cur
-            jacobian_y[:, idx] -= 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+            jacobian_y[:, idx] = jacobian_y[:, idx] - 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
 
             jacobian_y[:, idx] = jacobian_y[:, idx] / (12*dy_cur)
         

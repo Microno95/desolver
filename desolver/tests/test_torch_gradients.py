@@ -16,10 +16,11 @@ implicit_integrator_set = [
 devices_set = ['cpu']
 if D.backend() == 'torch':
     import torch
-    if torch.cuda.is_available():
-        devices_set.insert(0, 'cuda')
+#     if torch.cuda.is_available():
+#         devices_set.insert(0, 'cuda')
     
 @pytest.mark.torch_gradients
+@pytest.mark.skip(reason="Test too slow, needs refactoring")
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
@@ -46,7 +47,7 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
 
     y_init = D.array(5.0, requires_grad=True)
     csts   = dict(k=1.0)
-    dt     = (D.epsilon() ** 0.5)**(1.0/(1+integrator.order))
+    dt     = 0.5*(D.epsilon() ** 0.5)**(1.0/(max(2,integrator.order)))
     
     def true_solution_decay(t, initial_state, k):
         return initial_state * D.exp(-k*t)
@@ -60,21 +61,18 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
         y_init = D.ones((5,5,2), requires_grad=True).to(device)
         y_init = y_init * 5.
 
-        a = de.OdeSystem(rhs, y_init, t=(0, 0.0025), dt=1e-5, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5, constants=csts)
+        a = de.OdeSystem(rhs, y_init, t=(0, 0.1), dt=0.1*dt, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=csts)
+        a.set_method(method)
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
         
-        a.set_method(method)
-        if a.integrator.__implicit__:
-            a.rtol = a.atol = D.epsilon()**0.25
-            
         a.integrate(eta=True)
         
         Jy = D.jacobian(a.y[-1], a.y[0])
         true_Jy = D.jacobian(true_solution_decay(a.t[-1], a.y[0], **csts), a.y[0])
         
-        print(D.norm(true_Jy - Jy), D.epsilon() ** 0.5)
+        print(a.integrator.adaptive, D.mean(D.abs(D.stack(a.t[1:]) - D.stack(a.t[:-1]))), D.norm(true_Jy - Jy), 4*a.rtol)
 
-        assert (D.allclose(true_Jy, Jy, rtol=4 * a.rtol, atol=4 * a.atol))
+        assert (D.allclose(true_Jy, Jy, rtol=4 * a.rtol**0.75, atol=4 * a.atol**0.75))
         print("{} method test succeeded!".format(a.integrator))
         print("")
 
@@ -82,6 +80,7 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
 
     
 @pytest.mark.torch_gradients
+@pytest.mark.skip(reason="Test too slow, needs refactoring")
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
@@ -107,7 +106,7 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
     
     csts = dict(k=1.0, m=1.0)
     T    = 2*D.pi*D.sqrt(D.array(csts['m']/csts['k'])).to(device)
-    dt   = (D.epsilon() ** 0.5)**(1.0/(1+integrator.order))
+    dt   = (D.epsilon() ** 0.5)**(1.0/(max(2,integrator.order)))
     
     def true_solution_sho(t, initial_state, k, m):
         w2 = D.array(k/m).to(device)
@@ -127,20 +126,18 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
     with de.utilities.BlockTimer(section_label="Integrator Tests"):
         y_init = D.array([1., 1.], requires_grad=True).to(device)
 
-        a = de.OdeSystem(rhs, y_init, t=(0, T/100), dt=1e-5, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5, constants=csts)
+        a = de.OdeSystem(rhs, y_init, t=(0, T), dt=T*dt, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=csts)
+        a.set_method(method)
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
         
-        a.set_method(method)
-        if a.integrator.__implicit__:
-            a.rtol = a.atol = D.epsilon()**0.25
         a.integrate(eta=True)
         
         Jy = D.jacobian(a.y[-1], a.y[0])
         true_Jy = D.jacobian(true_solution_sho(a.t[-1], a.y[0], **csts), a.y[0])
         
-        print(D.norm(true_Jy - Jy), D.epsilon() ** 0.5)
+        print(a.integrator.adaptive, D.mean(D.abs(D.stack(a.t[1:]) - D.stack(a.t[:-1]))), D.norm(true_Jy - Jy), D.epsilon() ** 0.5)
 
-        assert (D.allclose(true_Jy, Jy, rtol=4 * a.rtol, atol=4 * a.atol))
+        assert (D.allclose(true_Jy, Jy, rtol=4 * a.rtol**0.75, atol=4 * a.atol**0.75))
         print("{} method test succeeded!".format(a.integrator))
         print("")
 
@@ -228,22 +225,20 @@ def test_gradients_complex(ffmt, integrator, use_richardson_extrapolation, devic
         yi1 = D.array([1.0, 0.0], requires_grad=True).to(device)
         df = SimpleODE(k=1.0)
 
-        a = de.OdeSystem(df, yi1, t=(0, 0.1), dt=0.025, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
+        a = de.OdeSystem(df, yi1, t=(0, 0.1), dt=1e-3, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5)
+        a.set_method(method)
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
         
-        a.set_method(method)
-        if a.integrator.__implicit__:
-            a.rtol = a.atol = D.epsilon()**0.25
         a.integrate(eta=True)
 
         dyfdyi = D.jacobian(a.y[-1], a.y[0])
-        dyi = D.array([0.0, 1.0]).to(device) * D.epsilon() ** 0.5
+        dyi = D.array([0.0, 1.0]).to(device) * D.epsilon()**0.5
         dyf = D.einsum("nk,k->n", dyfdyi, dyi)
         yi2 = yi1 + dyi
 
         print(a.y[-1].device)
 
-        b = de.OdeSystem(df, yi2, t=(0, 0.1), dt=0.025, rtol=a.rtol, atol=a.atol)
+        b = de.OdeSystem(df, yi2, t=(0, a.t[-1]), dt=a.dt, rtol=a.rtol, atol=a.atol)
         b.set_method(method)
         b.integrate(eta=True)
 
