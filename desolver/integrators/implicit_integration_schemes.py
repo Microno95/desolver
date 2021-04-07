@@ -5,7 +5,7 @@ from .. import backend as D
 
 class GaussLegendre4(ImplicitRungeKuttaIntegrator):
     order = 4
-    __adaptive__   = True
+    __adaptive__   = False
     __symplectic__ = False
     __alt_names__  = tuple()
     
@@ -24,7 +24,7 @@ class GaussLegendre4(ImplicitRungeKuttaIntegrator):
     
 class GaussLegendre6(ImplicitRungeKuttaIntegrator):
     order = 6
-    __adaptive__   = True
+    __adaptive__   = False
     __symplectic__ = False
     __alt_names__  = tuple()
     
@@ -44,7 +44,7 @@ class GaussLegendre6(ImplicitRungeKuttaIntegrator):
     
 class LobattoIIIA2(ImplicitRungeKuttaIntegrator):
     order = 2
-    __adaptive__   = True
+    __adaptive__   = False
     __symplectic__ = False
     __alt_names__  = tuple()
     
@@ -59,7 +59,7 @@ class LobattoIIIA2(ImplicitRungeKuttaIntegrator):
     
 class LobattoIIIA4(ImplicitRungeKuttaIntegrator):
     order = 4
-    __adaptive__   = True
+    __adaptive__   = False
     __symplectic__ = False
     __alt_names__  = tuple()
     
@@ -90,7 +90,7 @@ class LobattoIIIB2(ImplicitRungeKuttaIntegrator):
     
 class LobattoIIIB4(ImplicitRungeKuttaIntegrator):
     order = 4
-    __adaptive__   = True
+    __adaptive__   = False
     __symplectic__ = False
     __alt_names__  = tuple()
     
@@ -106,7 +106,7 @@ class LobattoIIIB4(ImplicitRungeKuttaIntegrator):
     
 class LobattoIIIC2(ImplicitRungeKuttaIntegrator):
     order = 2
-    __adaptive__   = True
+    __adaptive__   = False
     __symplectic__ = False
     __alt_names__  = tuple()
     
@@ -198,7 +198,7 @@ class DIRK3LStable(ImplicitRungeKuttaIntegrator):
     
 class RadauIA3(ImplicitRungeKuttaIntegrator):
     order = 3
-    __adaptive__   = True
+    __adaptive__   = False
     __symplectic__ = False
     __alt_names__  = tuple()
     
@@ -214,7 +214,7 @@ class RadauIA3(ImplicitRungeKuttaIntegrator):
     
 class RadauIA5(ImplicitRungeKuttaIntegrator):
     order = 5
-    __adaptive__   = True
+    __adaptive__   = False
     __symplectic__ = False
     __alt_names__  = tuple()
     
@@ -235,7 +235,7 @@ class RadauIA5(ImplicitRungeKuttaIntegrator):
     
 class RadauIIA3(ImplicitRungeKuttaIntegrator):
     order = 3
-    __adaptive__   = True
+    __adaptive__   = False
     __symplectic__ = False
     __alt_names__  = tuple()
     

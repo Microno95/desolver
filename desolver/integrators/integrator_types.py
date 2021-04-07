@@ -276,6 +276,7 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
         aux_shape = self.aux.shape
         
         def nfun(next_state):
+            nonlocal initial_time, initial_state, timestep, aux_shape
             __aux_states = D.reshape(next_state, aux_shape)
             __rhs_states = D.stack([
                 rhs(initial_time + tbl[0] * timestep, initial_state + timestep * D.sum(tbl[tableau_idx_expand] * __aux_states, axis=0), **constants) for tbl in self.tableau
@@ -286,7 +287,7 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             return __states
         
         def __nfun_jac(next_state):
-            nonlocal self
+            nonlocal self, initial_time, initial_state, timestep, aux_shape
             __aux_states = D.reshape(next_state, aux_shape)
             __step       = self.numel
             if D.backend() == 'torch':
@@ -306,7 +307,10 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
                 __jac = D.to_float(__jac)
             return __jac
             
-        initial_guess = D.to_float((D.zeros_like(self.aux) + self.dState[None]))
+        initial_guess = D.zeros_like(self.aux)
+        midpoint_guess = rhs(initial_time, initial_state, **constants)
+        midpoint_guess = 0.5 * timestep * (midpoint_guess + rhs(initial_time + 0.5 * timestep, initial_state + 0.5 * timestep * midpoint_guess, **constants))
+        initial_guess = D.to_float(initial_guess + (0.5*midpoint_guess + 0.5*self.dState)[None])
         if rhs.jac_is_wrapped_rhs and D.backend() == 'torch':
             nfun_jac = None
             initial_guess.requires_grad = True
@@ -316,18 +320,14 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             sparsity = 1.0 - D.sum(D.abs(D.to_float(nfun_jac(initial_guess))) > 0) / (self.tableau.shape[0]*self.numel)**2
             
         try:
-            aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=250, sparse=sparsity >= 0.7)
+            aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=125, sparse=sparsity >= 0.7)
             if not success and prec > self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))):
                 raise exception_types.FailedIntegrationError("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, 32*D.epsilon(), num_iter))
         except:
             raise
             
-        self.aux = D.to_float(D.reshape(aux_root, aux_shape))
-            
-        self.dState = D.zeros_like(initial_state)
-        for fs, tbl in zip(self.final_state[0][1:], self.tableau):
-            aux_eval    = D.sum(tbl[tableau_idx_expand] * self.aux, axis=0)
-            self.dState = self.dState + timestep * fs * rhs(initial_time + tbl[0] * timestep, initial_state + timestep * aux_eval, **constants)
+        self.aux    = D.reshape(aux_root, aux_shape)
+        self.dState = timestep * D.sum(self.final_state[0][tableau_idx_expand] * self.aux, axis=0)
         self.dTime  = D.copy(timestep)
         
         if self.adaptive:
