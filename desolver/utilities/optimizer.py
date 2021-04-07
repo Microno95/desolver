@@ -252,7 +252,11 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
         jac = utilities.JacobianWrapper(f, atol=tol, rtol=tol)
     else:
         jac_provided = True
-    no_dim = len(D.shape(x0)) == 0 or D.shape(x0) == (1,)
+    no_dim = D.shape(D.reshape(x0, (-1,))) == (1,)
+    if D.backend() == 'torch':
+        has_grad = x0.requires_grad
+        if not has_grad:
+            x0.requires_grad = True
     if not no_dim:
         x = D.reshape(x0, (-1,))
     else:
@@ -260,12 +264,13 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
     w_relax = 0.5
     prec    = numpy.inf
     for iteration in range(maxiter):
-        if D.backend() == 'torch' and not jac_provided:
-            _x  = x.clone().detach()
-            _x.requires_grad = True
-            F0  = f(_x)
-            Jf0 = D.jacobian(F0, _x).detach()
-            F0  = F0.detach()
+        if D.backend() == 'torch':
+            F0  = f(x)
+            if not jac_provided:
+                Jf0 = D.jacobian(F0, x)
+            else:
+                Jf0 = jac(x)
+            F0  = F0
         else:
             F0  = f(x)
             Jf0 = jac(x)
@@ -281,10 +286,14 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
                 dx = D.solve_linear_system(Jf0, -D.reshape(F0, (-1, 1)), sparse=sparse)
         if verbose:
             print("[{iteration}]: x = {x}, dx = {dx}, F = {F0}, Jf = {Jf0}".format(**locals()))
+            if D.backend() == 'torch':
+                dx_by_x0 = D.jacobian(dx, x0)
+                x_by_x0  = D.jacobian(x, x0)
+                print("[additional info]: dx/x0 = {dx_by_x0}, x/x0 = {x_by_x0}".format(**locals()))
             print()
         x = x+D.reshape(dx, D.shape(x))
         prec = D.max(D.to_float(D.abs(dx)))
-        if prec < tol or not D.all(D.isfinite(x)):
+        if prec < tol or not D.all(D.isfinite(D.to_float(x))):
             break
     return x, (prec <= tol, iteration, prec)
 
