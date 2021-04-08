@@ -888,6 +888,11 @@ class OdeSystem(object):
                     elif self.__dense_output:
                         self.sol.add_interpolant(self.__t[self.counter], tsol)
 
+                steps += 1
+                
+                for i in callback:
+                    i(self)
+                    
                 if tqdm_progress_bar is not None:
                     tqdm_progress_bar.total = tqdm_progress_bar.n
                     if D.to_numpy(tf) == np.inf:
@@ -896,11 +901,6 @@ class OdeSystem(object):
                         tqdm_progress_bar.total = tqdm_progress_bar.n + int((tf - self.__t[self.counter])/self.dt)
                     tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.__t[self.counter], tf, self.dt).ljust(8)
                     tqdm_progress_bar.update()
-
-                steps += 1
-
-                for i in callback:
-                    i(self)
                     
         except KeyboardInterrupt:
             self.int_status = -2

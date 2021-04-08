@@ -143,10 +143,13 @@ def __matrix_inv_helper(A_in, tol=epsilon()):
             I[i, :] = I[i, :] - f*I[k, :]
         
     I = I@P
-        
+    Ident = eye(shape(A)[0], dtype=A.dtype)
     Ik = I@A_in
     for _ in range(25):
-        I  = 2*I - Ik@I
+        AI = A_in@I
+        Wn = -147*Ident + AI@(53*Ident + AI@(-11*Ident + AI))
+        I = 0.25*I@(32*Ident + AI@(-113*Ident + AI@(231*Ident + AI@(-301*Ident + AI@(259*Ident + AI@Wn)))))
+#         I  = 2*I - Ik@I
         Ik = I@A_in
         if max(abs(to_float(Ik))) - 1 <= tol:
             break
@@ -164,6 +167,7 @@ def __matrix_inv_dispatcher(A, *args, **kwargs):
         return numpy.linalg.inv(A, *args, **kwargs)
 
 matrix_inv = __matrix_inv_dispatcher
+
 
 # gdual_real128 Definitions
 # try:

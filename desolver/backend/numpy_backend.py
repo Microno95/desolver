@@ -24,8 +24,10 @@ float_fmts.update({
 
 
 def asarray(x):
-    return array(x)
-
+    if hasattr(x, 'dtype'):
+        return array(x, dtype=x.dtype)
+    else:
+        return array(x)
 
 def to_float(x):
     return numpy.asanyarray(x).astype(float64)
@@ -271,3 +273,5 @@ def solve_linear_system(A,b,overwrite_a=True,overwrite_b=True,check_finite=False
         return scipy.linalg.solve(A,b,overwrite_a=overwrite_a,overwrite_b=overwrite_b,check_finite=check_finite)
 
 matrix_inv = numpy.linalg.inv
+eig = numpy.linalg.eig
+

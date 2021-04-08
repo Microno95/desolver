@@ -15,6 +15,9 @@ class ExplicitIntegrator(IntegratorTemplate):
     
     def __init__(self, sys_dim, aux_shape, adaptive, dtype=None, rtol=None, atol=None, device=None):
         self.dim        = sys_dim
+        self.numel      = 1
+        for i in self.dim:
+            self.numel *= int(i)
         self.rtol       = rtol if rtol is not None else 32 * D.epsilon()
         self.atol       = atol if atol is not None else 32 * D.epsilon()
         self.adaptive   = adaptive
@@ -321,7 +324,7 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             
         try:
             aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=125, sparse=sparsity >= 0.7)
-            if not success and prec > self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))):
+            if not success and prec > D.max(D.abs(self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))))):
                 raise exception_types.FailedIntegrationError("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, 32*D.epsilon(), num_iter))
         except:
             raise

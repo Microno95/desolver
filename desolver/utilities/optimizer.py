@@ -134,9 +134,9 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
     """
     lower_bound, upper_bound = bounds
     if tol is None:
-        tol = D.epsilon()
+        tol = 16*D.epsilon()
     if tol < D.epsilon():
-        tol = D.epsilon()
+        tol = 16*D.epsilon()
     tol = D.to_float(tol)
     a,b = D.stack([lower_bound for _ in range(len(f))]), D.stack([upper_bound for _ in range(len(f))])
     
@@ -238,6 +238,49 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
         print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}, conv={true_conv}".format(**locals()))
     return b, true_conv
 
+def preconditioner(A):
+    I    = D.eye(A.shape[0])
+    if D.backend() == 'torch':
+        I = I.to(A)
+    Pinv = D.zeros_like(A)
+    nA   = 0.5 * (D.norm(A, axis=1) + D.norm(A, axis=0))
+    for i in range(D.shape(A)[0]):
+        if nA[i] > 32*D.epsilon():
+            Pinv[i,i] = 1/nA[i]
+        else:
+            Pinv[i,i] = 1.0
+    nPinv = D.norm(Pinv@A)
+    Pinv  = Pinv / nPinv
+        
+    Ik = Pinv@A
+    for _ in range(3):
+        AP = A@Pinv
+        Wn = -147*I + AP@(53*I + AP@(-11*I + AP))
+        In0 = 0.75*Pinv + 0.25*0.25*Pinv@(32*I + AP@(-113*I + AP@(231*I + AP@(-301*I + AP@(259*I + AP@Wn)))))
+        In1 = 2*Pinv - Ik@Pinv
+        if D.norm(D.to_float(I - In0@A)) < D.norm(D.to_float(I - In1@A)):
+            In = In0
+        else:
+            In = In1
+        if D.norm(D.to_float(In@A)) >= D.norm(D.to_float(Pinv@A)):
+            break
+        else:
+            Pinv = In
+        nPinv = D.norm(Pinv@A)
+        Pinv  = Pinv / nPinv
+        Ik    = Pinv@A
+        if D.max(D.abs(D.to_float(Ik))) - 1 <= tol:
+            break
+    return Pinv
+
+def estimate_cond(A):
+    out = D.abs(A)
+    out = out[out > 0]
+    out = D.sqrt(D.max(out) / D.min(out))
+    if out <= 32*D.epsilon():
+        out = D.ones_like(out)
+    return out
+
 def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, sparse=False):
     if tol is None:
         if D.epsilon() <= 1e-5:
@@ -272,18 +315,23 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
                 Jf0 = jac(x)
             F0  = F0
         else:
-            F0  = f(x)
-            Jf0 = jac(x)
+            F0  = f(x).astype(D.float64)
+            Jf0 = jac(x).astype(D.float64)
         if no_dim:
             dx = -D.reshape(F0, tuple()) / D.reshape(Jf0, tuple())
         else:
+            F0 = -D.reshape(F0, (-1, 1))
+            if estimate_cond(Jf0) > 100:
+                Pinv = preconditioner(Jf0)
+                Jf0 = Pinv@Jf0
+                F0  = Pinv@F0
             if D.backend() == 'numpy':
                 if F0.dtype == object or Jf0.dtype == object:
-                    dx = D.matrix_inv(Jf0, tol=tol)@(-D.reshape(F0, (-1, 1)))
+                    dx = D.matrix_inv(Jf0, tol=tol)@F0
                 else:
-                    dx = D.solve_linear_system(Jf0.astype(D.float64), -D.reshape(F0, (-1, 1)).astype(D.float64), sparse=sparse).astype(x.dtype)
+                    dx = D.solve_linear_system(Jf0, F0, sparse=sparse).astype(x.dtype)
             else:
-                dx = D.solve_linear_system(Jf0, -D.reshape(F0, (-1, 1)), sparse=sparse)
+                dx = D.solve_linear_system(Jf0, F0, sparse=sparse)
         if verbose:
             print("[{iteration}]: x = {x}, dx = {dx}, F = {F0}, Jf = {Jf0}".format(**locals()))
             if D.backend() == 'torch':
