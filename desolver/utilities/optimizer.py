@@ -288,7 +288,7 @@ def estimate_cond(A):
         out = D.ones_like(out)
     return out
 
-def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, sparse=False):
+def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, sparse=False, use_preconditioner=True):
     if tol is None:
         if D.epsilon() <= 1e-5:
             tol = 32*D.epsilon()
@@ -328,7 +328,7 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
             dx = -D.reshape(F0, tuple()) / D.reshape(Jf0, tuple())
         else:
             F0 = -D.reshape(F0, (-1, 1))
-            if estimate_cond(Jf0) > 100:
+            if use_preconditioner and estimate_cond(Jf0) > 100:
                 Pinv = preconditioner(Jf0, tol=tol)
                 Jf0 = Pinv@Jf0
                 F0  = Pinv@F0
