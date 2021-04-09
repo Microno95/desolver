@@ -14,10 +14,10 @@ implicit_integrator_set = [
 
 
 if D.backend() == 'torch':
-    devices_set = ['cpu']
+    devices_set = [pytest.param('cpu', marks=pytest.mark.cpu)]
     import torch
     if torch.cuda.is_available():
-        devices_set.insert(0, 'cuda')
+        devices_set.insert(0, pytest.param('cuda', marks=pytest.mark.gpu))
 else:
     devices_set = [None]
 

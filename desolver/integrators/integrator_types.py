@@ -322,12 +322,10 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             nfun_jac = __nfun_jac
             sparsity = 1.0 - D.sum(D.abs(D.to_float(nfun_jac(initial_guess))) > 0) / (self.tableau.shape[0]*self.numel)**2
             
-        try:
-            aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=125, sparse=sparsity >= 0.7)
-            if not success and prec > D.max(D.abs(self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))))):
-                raise exception_types.FailedIntegrationError("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, 32*D.epsilon(), num_iter))
-        except:
-            raise
+        aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=125, sparse=sparsity >= 0.7)
+        
+        if not success and prec > D.max(D.abs(self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))))):
+            raise exception_types.FailedToMeetTolerances("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, 32*D.epsilon(), num_iter))
             
         self.aux    = D.reshape(aux_root, aux_shape)
         self.dState = timestep * D.sum(self.final_state[0][tableau_idx_expand] * self.aux, axis=0)

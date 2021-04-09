@@ -96,11 +96,11 @@ def test_dense_output(ffmt):
 
     (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system()
 
-    assert (a.integration_status() == "Integration has not been run.")
+    assert (a.integration_status == "Integration has not been run.")
 
     a.integrate()
 
-    assert (a.integration_status() == "Integration completed successfully.")
+    assert (a.integration_status == "Integration completed successfully.")
 
     assert (D.max(D.abs(a[0].y - analytic_soln(a[0].t, y_init))) <= 4 * D.epsilon())
     assert (D.max(D.abs(a[0].t)) <= 4 * D.epsilon())

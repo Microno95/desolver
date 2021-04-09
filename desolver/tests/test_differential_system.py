@@ -104,11 +104,11 @@ def test_integration_and_representation(ffmt):
 
     (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system()
 
-    assert (a.integration_status() == "Integration has not been run.")
+    assert (a.integration_status == "Integration has not been run.")
 
     a.integrate()
 
-    assert (a.integration_status() == "Integration completed successfully.")
+    assert (a.integration_status == "Integration completed successfully.")
 
     print(str(a))
     print(repr(a))
@@ -147,11 +147,11 @@ def test_integration_and_nearest_float_no_dense_output(ffmt):
     a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
                      atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
 
-    assert (a.integration_status() == "Integration has not been run.")
+    assert (a.integration_status == "Integration has not been run.")
 
     a.integrate()
 
-    assert (a.integration_status() == "Integration completed successfully.")
+    assert (a.integration_status == "Integration completed successfully.")
 
     assert (D.abs(a.t[-2] - a[2 * D.pi].t) <= D.abs(a.dt))
 
@@ -310,6 +310,53 @@ def test_non_callable_rhs(ffmt):
 
         a.tf = 0.0
 
+
+def test_callback_called():
+    de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
+
+    @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, **kwargs):
+        return de_mat @ state + D.array([0.0, t])
+
+    y_init = D.array([1., 0.])
+    
+    callback_called = False
+    
+    def callback(ode_sys):
+        nonlocal callback_called
+        if not callback_called and ode_sys.t[-1] > D.pi:
+            callback_called = True
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
+                     atol=D.epsilon() ** 0.5)
+
+    a.integrate(callback=callback)
+    
+    assert(callback_called)
+    
+
+def test_keyboard_interrupt_caught():
+    de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
+
+    @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, **kwargs):
+        return de_mat @ state + D.array([0.0, t])
+
+    y_init = D.array([1., 0.])
+    
+    def kb_callback(ode_sys):
+        if ode_sys.t[-1] > D.pi:
+            raise KeyboardInterrupt()
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
+                     atol=D.epsilon() ** 0.5)
+
+    with pytest.raises(KeyboardInterrupt):
+        a.integrate(callback=kb_callback)
+    
+    assert(a.integration_status == "A KeyboardInterrupt exception was raised during integration.")
+    
+    
 
 def test_DiffRHS():
     def rhs(t, state, k, **kwargs):

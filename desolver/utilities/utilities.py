@@ -1,6 +1,7 @@
 import time
 import sys
 import numpy
+import warnings
 from .. import backend as D
 
 __all__ = [
@@ -163,24 +164,24 @@ def convert_suffix(value, suffixes=('d', 'h', 'm', 's'), ratios=(24, 60, 60), de
     ret_string = ret_string + "{:.2f}{}".format(outputValues[0], suffixes[-1])
     return ret_string
 
-def warning(*args, **kwargs):
+def warning(message, category=Warning):
     """Convenience function for printing to sys.stderr. 
 
     Parameters
     ----------
-    args : variable
-        arguments to be passed to print
-    kwargs : variable
-        keyword arguments to be passed to print
+    message  : str
+        warning message
+    category : warning category
+        type of warning message. eg. DeprecationWarning
         
     Examples
     --------
     
-    >>> warning("Things have failed...")
+    >>> warning("Things have failed...", warning.Warning)
     Things have failed...
     
     """
-    print(*args, file=sys.stderr, **kwargs)
+    warnings.warn(message, category=category)
 
 def search_bisection(array, val):
     """Finds the index of the nearest value to val in array. Uses the bisection method.

@@ -11,10 +11,19 @@ def test_recursion_error():
         raise
 
 
-def test_failed_integration_error():
+def test_failed_integration():
     try:
-        raise de.exception_types.FailedIntegrationError()
-    except de.exception_types.FailedIntegrationError:
+        raise de.exception_types.FailedIntegration()
+    except de.exception_types.FailedIntegration:
+        pass
+    except:
+        raise
+
+        
+def test_tolerance_failure():
+    try:
+        raise de.exception_types.FailedToMeetTolerances()
+    except de.exception_types.FailedToMeetTolerances:
         pass
     except:
         raise

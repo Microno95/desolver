@@ -374,7 +374,7 @@ class OdeSystem(object):
             
         self.staggered_mask = None
         self.__dense_output = dense_output
-        self.int_status     = 0
+        self.__int_status   = 0
         self.success        = False
         self.sol            = None
             
@@ -382,7 +382,7 @@ class OdeSystem(object):
         self.__allocate_soln_space(self.__alloc_space_steps(self.tf))
         self.__fix_dt_dir(self.tf, self.t0)
         self.__events       = []
-        self.initialise_integrator()
+        self.initialise_integrator(preserve_states=False)
         
         if self.__dense_output:
             self.sol = DenseOutput([self.t0], [])
@@ -637,8 +637,8 @@ class OdeSystem(object):
         """Returns the current time of the ODE system"""
         return self.t[self.counter]
 
-    def initialise_integrator(self):
-        integrator_kwargs = dict(dtype=self.y[0].dtype, device=self.device)
+    def initialise_integrator(self, preserve_states=False):
+        integrator_kwargs = dict(dtype=self.y[-1].dtype, device=self.device)
         
         integrator_kwargs['atol'] = self.atol
         integrator_kwargs['rtol'] = self.rtol
@@ -646,7 +646,19 @@ class OdeSystem(object):
         if self.method.__symplectic__ and not self.method.__implicit__:
             integrator_kwargs['staggered_mask'] = self.staggered_mask
             
+        if self.integrator:
+            old_states_exist = True
+            old_dState      = self.integrator.dState
+            old_dTime       = self.integrator.dTime
+        else:
+            old_states_exist = False
         self.integrator = self.method(self.dim, **integrator_kwargs)
+        if old_states_exist and preserve_states:
+            self.integrator.dState = old_dState
+            self.integrator.dTime  = old_dTime
+            if D.backend() == 'torch':
+                self.integrator.dState      = self.integrator.dState.to(self.integrator.device)
+                self.integrator.dTime       = self.integrator.dTime.to(self.integrator.device)
         
     def __get_integrator_mask(self, staggered_mask):
         if staggered_mask is None and hasattr(self.integrator, "staggered_mask"):
@@ -663,7 +675,7 @@ class OdeSystem(object):
     def method(self, new_method):
         self.set_method(new_method, None)
     
-    def set_method(self, new_method, staggered_mask=None):
+    def set_method(self, new_method, staggered_mask=None, preserve_states=True):
         """Sets the method of integration.
 
         Parameters
@@ -684,9 +696,8 @@ class OdeSystem(object):
             If the string is not a valid integration scheme.
         """        
         self.staggered_mask = self.__get_integrator_mask(staggered_mask)
-        if self.int_status == 1:
-            deutil.warning("An integration was already run, the system will be reset")
-            self.reset()
+        if self.__int_status == 1:
+            deutil.warning("An integration was already run, this will not reset the system", category=RuntimeWarning)
         if new_method in integrators.available_methods():
             self.__method = integrators.available_methods(False)[new_method]
         elif issubclass(new_method, integrators.IntegratorTemplate):
@@ -696,7 +707,7 @@ class OdeSystem(object):
         else:
             raise ValueError("The method you selected does not exist in the list of available methods, \
                               call desolver.available_methods() to see what these are")
-        self.initialise_integrator()
+        self.initialise_integrator(preserve_states=preserve_states)
                 
     def get_step_interpolant(self):
         "Computes the 3rd order Hermite polynomial interpolant over one step."
@@ -709,6 +720,7 @@ class OdeSystem(object):
                     self.equ_rhs(self.__t[self.counter], self.__y[self.counter], **self.constants)
                 )
     
+    @property
     def integration_status(self):
         """Returns the integration status as a human-readable string.
 
@@ -717,21 +729,22 @@ class OdeSystem(object):
         str
             String containing the integration status message.
         """
-        if self.int_status == 0:
+        if self.__int_status == 0:
             return "Integration has not been run."
-        elif self.int_status == 1:
-            return "Integration completed successfully."
-        elif self.int_status == 2:
-            return "Integration terminated upon finding a triggered event."
-        elif self.int_status == -1:
-            return "Recursion limit was reached during integration, "+\
-                   "this can be caused by the adaptive integrator being unable "+\
-                   "to find a suitable step size to achieve the rtol/atol "+\
-                   "requirements."
-        elif self.int_status == -2:
+        if isinstance(self.__int_status, KeyboardInterrupt):
             return "A KeyboardInterrupt exception was raised during integration."
-        elif self.int_status == -3:
-            return "A generic exception was raised during integration."
+        if isinstance(self.__int_status, etypes.FailedIntegration):
+            if self.__int_status.__cause__ is not None:
+                return "The integration failed with the following exception: {}\n\tCaused by {}".format(self.__int_status, self.__int_status.__cause__)
+            else:
+                return "The integration failed with the following exception: {}".format(self.__int_status)
+        if self.__int_status == 1:
+            return "Integration completed successfully."
+        if self.__int_status == 2:
+            return "Integration terminated upon finding a triggered event."
+        else:
+            return "It should not be possible to initialise the system with this status"
+        
 
     def reset(self):
         """Resets the system to the initial time."""
@@ -741,12 +754,12 @@ class OdeSystem(object):
         self.dt           = self.__dt0
         self.equ_rhs.nfev = 0
         self.__move_to_device()
-        self.int_status   = 0
+        self.__int_status   = 0
         if self.__dense_output:
             self.sol = DenseOutput([self.t0], [])
         if self.__events:
             self.__events = []
-        self.initialise_integrator()
+        self.initialise_integrator(preserve_states=False)
 
     def integrate(self, t=None, callback=None, eta=False, events=None):
         """Integrates the system to a specified time.
@@ -799,7 +812,7 @@ class OdeSystem(object):
         events, is_terminal, direction = prepare_events(events)
         
         if D.to_numpy(tf) == np.inf and not any(is_terminal):
-            deutil.warning("Specifying an indefinite integration time with no terminal events will lead to memory issues.")
+            deutil.warning("Specifying an indefinite integration time with no terminal events can lead to memory issues if no event terminates the integration.", category=RuntimeWarning)
         
         self.__fix_dt_dir(tf, self.t[-1])
 
@@ -820,13 +833,13 @@ class OdeSystem(object):
                 callback = []
             else:
                 callback = [callback]
-            
+        
         end_int = False
-        self.equ_rhs.nfev = 0 if self.int_status == 1 else self.equ_rhs.nfev
         cState  = D.zeros_like(self.__y[self.counter])
         cTime   = D.zeros_like(self.__t[self.counter])        
         self.__allocate_soln_space(total_steps)
         try:
+            self.success = False
             while self.dt != 0 and D.abs(tf - self.__t[self.counter]) >= D.epsilon() and not end_int:
                 if D.abs(self.dt + self.__t[self.counter]) > D.abs(tf):
                     self.dt = (tf - self.__t[self.counter])
@@ -876,7 +889,7 @@ class OdeSystem(object):
 
                         if end_int:
                             tsol            = self.get_step_interpolant()
-                            self.int_status = 2
+                            self.__int_status = 2
                             self.success    = True
                         else:
                             if self.counter+len(roots)+1 >= len(self.__y):
@@ -902,26 +915,26 @@ class OdeSystem(object):
                     tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.__t[self.counter], tf, self.dt).ljust(8)
                     tqdm_progress_bar.update()
                     
-        except KeyboardInterrupt:
-            self.int_status = -2
-            raise
-        except RecursionError:
-            self.int_status = -1
-            raise
-        except:
-            self.int_status = -3
-            raise
+        except KeyboardInterrupt as e:
+            self.__int_status = e
+            raise e
+        except Exception as e:
+            new_e = etypes.FailedIntegration("Failed to integrate system")
+            new_e.__cause__ = e
+            self.__int_status = new_e
+            raise new_e
+        else:
+            if self.__int_status != 2 and not isinstance(self.__int_status, (etypes.FailedIntegration, KeyboardInterrupt)):
+                self.success    = True
+                self.__int_status = 1
         finally:
-            self.success    = True
-            if self.int_status != 2:
-                self.int_status = 1
-            self.__trim_soln_space()
             if eta:
                 tqdm_progress_bar.close()
+            self.__trim_soln_space()
 
     def __repr__(self):
         return "\n".join([
-            """{:>10}: {:<128}""".format("message",   self.integration_status()),
+            """{:>10}: {:<128}""".format("message",   self.integration_status),
             """{:>10}: {:<128}""".format("nfev",      str(self.nfev)),
             """{:>10}: {:<128}""".format("sol",       str(self.sol)),
             """{:>10}: {:<128}""".format("t0",        str(self.t0)),
@@ -949,7 +962,7 @@ class OdeSystem(object):
 {:>10}: {:<128}  
 ```
 """.format(
-            "message", self.integration_status(), 
+            "message", self.integration_status,
             "nfev", str(self.nfev), 
             "sol", str(self.sol), 
             "t0", str(self.t0), 

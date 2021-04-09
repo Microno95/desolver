@@ -13,11 +13,13 @@ implicit_integrator_set = [
 ]
 
 
-devices_set = ['cpu']
 if D.backend() == 'torch':
+    devices_set = [pytest.param('cpu', marks=pytest.mark.cpu)]
     import torch
-#     if torch.cuda.is_available():
-#         devices_set.insert(0, 'cuda')
+    if torch.cuda.is_available():
+        devices_set.insert(0, pytest.param('cuda', marks=pytest.mark.gpu))
+else:
+    devices_set = [None]
     
 @pytest.mark.torch_gradients
 # @pytest.mark.skip(reason="Test too slow, needs refactoring")

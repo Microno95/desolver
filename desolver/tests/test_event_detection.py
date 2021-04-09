@@ -14,10 +14,10 @@ implicit_integrator_set = [
 
 
 if D.backend() == 'torch':
-    devices_set = ['cpu']
+    devices_set = [pytest.param('cpu', marks=pytest.mark.cpu)]
     import torch
     if torch.cuda.is_available():
-        devices_set.insert(0, 'cuda')
+        devices_set.insert(0, pytest.param('cuda', marks=pytest.mark.gpu))
 else:
     devices_set = [None]
 
@@ -83,7 +83,7 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
         a.set_method(method)
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
-        assert (a.integration_status() == "Integration has not been run.")
+        assert (a.integration_status == "Integration has not been run.")
 
         a.integrate(eta=True, events=[time_event, second_time_event, first_y_event])
 
@@ -152,11 +152,11 @@ def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation, 
     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
         a.set_method(method)
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
-        assert (a.integration_status() == "Integration has not been run.")
+        assert (a.integration_status == "Integration has not been run.")
 
         a.integrate(eta=True, events=time_event)
 
-        assert (a.integration_status() == "Integration terminated upon finding a triggered event.")
+        assert (a.integration_status == "Integration terminated upon finding a triggered event.")
 
         assert (D.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon())
         assert (len(a.events) == 1)
@@ -216,7 +216,7 @@ def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation, 
 #     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
 #         a.set_method(method)
 #         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
-#         assert (a.integration_status() == "Integration has not been run.")
+#         assert (a.integration_status == "Integration has not been run.")
 
 #         a.integrate(eta=True, events=time_event)
 
