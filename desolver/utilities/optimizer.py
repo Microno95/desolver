@@ -238,7 +238,14 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
         print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}, conv={true_conv}".format(**locals()))
     return b, true_conv
 
-def preconditioner(A):
+def preconditioner(A, tol=None):
+    if tol is None:
+        if D.epsilon() <= 1e-5:
+            tol = 32*D.epsilon()
+        else:
+            tol = D.epsilon()
+    if tol < 32*D.epsilon() and D.epsilon() <= 1e-5:
+        tol = 32*D.epsilon()
     I    = D.eye(A.shape[0])
     if D.backend() == 'torch':
         I = I.to(A)
@@ -262,7 +269,7 @@ def preconditioner(A):
             In = In0
         else:
             In = In1
-        if D.norm(D.to_float(In@A)) >= D.norm(D.to_float(Pinv@A)):
+        if D.norm(D.to_float(I - In@A)) >= D.norm(D.to_float(I - Ik)):
             break
         else:
             Pinv = In
@@ -322,7 +329,7 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
         else:
             F0 = -D.reshape(F0, (-1, 1))
             if estimate_cond(Jf0) > 100:
-                Pinv = preconditioner(Jf0)
+                Pinv = preconditioner(Jf0, tol=tol)
                 Jf0 = Pinv@Jf0
                 F0  = Pinv@F0
             if D.backend() == 'numpy':
