@@ -182,7 +182,6 @@ def test_newtonraphson(ffmt, tol):
                             32 * D.epsilon()))
         assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32 * D.epsilon())
 
-@pytest.mark.skipif(D.backend() == 'torch', reason="JacobianWrapper breaks pytorch AD")
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('tol',  [None, 40, 1])
 def test_newtonraphson_estimated_jac(ffmt, tol):

@@ -59,22 +59,24 @@ class JacobianWrapper(object):
         dy_val        = self.rhs(y, **kwargs)
         unravelled_dy = D.reshape(dy_val, (-1,))
         jacobian_y    = D.zeros((*D.shape(unravelled_dy), *D.shape(unravelled_y)), dtype=unravelled_dy.dtype)
+        y_msk         = D.zeros_like(unravelled_y)
         if D.backend() == 'torch':
-            jacobian_y = jacobian_y.to(y.device)
+            jacobian_y = jacobian_y.to(dy_val).to(y.device)
         for idx,val in enumerate(unravelled_y):
-            y_jac  = D.copy(unravelled_y)
+            y_msk[idx-1] = 0.0
+            y_msk[idx]   = 1.0
             dy_cur = dy
-            if not self.adaptive and (D.abs(y_jac[idx]) > 1.0 or dy_cur > D.abs(y_jac[idx]) > 0.0):
-                dy_cur = dy_cur * y_jac[idx]
+            if not self.adaptive and (D.abs(val) > 1.0 or dy_cur > D.abs(val) > 0.0):
+                dy_cur = dy_cur * val
 
             # 1*f[i-2]-8*f[i-1]+0*f[i+0]+8*f[i+1]-1*f[i+2]
-            y_jac[idx]         = val + 2*dy_cur
+            y_jac              = unravelled_y + 2*dy_cur * y_msk
             jacobian_y[:, idx] = -D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
-            y_jac[idx]         = val + dy_cur
+            y_jac              = unravelled_y + dy_cur * y_msk
             jacobian_y[:, idx] = jacobian_y[:, idx] + 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
-            y_jac[idx]         = val - 2*dy_cur
+            y_jac              = unravelled_y - 2*dy_cur * y_msk
             jacobian_y[:, idx] = jacobian_y[:, idx] + D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
-            y_jac[idx]         = val - dy_cur
+            y_jac              = unravelled_y - dy_cur * y_msk
             jacobian_y[:, idx] = jacobian_y[:, idx] - 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
 
             jacobian_y[:, idx] = jacobian_y[:, idx] / (12*dy_cur)
