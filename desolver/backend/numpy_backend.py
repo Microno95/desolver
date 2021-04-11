@@ -266,7 +266,7 @@ def logical_xor(a, b, out=None, where=True):
 nonzero = numpy.nonzero
 argsort = numpy.argsort
 
-def solve_linear_system(A,b,overwrite_a=True,overwrite_b=True,check_finite=False,sparse=False):
+def solve_linear_system(A,b,overwrite_a=False,overwrite_b=False,check_finite=False,sparse=False):
     if sparse:
         return scipy.sparse.linalg.spsolve(scipy.sparse.csc_matrix(A),b)
     else:
@@ -274,4 +274,4 @@ def solve_linear_system(A,b,overwrite_a=True,overwrite_b=True,check_finite=False
 
 matrix_inv = numpy.linalg.inv
 eig = numpy.linalg.eig
-
+diag = numpy.diag

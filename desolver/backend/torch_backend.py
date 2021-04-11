@@ -466,3 +466,5 @@ def solve_linear_system(A,b,sparse=False):
     return torch.solve(b,A).solution
 
 matrix_inv = torch.linalg.inv
+eig = torch.eig
+diag = torch.diag

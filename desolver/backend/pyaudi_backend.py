@@ -168,6 +168,131 @@ def __matrix_inv_dispatcher(A, *args, **kwargs):
 
 matrix_inv = __matrix_inv_dispatcher
 
+def __qr_gramschmidt(A):
+    Q = zeros_like(A)
+    for idx in range(len(A)):
+        Q[:, idx] = A[:, idx]
+        for jdx in range(idx):
+            Q[:, idx] = Q[:, idx] - (Q[:, jdx].T@Q[:, idx])*Q[:, jdx]
+        Q[:, idx] = Q[:, idx] / (Q[:, idx:idx+1].T@Q[:, idx:idx+1])**0.5
+    R = Q.T@A
+    return Q,R
+
+def __qr_householder(A_in, overwrite_a=False):
+    n = A_in.shape[0]
+    if n == 1:
+        return 1, A_in, A_in
+    if overwrite_a:
+        A = A_in
+    else:
+        A = copy(A_in)
+    I = eye(n)
+    Q = copy(I)
+    for idx in range(n):
+        v  = copy(A[idx:, idx:idx+1])
+        dA = (v.T@v)**0.5
+        fA00 = float(A[idx, idx])
+        if fA00 < 0:
+            v[0] = v[0] - dA
+        elif fA00 > 0:
+            v[0] = v[0] + dA    
+        vn = (v.T@v)**0.5
+        if float(vn) > 0.0:
+            v = v / vn
+        H = I[idx:, idx:] - 2*v@v.T
+        A[idx:, idx:] = H@A[idx:, idx:]
+        A[idx:, :idx] = H@A[idx:, :idx]
+        Q[idx:, idx:] = Q[idx:, idx:]@H
+        Q[:idx, idx:] = Q[:idx, idx:]@H
+    return Q,A
+
+def __backward_substitution(U, b, overwrite_b=False):
+    if overwrite_b:
+        for idx in range(shape(U)[0]-1,-1,-1):
+            b[idx] = b[idx] - sum(U[idx, idx+1:]*b[idx+1:, 0])
+            b[idx] = b[idx] / U[idx, idx]
+        return b
+    else:
+        x = copy(b)
+        for idx in range(shape(U)[0]-1,-1,-1):
+            x[idx] = x[idx] - sum(U[idx, idx+1:]*x[idx+1:, 0])
+            x[idx] = x[idx] / U[idx, idx]
+        return x
+
+def __forward_substitution(L, b, overwrite_b=False):
+    if overwrite_b:
+        for idx in range(shape(L)[0]):
+            b[idx] = b[idx] - sum(L[idx, :idx]*b[:idx, 0])
+            b[idx] = b[idx] / L[idx, idx]
+        return b
+    else:
+        x = copy(b)
+        for idx in range(shape(L)[0]):
+            x[idx] = x[idx] - sum(L[idx, :idx]*x[:idx, 0])
+            x[idx] = x[idx] / L[idx, idx]
+        return x
+    
+def __lu(A, overwrite_a=False):
+    if shape(A)[0] != shape(A)[1]:
+        raise numpy.linalg.LinAlgError("Matrix is not square, inversion is not possible")
+    detA = numpy.linalg.det(to_float(A))
+    if detA == 0:
+        raise numpy.linalg.LinAlgError("Matrix has a determinant of {} which makes it non-invertible".format(detA))
+    P = eye(shape(A)[0], dtype=A.dtype)
+    L = eye(shape(A)[0], dtype=A.dtype)
+    if overwrite_a:
+        U = A
+    else:
+        U = copy(A)
+    h = 0 # Initialization of the pivot row
+    k = 0 # Initialization of the pivot column
+
+    while h < shape(U)[0] and k < shape(U)[1]:
+        # Find the k-th pivot: 
+        i_max = h + argmax(abs(to_float(U[h:, k])))
+        if to_float(U[i_max, k]) == 0:
+            # No pivot in this column, pass to next column
+            k = k + 1
+        else:
+            U[h], U[i_max] = copy(U[i_max]), copy(U[h])
+            P[h], P[i_max] = copy(P[i_max]), copy(P[h])
+            for i in range(h+1, shape(A)[0]):
+                f = U[i, k] / U[h, k]
+                L[i, :] = L[i, :] + f * L[h, :]
+                U[i, :] = U[i, :] - f * U[h, :]
+            # Increase pivot row and column
+            h = h + 1
+            k = k + 1
+    return P,L,U
+
+def __solve_linear_system_helper(A, b, overwrite_a=False):
+    if len(A) > 9:
+        Q,R = __qr_householder(A, overwrite_a=overwrite_a)
+        return __backward_substitution(R,Q.T@b,overwrite_b=True)
+    elif len(A) < 20:
+        Q,R = __qr_gramschmidt(A)
+        return __backward_substitution(R,Q.T@b,overwrite_b=True)
+    else:
+        P,L,U = __lu(A, b, overwrite_a=overwrite_a)
+        y = __forward_substituion(L,P@b,overwrite_b=True)
+        return __backward_substition(U,y,overwrite_b=True)
+    
+def __solve_linear_system_dispatcher(A, b, overwrite_a=False, overwrite_b=False, check_finite=False, sparse=False, *args, **kwargs):
+    if A.dtype == object:
+        if len(shape(A)) == 2:
+            return __solve_linear_system_helper(A, b, overwrite_a=overwrite_a, *args, **kwargs)
+        else:
+            assert A.shape[:-2] == b.shape[:-2], "Batched system must have compatible shapes for A and b!"
+            return reshape(stack([
+                __solve_linear_system_helper(A_batch, b_atch, overwrite_a=overwrite_a, *args, **kwargs) for A_batch_b_batch in zip(reshape(A, (-1, *shape(A)[-2:])), reshape(b, (-1, *shape(b)[-2:])))
+            ]), shape(b))
+    else:
+        if sparse:
+            return scipy.sparse.linalg.spsolve(scipy.sparse.csc_matrix(A),b)
+        else:
+            return scipy.linalg.solve(A,b,overwrite_a=overwrite_a,overwrite_b=overwrite_b,check_finite=check_finite)
+    
+solve_linear_system = __solve_linear_system_dispatcher
 
 # gdual_real128 Definitions
 # try:

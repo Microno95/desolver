@@ -333,12 +333,12 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
                 Jf0 = Pinv@Jf0
                 F0  = Pinv@F0
             if D.backend() == 'numpy':
-                if F0.dtype == object or Jf0.dtype == object:
-                    dx = D.matrix_inv(Jf0, tol=tol)@F0
-                else:
-                    dx = D.solve_linear_system(Jf0, F0, sparse=sparse).astype(x.dtype)
-            else:
-                dx = D.solve_linear_system(Jf0, F0, sparse=sparse)
+                if Jf0.dtype == D.float16 or Jf0.dtype == D.float32:
+                    Jf0 = Jf0.astype(D.float64)
+                    F0  = F0.astype(D.float64)
+            dx = D.solve_linear_system(Jf0, F0, sparse=sparse)
+            if D.backend() == 'numpy':
+                dx = dx.astype(x.dtype)
         if verbose:
             print("[{iteration}]: x = {x}, dx = {dx}, F = {F0}, Jf = {Jf0}".format(**locals()))
             if D.backend() == 'torch':
