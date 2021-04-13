@@ -103,9 +103,11 @@ class RichardsonIntegratorTemplate(IntegratorTemplate):
                     next_timestep *= 2.0
                 redo_step = False
         else:
-            timestep = new_timestep
+            next_timestep = new_timestep
         if redo_step:
             timestep, (self.dTime, self.dState) = self(rhs, initial_time, initial_state, constants, next_timestep)
+        else:
+            timestep = next_timestep
             
         return timestep, (self.dTime, self.dState)
 
