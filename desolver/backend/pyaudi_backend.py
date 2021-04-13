@@ -186,7 +186,7 @@ def __qr_householder(A_in, overwrite_a=False):
         A = A_in
     else:
         A = copy(A_in)
-    I = eye(n)
+    I = eye(n, dtype=A.dtype)
     Q = copy(I)
     for idx in range(n):
         v  = copy(A[idx:, idx:idx+1])
@@ -200,10 +200,8 @@ def __qr_householder(A_in, overwrite_a=False):
         if float(vn) > 0.0:
             v = v / vn
         H = I[idx:, idx:] - 2*v@v.T
-        A[idx:, idx:] = H@A[idx:, idx:]
-        A[idx:, :idx] = H@A[idx:, :idx]
-        Q[idx:, idx:] = Q[idx:, idx:]@H
-        Q[:idx, idx:] = Q[:idx, idx:]@H
+        A[idx:, :] = H@A[idx:, :]
+        Q[:, idx:] = Q[:, idx:]@H
     return Q,A
 
 def __backward_substitution(U, b, overwrite_b=False):
@@ -254,8 +252,8 @@ def __lu(A, overwrite_a=False):
             # No pivot in this column, pass to next column
             k = k + 1
         else:
-            U[h], U[i_max] = copy(U[i_max]), copy(U[h])
-            P[h], P[i_max] = copy(P[i_max]), copy(P[h])
+            U[h], U[i_max] = U[i_max], copy(U[h])
+            P[h], P[i_max] = P[i_max], copy(P[h])
             for i in range(h+1, shape(A)[0]):
                 f = U[i, k] / U[h, k]
                 L[i, :] = L[i, :] + f * L[h, :]
@@ -266,19 +264,26 @@ def __lu(A, overwrite_a=False):
     return P,L,U
 
 def __solve_linear_system_helper(A, b, overwrite_a=False):
-    if len(A) > 9:
-        Q,R = __qr_householder(A, overwrite_a=overwrite_a)
-        return __backward_substitution(R,Q.T@b,overwrite_b=True)
-    elif len(A) < 20:
-        Q,R = __qr_gramschmidt(A)
+    if len(A) < 30:
+        if A.dtype == object:
+            if len(A) < 10:
+                Q,R = __qr_gramschmidt(A)
+            else:
+                Q,R = __qr_householder(A, overwrite_a=overwrite_a)
+        else:
+            Q,R = scipy.linalg.qr(A, overwrite_a=overwrite_a)
         return __backward_substitution(R,Q.T@b,overwrite_b=True)
     else:
-        P,L,U = __lu(A, b, overwrite_a=overwrite_a)
-        y = __forward_substituion(L,P@b,overwrite_b=True)
-        return __backward_substition(U,y,overwrite_b=True)
+        if A.dtype == object:
+            P,L,U = __lu(A, overwrite_a=overwrite_a)
+        else:
+            P,L,U = scipy.linalg.lu(A, overwrite_a=overwrite_a)
+        y = P@b
+        y = __forward_substitution(L,y,overwrite_b=True)
+        return __backward_substitution(U,y,overwrite_b=True)
     
 def __solve_linear_system_dispatcher(A, b, overwrite_a=False, overwrite_b=False, check_finite=False, sparse=False, *args, **kwargs):
-    if A.dtype == object:
+    if A.dtype == object or b.dtype == object:
         if len(shape(A)) == 2:
             return __solve_linear_system_helper(A, b, overwrite_a=overwrite_a, *args, **kwargs)
         else:
@@ -293,6 +298,14 @@ def __solve_linear_system_dispatcher(A, b, overwrite_a=False, overwrite_b=False,
             return scipy.linalg.solve(A,b,overwrite_a=overwrite_a,overwrite_b=overwrite_b,check_finite=check_finite)
     
 solve_linear_system = __solve_linear_system_dispatcher
+
+def eval_weights(x, weights):
+    if isinstance(x, (gdual_double, gdual_vdouble)):
+        return x.evaluate(weights)
+    elif isinstance(x, numpy.ndarray):
+        return reshape(array(list(map(lambda y: eval_weights(y, weights), ravel(x)))), x.shape)
+    else:
+        return x
 
 # gdual_real128 Definitions
 # try:

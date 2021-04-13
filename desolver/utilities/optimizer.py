@@ -250,9 +250,10 @@ def preconditioner(A, tol=None):
     if D.backend() == 'torch':
         I = I.to(A)
     Pinv = D.zeros_like(A)
-    nA   = 0.5 * (D.norm(A, axis=1) + D.norm(A, axis=0))
+    A2   = A*A
+    nA   = 0.5 * (D.sum(A2, axis=0) + D.sum(A2, axis=1))
     for i in range(D.shape(A)[0]):
-        if nA[i] > 32*D.epsilon():
+        if float(nA[i]) > 32*D.epsilon():
             Pinv[i,i] = 1/nA[i]
         else:
             Pinv[i,i] = 1.0
@@ -322,23 +323,20 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, spars
                 Jf0 = jac(x)
             F0  = F0
         else:
-            F0  = f(x).astype(D.float64)
+            F0  = f(x)
             Jf0 = jac(x).astype(D.float64)
         if no_dim:
             dx = -D.reshape(F0, tuple()) / D.reshape(Jf0, tuple())
         else:
             F0 = -D.reshape(F0, (-1, 1))
-            if use_preconditioner and estimate_cond(Jf0) > 100:
+            if Jf0.dtype != object and use_preconditioner and estimate_cond(Jf0) > 100:
                 Pinv = preconditioner(Jf0, tol=tol)
                 Jf0 = Pinv@Jf0
                 F0  = Pinv@F0
             if D.backend() == 'numpy':
-                if Jf0.dtype == D.float16 or Jf0.dtype == D.float32:
-                    Jf0 = Jf0.astype(D.float64)
-                    F0  = F0.astype(D.float64)
-            dx = D.solve_linear_system(Jf0, F0, sparse=sparse)
-            if D.backend() == 'numpy':
-                dx = dx.astype(x.dtype)
+                dx = D.solve_linear_system(Jf0, F0, sparse=sparse, overwrite_a=True, overwrite_b=True)
+            else:
+                dx = D.solve_linear_system(Jf0, F0, sparse=sparse)
         if verbose:
             print("[{iteration}]: x = {x}, dx = {dx}, F = {F0}, Jf = {Jf0}".format(**locals()))
             if D.backend() == 'torch':

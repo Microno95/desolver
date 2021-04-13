@@ -157,7 +157,9 @@ def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation, 
         a.integrate(eta=True, events=time_event)
 
         assert (a.integration_status == "Integration terminated upon finding a triggered event.")
-
+        
+        print(a)
+        print(a.events)
         assert (D.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon())
         assert (len(a.events) == 1)
         assert (a.events[0].event == time_event)

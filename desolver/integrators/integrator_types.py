@@ -137,7 +137,7 @@ class ExplicitRungeKuttaIntegrator(ExplicitIntegrator):
             return timestep, (self.dTime, self.dState)
         
     def get_error_estimate(self, tableau_idx_expand):
-        return D.sum((self.final_state[1] - self.final_state[0])[tableau_idx_expand] * self.aux, axis=0)
+        return D.sum(self.final_state[1][tableau_idx_expand]* self.aux, axis=0) - D.sum(self.final_state[0][tableau_idx_expand]* self.aux, axis=0)
 
     __call__ = forward
 
@@ -268,7 +268,10 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             self.dTime       = self.dTime.to(self.device)
             self.aux         = self.aux.to(self.device)
             self.tableau     = self.tableau.to(self.device)
-            self.final_state = self.final_state.to(self.device)        
+            self.final_state = self.final_state.to(self.device)
+            
+        self.niter0 = 0
+        self.niter1 = 0
             
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
         if self.tableau is None:
@@ -285,8 +288,6 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
                 rhs(initial_time + tbl[0] * timestep, initial_state + timestep * D.sum(tbl[tableau_idx_expand] * __aux_states, axis=0), **constants) for tbl in self.tableau
             ])
             __states =  D.reshape(__aux_states - __rhs_states, (-1,))
-            if __states.dtype == object:
-                __states = D.to_float(__states)
             return __states
         
         def __nfun_jac(next_state):
@@ -306,14 +307,15 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
                     __jac[idx:idx+__step, jdx:jdx+__step] -= timestep * self.tableau[idx//__step, 1+jdx//__step]*__rhs_jac[idx//__step].reshape(__step, __step)
             if __jac.shape[0] == 1 and __jac.shape[1] == 1:
                 __jac = D.reshape(__jac, tuple())
-            if __jac.dtype == object:
-                __jac = D.to_float(__jac)
             return __jac
             
         initial_guess = D.zeros_like(self.aux)
+        
         midpoint_guess = rhs(initial_time, initial_state, **constants)
         midpoint_guess = 0.5 * timestep * (midpoint_guess + rhs(initial_time + 0.5 * timestep, initial_state + 0.5 * timestep * midpoint_guess, **constants))
+        
         initial_guess = D.to_float(initial_guess + (0.5*midpoint_guess + 0.5*self.dState)[None])
+        
         if rhs.jac_is_wrapped_rhs and D.backend() == 'torch':
             nfun_jac = None
             initial_guess.requires_grad = True
@@ -322,12 +324,19 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             nfun_jac = __nfun_jac
             sparsity = 1.0 - D.sum(D.abs(D.to_float(nfun_jac(initial_guess))) > 0) / (self.tableau.shape[0]*self.numel)**2
             
-        aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=125, sparse=sparsity >= 0.7)
-        
+        aux_root, (success, self.niter1, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=125, sparse=sparsity >= 0.7)
         if not success and prec > D.max(D.abs(self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))))):
-            raise exception_types.FailedToMeetTolerances("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, 32*D.epsilon(), num_iter))
+            raise exception_types.FailedToMeetTolerances("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, 32*D.epsilon(), self.niter1))
+            
+        if self.niter0 == 0:
+            self.niter0 = self.niter1
             
         self.aux    = D.reshape(aux_root, aux_shape)
+#         if initial_state.dtype == object:
+#             new_aux = D.stack([
+#                     rhs(initial_time + tbl[0] * timestep, initial_state + timestep * D.sum(tbl[tableau_idx_expand] * self.aux, axis=0), **constants) for tbl in self.tableau
+#                 ])
+#             self.aux = new_aux
         self.dState = timestep * D.sum(self.final_state[0][tableau_idx_expand] * self.aux, axis=0)
         self.dTime  = D.copy(timestep)
         
@@ -337,10 +346,29 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             if redo_step:
                 timestep, (self.dTime, self.dState) = self(rhs, initial_time, initial_state, constants, timestep)
 
+        self.niter0 = self.niter1
+                
         return timestep, (self.dTime, self.dState)
         
+    def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.8):
+        err_estimate = D.max(D.abs(D.to_float(diff)))
+        relerr = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state) + self.rtol * D.abs(dState / timestep)))
+        corr = 1.0
+#         rel_niter = (self.niter0 / self.niter1)**(1.0 / self.order)
+#         if rel_niter != 0:
+#             corr = corr * rel_niter
+#         else:
+        if err_estimate != 0:
+            corr = corr * tol * (relerr / err_estimate)**(1.0 / self.order)
+        if corr != 0:
+            timestep = corr * timestep
+        if err_estimate > relerr:
+            return timestep, True
+        else:
+            return timestep, False
+        
     def get_error_estimate(self, tableau_idx_expand):
-        return D.sum((self.final_state[1] - self.final_state[0])[tableau_idx_expand] * self.aux, axis=0)
+        return D.sum(self.final_state[1][tableau_idx_expand]* self.aux, axis=0) - D.sum(self.final_state[0][tableau_idx_expand]* self.aux, axis=0)
 
     __call__ = forward
     

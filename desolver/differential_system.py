@@ -375,7 +375,6 @@ class OdeSystem(object):
         self.staggered_mask = None
         self.__dense_output = dense_output
         self.__int_status   = 0
-        self.success        = False
         self.sol            = None
             
         self.__move_to_device()
@@ -387,6 +386,10 @@ class OdeSystem(object):
         if self.__dense_output:
             self.sol = DenseOutput([self.t0], [])
 
+    @property
+    def success(self):
+        return self.__int_status == 1 or self.__int_status == 2
+            
     @property
     def events(self):
         """A tuple of (time, state) tuples at which each event occurs.
@@ -805,7 +808,7 @@ class OdeSystem(object):
         else:
             tf = self.tf
             
-        if D.abs(tf - self.t[-1]) < D.epsilon():
+        if D.abs(tf - self.__t[self.counter]) < D.epsilon():
             return
         steps  = 0
             
@@ -814,10 +817,10 @@ class OdeSystem(object):
         if D.to_numpy(tf) == np.inf and not any(is_terminal):
             deutil.warning("Specifying an indefinite integration time with no terminal events can lead to memory issues if no event terminates the integration.", category=RuntimeWarning)
         
-        self.__fix_dt_dir(tf, self.t[-1])
+        self.__fix_dt_dir(tf, self.__t[self.counter])
 
-        if D.abs(self.dt) > D.abs(tf - self.t[-1]):
-            self.dt = D.abs(tf - self.t[-1])*0.5
+        if D.abs(self.dt) > D.abs(tf - self.__t[self.counter]):
+            self.dt = D.abs(tf - self.__t[self.counter])*0.5
 
         total_steps = self.__alloc_space_steps(tf)
         
@@ -839,7 +842,6 @@ class OdeSystem(object):
         cTime   = D.zeros_like(self.__t[self.counter])        
         self.__allocate_soln_space(total_steps)
         try:
-            self.success = False
             while self.dt != 0 and D.abs(tf - self.__t[self.counter]) >= D.epsilon() and not end_int:
                 if D.abs(self.dt + self.__t[self.counter]) > D.abs(tf):
                     self.dt = (tf - self.__t[self.counter])
@@ -881,16 +883,21 @@ class OdeSystem(object):
                         self.counter -= 1
 
                         for ev_idx,(root,ev) in enumerate(zip(roots, evs)):
-                            if root != self.__t[self.counter]:
+                            if dTime >= 0:
+                                true_positive = (self.__t[self.counter] <= root) & (root <= prev_time + dTime)
+                            else:
+                                true_positive = (prev_time + dTime <= root) & (root <= self.__t[self.counter]) 
+                            if true_positive:
                                 prev_dt = self.dt
                                 self.integrate(root)
-                                self.__events.append(StateTuple(t=self.__t[self.counter], y=self.__y[self.counter], event=ev))
                                 self.dt = prev_dt
+                                ev_state = StateTuple(t=self.__t[self.counter], y=self.__y[self.counter], event=ev)
+                                if not self.__events or ev_state.t != self.__events[-1].t:
+                                    self.__events.append(ev_state)
 
                         if end_int:
-                            tsol            = self.get_step_interpolant()
+                            tsol              = self.get_step_interpolant()
                             self.__int_status = 2
-                            self.success    = True
                         else:
                             if self.counter+len(roots)+1 >= len(self.__y):
                                 total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
@@ -925,7 +932,6 @@ class OdeSystem(object):
             raise new_e
         else:
             if self.__int_status != 2 and not isinstance(self.__int_status, (etypes.FailedIntegration, KeyboardInterrupt)):
-                self.success    = True
                 self.__int_status = 1
         finally:
             if eta:
@@ -1014,7 +1020,13 @@ class OdeSystem(object):
                 return StateTuple(t=index, y=self.sol(index), event=None)
             else:
                 nearest_idx = deutil.search_bisection(self.__t, index)
-                return StateTuple(t=self.t[nearest_idx], y=self.y[nearest_idx], event=None)
+                if nearest_idx < self.counter:
+                    if D.abs(D.to_float(self.t[nearest_idx] - index)) < D.abs(D.to_float(self.t[nearest_idx+1]-index)):
+                        return StateTuple(t=self.t[nearest_idx], y=self.y[nearest_idx], event=None)
+                    else:
+                        return StateTuple(t=self.t[nearest_idx+1], y=self.y[nearest_idx+1], event=None)
+                else:
+                    return StateTuple(t=self.t[nearest_idx], y=self.y[nearest_idx], event=None)
             
     def __len__(self):
         return self.counter + 1
