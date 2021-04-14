@@ -12,6 +12,7 @@ import numpy as np
 
 CubicHermiteInterp = deutil.interpolation.CubicHermiteInterp
 root_finder        = deutil.optimizer.brentsrootvec
+root_polisher      = deutil.optimizer.newtonraphson
 
 __all__ = [
     'DiffRHS',
@@ -30,21 +31,22 @@ def prepare_events(events):
     if events is not None:
         is_terminal = D.zeros(len(events), dtype=bool)
         direction   = D.zeros(len(events), dtype=D.int64)
+        last_occurence = D.zeros(len(events), dtype=D.int64) - 1
         for i, event in enumerate(events):
             if hasattr(event, "is_terminal"):
                 is_terminal[i] = bool(event.is_terminal)
-
             if hasattr(event, "direction"):
                 direction[i] = event.direction
     else:
         is_terminal = None
         direction   = None
+        last_occurence = None
 
-    return events, is_terminal, direction
+    return events, is_terminal, direction, last_occurence
 
 #####
 
-def handle_events(sol, events, consts, direction, is_terminal):
+def handle_events(sol_tuple, events, consts, direction, is_terminal):
     """Helper function to handle events.
     Parameters
     ----------
@@ -70,28 +72,44 @@ def handle_events(sol, events, consts, direction, is_terminal):
     terminate : bool
         Whether a terminal event occurred.
     """
+    sol, t_prev, t_next = sol_tuple
     ev_f = [(lambda event: lambda t: event(t, sol(t), **consts))(ev) for ev in events]
-    t_prev, t_next = sol.t0, sol.t1
     
     roots, success = root_finder(
         ev_f,
         [t_prev, t_next],
-        tol=D.epsilon()
+        tol=None,
+        verbose=False
     )
     
     roots = D.asarray(roots)
     
-    g     = [ev_f[idx]((1.8*t_root + 0.2*t_prev)/2) for idx, t_root in enumerate(roots)]
-    g_new = [ev_f[idx]((1.8*t_root + 0.2*t_next)/2) for idx, t_root in enumerate(roots)]
+    g     = [ev_f[idx](t_root - (t_next - t_prev)*D.epsilon()**0.5) for idx, t_root in enumerate(roots)]
+    g_cen = [ev_f[idx](t_root) for idx, t_root in enumerate(roots)]
+    g_new = [ev_f[idx](t_root + (t_next - t_prev)*D.epsilon()**0.5) for idx, t_root in enumerate(roots)]
     
-    g     = D.stack(g)
-    g_new = D.stack(g_new)
+    g     = D.to_float(D.stack(g))
+    g_cen = D.to_float(D.stack(g_cen))
+    g_new = D.to_float(D.stack(g_new))
     
     if D.backend() == 'torch':
         direction = direction.to(g.device)
     
-    up     = (g <= 0) & (g_new >= 0)
-    down   = (g >= 0) & (g_new <= 0)
+    up     = ((g <= 0) & (g_new >= 0)) | ((g <= 0) & (g_cen >= 0)) | ((g_cen <= 0) & (g_new >= 0))
+    down   = ((g >= 0) & (g_new <= 0)) | ((g >= 0) & (g_cen <= 0)) | ((g_cen >= 0) & (g_new <= 0))
+    
+    for receptive_field in [1.0, 2.0, 3.0]:
+        g     = [ev_f[idx](t_root - receptive_field * (t_next - t_prev)*D.epsilon()**0.75) for idx, t_root in enumerate(roots)]
+        g_new = [ev_f[idx](t_root + receptive_field * (t_next - t_prev)*D.epsilon()**0.75) for idx, t_root in enumerate(roots)]
+
+        g     = D.to_float(D.stack(g))
+        g_new = D.to_float(D.stack(g_new))
+
+        up     = up | (((g <= 0) & (g_new >= 0)) | ((g <= 0) & (g_cen >= 0)) | ((g_cen <= 0) & (g_new >= 0)))
+        down   = down | ((g >= 0) & (g_new <= 0)) | ((g >= 0) & (g_cen <= 0)) | ((g_cen >= 0) & (g_new <= 0))
+    
+    up   = success & up
+    down = success & down
     either = up | down
     
     mask   = (up     & (direction > 0) |
@@ -175,6 +193,14 @@ class DenseOutput(object):
             self.t_eval.append(t)
             self.y_interpolants.append(y_interp)
     
+    def remove_interpolant(self, idx):
+        if idx < 0:
+            return self.t_eval.pop(idx), self.y_interpolants.pop(idx+1)
+        else:
+            return self.t_eval.pop(idx+1), self.y_interpolants.pop(idx)
+    
+    def __len__(self):
+        return len(self.t_eval) - 1
 
 class DiffRHS(object):
     """Differential Equation class. Designed to wrap around around a function for the right-hand side of an ordinary differential equation.
@@ -375,7 +401,7 @@ class OdeSystem(object):
         self.staggered_mask = None
         self.__dense_output = dense_output
         self.__int_status   = 0
-        self.sol            = None
+        self.__sol          = DenseOutput([self.t0], [])
             
         self.__move_to_device()
         self.__allocate_soln_space(self.__alloc_space_steps(self.tf))
@@ -383,9 +409,13 @@ class OdeSystem(object):
         self.__events       = []
         self.initialise_integrator(preserve_states=False)
         
+    @property
+    def sol(self):
         if self.__dense_output:
-            self.sol = DenseOutput([self.t0], [])
-
+            return self.__sol
+        else:
+            return None
+        
     @property
     def success(self):
         return self.__int_status == 1 or self.__int_status == 2
@@ -753,13 +783,11 @@ class OdeSystem(object):
         """Resets the system to the initial time."""
         self.counter      = 0
         self.__trim_soln_space()
-        self.sol          = None
+        self.__sol        = DenseOutput([self.t0], [])
         self.dt           = self.__dt0
         self.equ_rhs.nfev = 0
         self.__move_to_device()
         self.__int_status   = 0
-        if self.__dense_output:
-            self.sol = DenseOutput([self.t0], [])
         if self.__events:
             self.__events = []
         self.initialise_integrator(preserve_states=False)
@@ -812,7 +840,7 @@ class OdeSystem(object):
             return
         steps  = 0
             
-        events, is_terminal, direction = prepare_events(events)
+        events, is_terminal, direction, last_occurence = prepare_events(events)
         
         if D.to_numpy(tf) == np.inf and not any(is_terminal):
             deutil.warning("Specifying an indefinite integration time with no terminal events can lead to memory issues if no event terminates the integration.", category=RuntimeWarning)
@@ -868,35 +896,44 @@ class OdeSystem(object):
                 self.counter += 1
 
                 if events is not None or self.__dense_output:
-                    tsol = self.get_step_interpolant()
+                    self.__sol.add_interpolant(self.__t[self.counter], self.get_step_interpolant())
+                    if len(self.__sol) > 2 and not self.__dense_output:
+                        self.__sol.remove_interpolant(0)
 
                     if events is not None:
-                        active_events, roots, end_int, evs = handle_events(tsol, events, self.constants, direction, is_terminal)
+                        next_time  = self.__t[self.counter]
+                        next_state = self.__y[self.counter]
+                        prev_time  = self.__t[self.counter - 1]
+                        prev_state = self.__y[self.counter - 1]
+                        self.counter -= 1
+                        
+                        sol_tuple = (self.__sol, prev_time, next_time)
+                        active_events, roots, end_int, evs = handle_events(sol_tuple, events, self.constants, direction, is_terminal)
 
                         if self.counter+len(roots)+1 >= len(self.__y):
                             total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
                             self.__allocate_soln_space(total_steps)
-
-                        prev_time  = self.__t[self.counter - 1]
-                        prev_state = self.__y[self.counter - 1]
-                        
-                        self.counter -= 1
 
                         for ev_idx,(root,ev) in enumerate(zip(roots, evs)):
                             if dTime >= 0:
                                 true_positive = (self.__t[self.counter] <= root) & (root <= prev_time + dTime)
                             else:
                                 true_positive = (prev_time + dTime <= root) & (root <= self.__t[self.counter]) 
+                                
                             if true_positive:
-                                prev_dt = self.dt
-                                self.integrate(root)
-                                self.dt = prev_dt
-                                ev_state = StateTuple(t=self.__t[self.counter], y=self.__y[self.counter], event=ev)
-                                if not self.__events or ev_state.t != self.__events[-1].t:
+                                ev_state = StateTuple(t=root, y=self.__sol(root), event=ev)
+                                if not self.__events or last_occurence[ev_idx] == -1:
+                                    last_occurence[ev_idx] = len(self.__events)
                                     self.__events.append(ev_state)
+                                elif D.abs(ev_state.t - self.__events[last_occurence[ev_idx]].t) > D.epsilon()**0.7:
+                                    last_occurence[ev_idx] = len(self.__events)
+                                    self.__events.append(ev_state)
+                                    
+                        if not self.__dense_output:
+                            self.__sol.remove_interpolant(len(self.__sol) - 1)
 
                         if end_int:
-                            tsol              = self.get_step_interpolant()
+                            self.integrate(roots[-1])
                             self.__int_status = 2
                         else:
                             if self.counter+len(roots)+1 >= len(self.__y):
@@ -905,9 +942,7 @@ class OdeSystem(object):
                             self.__t[self.counter+1] = prev_time  + dTime 
                             self.__y[self.counter+1] = prev_state + dState
                             self.counter += 1
-                    elif self.__dense_output:
-                        self.sol.add_interpolant(self.__t[self.counter], tsol)
-
+                
                 steps += 1
                 
                 for i in callback:

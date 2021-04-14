@@ -74,7 +74,7 @@ def epsilon():
     """
 
     if _FLOAT_FORMAT == 'float16':
-        return 2e-3
+        return 5e-4
     elif _FLOAT_FORMAT == 'float32':
         return 5e-7
     elif _FLOAT_FORMAT in ['float64', 'gdual_double', 'gdual_vdouble']:

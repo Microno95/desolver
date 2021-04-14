@@ -94,9 +94,9 @@ class RichardsonIntegratorTemplate(IntegratorTemplate):
         new_timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, dt_z, tol=0.5 if self.__implicit__ else 0.9)
         if self.__symplectic__:
             timestep      = dt0
-            next_timestep = dt0
+            next_timestep = D.copy(dt0)
             if (0.8*new_timestep+0.2*timestep) < next_timestep:
-                while new_timestep < timestep:
+                while new_timestep < next_timestep:
                     next_timestep /= 2.0
             else:
                 while (0.8*new_timestep+0.2*timestep) > 2*next_timestep:

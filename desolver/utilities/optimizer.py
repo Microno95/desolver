@@ -8,7 +8,7 @@ __all__ = [
     'newtonraphson'
 ]
 
-def brentsroot(f, bounds, tol=None, verbose=False):
+def brentsroot(f, bounds, tol=None, verbose=False, return_interval=False):
     """Brent's algorithm for finding root of a bracketed function.
 
     Parameters
@@ -40,9 +40,9 @@ def brentsroot(f, bounds, tol=None, verbose=False):
     """
     lower_bound, upper_bound = bounds
     if tol is None:
-        tol = 16*D.epsilon()
+        tol = D.epsilon()
     if tol < D.epsilon():
-        tol = 16*D.epsilon()
+        tol = D.epsilon()
     tol = D.to_float(tol)
     a,b = D.to_float(lower_bound), D.to_float(upper_bound)
     fa = f(a)
@@ -64,7 +64,8 @@ def brentsroot(f, bounds, tol=None, verbose=False):
     
     while not conv:
         if verbose:
-            print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}".format(**locals()))
+            with numpy.printoptions(precision=17, linewidth=200):
+                print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}".format(**locals()))
         if fa != fc and fb != fc:
             s =     (a * fb * fc) / ((fa - fb)*(fa - fc))
             s = s + (b * fa * fc) / ((fb - fa)*(fb - fc))
@@ -96,13 +97,18 @@ def brentsroot(f, bounds, tol=None, verbose=False):
         if D.abs(fa) < D.abs(fb):
             a,b = b,a
             fa,fb = fb,fa
-        
         conv = (fb == 0 or fs == 0 or D.abs(b - a) < tol)
+        if numiter >= 64:
+            break
     if verbose:
-        print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}".format(**locals()))
-    return b, D.abs(f(b)) <= tol
+        with numpy.printoptions(precision=17, linewidth=200):
+            print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}".format(**locals()))
+    if return_interval:
+        return b, D.abs(f(b)) <= tol, (a, b)
+    else:
+        return b, D.abs(f(b)) <= tol
 
-def brentsrootvec(f, bounds, tol=None, verbose=False):
+def brentsrootvec(f, bounds, tol=None, verbose=False, return_interval=False):
     """Vectorised Brent's algorithm for finding root of bracketed functions.
 
     Parameters
@@ -134,9 +140,9 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
     """
     lower_bound, upper_bound = bounds
     if tol is None:
-        tol = 16*D.epsilon()
+        tol = D.epsilon()
     if tol < D.epsilon():
-        tol = 16*D.epsilon()
+        tol = D.epsilon()
     tol = D.to_float(tol)
     a,b = D.stack([lower_bound for _ in range(len(f))]), D.stack([upper_bound for _ in range(len(f))])
     
@@ -183,7 +189,8 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
     
     while D.any(conv):
         if verbose:
-            print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}, conv={not_conv}".format(**locals()))
+            with numpy.printoptions(precision=17, linewidth=200):
+                print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}, conv={not_conv}".format(**locals()))
         mask                      = D.logical_and(fa != fc, fb != fc)
         mask[not_conv]            = False 
         s[mask]                   = (a[mask] * fb[mask] * fc[mask]) / ((fa[mask] - fb[mask])*(fa[mask] - fc[mask]))
@@ -229,14 +236,17 @@ def brentsrootvec(f, bounds, tol=None, verbose=False):
         fa[mask], fb[mask] = fb[mask], fa[mask]
         
         conv               = D.logical_not(D.logical_or(D.logical_or(fb == 0, fs == 0), D.abs(b - a) < tol))
+        conv               = conv | (numiter >= 64)
         not_conv           = D.logical_not(conv)
-        true_conv          = D.abs(fb) <= tol
+        true_conv          = (D.abs(fb) <= tol)
         
-        if D.any(numiter > 1000):
-            break
     if verbose:
-        print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}, conv={true_conv}".format(**locals()))
-    return b, true_conv
+        with numpy.printoptions(precision=17, linewidth=200):
+            print("[{numiter}] a={a}, b={b}, f(a)={fa}, f(b)={fb}, conv={true_conv}".format(**locals()))
+    if return_interval:
+        return b, true_conv, (a, b)
+    else:
+        return b, true_conv
 
 def preconditioner(A, tol=None):
     if tol is None:

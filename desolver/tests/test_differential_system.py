@@ -150,6 +150,8 @@ def test_integration_and_nearest_float_no_dense_output(ffmt):
     assert (a.integration_status == "Integration has not been run.")
 
     a.integrate()
+    
+    assert (a.sol is None)
 
     assert (a.integration_status == "Integration completed successfully.")
 
