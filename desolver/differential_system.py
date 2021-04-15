@@ -254,12 +254,14 @@ class DiffRHS(object):
                 except:
                     self.md_repr = str(self.rhs)
             self.equ_repr = str(self.rhs)
+        self.__jac_wrapped_rhs_order = None
         if hasattr(self.rhs, 'jac'):
             self.__jac = self.rhs.jac
             self.__jac_time = None
             self.__jac_is_wrapped_rhs = False
         elif D.backend() != 'torch':
-            self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(0.0, y, **kwargs), flat=True)
+            self.__jac_wrapped_rhs_order = 5
+            self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(0.0, y, **kwargs), base_order=self.__jac_wrapped_rhs_order, flat=True)
             self.__jac_time = 0.0
             self.__jac_is_wrapped_rhs = True
         else:
@@ -291,7 +293,7 @@ class DiffRHS(object):
         if self.__jac_is_wrapped_rhs:
             if t != self.__jac_time:
                 self.__jac_time = t
-                self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(t, y, **kwargs), flat=True)
+                self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(t, y, **kwargs), base_order=self.__jac_wrapped_rhs_order, flat=True)
             called_val = self.__jac(y, *args, **kwargs)
         else:
             called_val = self.__jac(t, y, *args, **kwargs)
@@ -315,9 +317,17 @@ class DiffRHS(object):
         estimate if a jacobian function was originally attached.
         """
         if not self.__jac_is_wrapped_rhs:
-            self.__jac                = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(0.0, y, **kwargs), flat=True)
+            if self.__jac_wrapped_rhs_order is None:
+                self.__jac_wrapped_rhs_order = 5
+            self.__jac                = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(0.0, y, **kwargs), base_order=self.__jac_wrapped_rhs_order, flat=True)
             self.__jac_time           = 0.0
             self.__jac_is_wrapped_rhs = True
+            
+    def set_jac_base_order(self, order):
+        if self.__jac_is_wrapped_rhs:
+            self.__jac_wrapped_rhs_order = order
+            self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(0.0, y, **kwargs), base_order=self.__jac_wrapped_rhs_order, flat=True)
+            self.__jac_time = 0.0
     
     def __str__(self):
         return self.equ_repr
@@ -861,7 +871,7 @@ class OdeSystem(object):
         total_steps = self.__alloc_space_steps(tf)
         
         if eta:
-            tqdm_progress_bar = tqdm(total=int((tf - self.__t[self.counter])/self.dt))
+            tqdm_progress_bar = tqdm(total=int((tf - self.__t[self.counter])/self.dt)+1)
         else:
             tqdm_progress_bar = None
             
@@ -963,7 +973,7 @@ class OdeSystem(object):
                     if D.to_numpy(tf) == np.inf:
                         tqdm_progress_bar.total = None
                     else:
-                        tqdm_progress_bar.total = tqdm_progress_bar.n + int((tf - self.__t[self.counter])/self.dt)
+                        tqdm_progress_bar.total = tqdm_progress_bar.n + int((tf - self.__t[self.counter])/self.dt) + 1
                     tqdm_progress_bar.desc  = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.__t[self.counter], tf, self.dt).ljust(8)
                     tqdm_progress_bar.update()
                     

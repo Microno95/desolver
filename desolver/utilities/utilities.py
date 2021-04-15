@@ -44,18 +44,41 @@ class JacobianWrapper(object):
         If set to False, the shape will be (*x.shape, *f(x).shape). When x and f(x) are vector valued of length n and m respectively, the gradient will have the shape (n,m) as expected of the Jacobian of f(x).
     
     """
-    def __init__(self, rhs, richardson_iter=16, adaptive=True, flat=False, atol=None, rtol=None):
+    def __init__(self, rhs, base_order=2, richardson_iter=None, adaptive=True, flat=False, atol=None, rtol=None):
         self.rhs        = rhs
-        self.base_order = 4
-        self.richardson_iter = richardson_iter
+        self.base_order = base_order
+        if richardson_iter is None:
+            self.richardson_iter = 16 - base_order if base_order < 16 else base_order + 1
+        else:
+            self.richardson_iter = richardson_iter
         self.order      = self.base_order + self.richardson_iter
         self.adaptive   = adaptive
         self.atol       = 4*D.epsilon() if atol is None else atol
         self.rtol       = 4*D.epsilon() if rtol is None else rtol
         self.flat       = flat
+        self.nodal_points, self.weights = self.finite_difference_weights(self.base_order, order=1)
+        self.nodal_points = self.nodal_points[D.abs(self.weights) > 16*D.epsilon()]
+        self.weights      = self.weights[D.abs(self.weights) > 16*D.epsilon()]
         
+    @staticmethod
+    def finite_difference_weights(number_of_nodes, order=1):
+        cur_ffmt = D.float_fmt()
+        D.set_float_fmt('float64')
+        nodal_points = D.linspace(-1,1,number_of_nodes)
+        weight_matrix = D.stack([D.pow(D.to_type(D.asarray(nodal_points), D.float64), i) for i in range(len(nodal_points))])
+        b_vector      = D.zeros((len(nodal_points),), dtype=D.float64)
+        b_vector[order] = 1.0
+        if D.backend() == 'torch':
+            b_vector = b_vector[:, None]
+        weights = D.solve_linear_system(weight_matrix, b_vector)
+        if D.backend() == 'torch':
+            weights = weights[:, 0]
+        D.set_float_fmt(cur_ffmt)
+        return nodal_points, weights
     
-    def estimate(self, y, dy=1e-8, **kwargs):
+    def estimate(self, y, dy=None, **kwargs):
+        if dy is None:
+            dy = D.epsilon()**0.5
         unravelled_y  = D.reshape(y, (-1,))
         dy_val        = self.rhs(y, **kwargs)
         unravelled_dy = D.reshape(dy_val, (-1,))
@@ -69,19 +92,14 @@ class JacobianWrapper(object):
             dy_cur = dy
             if not self.adaptive and (D.abs(val) > 1.0 or dy_cur > D.abs(val) > 0.0):
                 dy_cur = dy_cur * val
-
-            # 1*f[i-2]-8*f[i-1]+0*f[i+0]+8*f[i+1]-1*f[i+2]
-            y_jac              = unravelled_y + 2*dy_cur * y_msk
-            jacobian_y[:, idx] = -D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
-            y_jac              = unravelled_y + dy_cur * y_msk
-            jacobian_y[:, idx] = jacobian_y[:, idx] + 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
-            y_jac              = unravelled_y - 2*dy_cur * y_msk
-            jacobian_y[:, idx] = jacobian_y[:, idx] + D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
-            y_jac              = unravelled_y - dy_cur * y_msk
-            jacobian_y[:, idx] = jacobian_y[:, idx] - 8*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
-
-            jacobian_y[:, idx] = jacobian_y[:, idx] / (12*dy_cur)
-        
+            
+            for A, w in zip(self.nodal_points, self.weights):
+                y_jac              = unravelled_y + A*dy_cur * y_msk
+                jacobian_y[:, idx] = jacobian_y[:, idx] + w*D.reshape(self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+                
+            jacobian_y[:, idx] = jacobian_y[:, idx] / dy_cur
+            
+            
         if self.flat:
             if D.shape(jacobian_y) == (1,1):
                 return jacobian_y[0,0]
@@ -89,7 +107,7 @@ class JacobianWrapper(object):
         else:
             return jacobian_y.reshape((*D.shape(dy_val), *D.shape(y)))
     
-    def richardson(self, y, dy=1e-1, factor=2.0, **kwargs):
+    def richardson(self, y, dy=0.5, factor=4.0, **kwargs):
         A       = [[self.estimate(y, dy=dy * (factor**-m), **kwargs)] for m in range(self.richardson_iter)]
         denom  = factor**self.base_order
         for m in range(1, self.richardson_iter):
@@ -97,8 +115,10 @@ class JacobianWrapper(object):
                 A[m].append(A[m][n-1] + (A[m][n-1] - A[m-1][n-1]) / (denom**n - 1))
         return A[-1][-1]
     
-    def adaptive_richardson(self, y, dy=0.5, factor=2, **kwargs):
+    def adaptive_richardson(self, y, dy=0.5, factor=4, **kwargs):
         A       = [[self.estimate(y, dy=dy, **kwargs)]]
+        if self.richardson_iter == 1:
+            return A[0][0]
         factor = 1.0*factor
         denom  = factor**self.base_order
         prev_error = numpy.inf
@@ -107,15 +127,16 @@ class JacobianWrapper(object):
             for n in range(1, m+1):
                 A[m].append(A[m][n-1] + (A[m][n-1] - A[m-1][n-1]) / (denom**n - 1))
             if m >= 3:
-                prev_error, t_conv = self.check_converged(A[-1][-1], A[-1][-1] - A[-2][-1], prev_error)
+                prev_error, t_conv = self.check_converged(A[m][m], A[m][m] - A[m-1][m-1], prev_error)
                 if t_conv:
+                    self.order = self.base_order + m
                     break
         return A[-2][-1]
 
     def check_converged(self, initial_state, diff, prev_error):
         err_estimate = D.max(D.abs(D.to_float(diff)))
         relerr = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state)))
-        if err_estimate > relerr and err_estimate <= prev_error:
+        if err_estimate > relerr and err_estimate < prev_error:
             return err_estimate, False
         else:
             return err_estimate, True

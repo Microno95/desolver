@@ -365,7 +365,7 @@ def gather(arr, indices, axis=0):
     return torch.gather(arr, dim=axis, index=indices)
 
 
-def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True):
+def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True, return_intermediate=False):
     """Computes the derivative of an output tensor wrt an input tensor.
 
     Computes the full nu-th order derivative for the output tensor wrt an input tensor. 
@@ -462,8 +462,15 @@ def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True):
         ])
         temp = temp.view(final_shape)
     if nu > 1:
-        temp = jacobian(temp, in_tensor, create_graph=create_graph, nu=nu - 1, batch_mode=batch_mode)
-    return temp.to(out_tensor.device)
+        temp2 = jacobian(temp, in_tensor, create_graph=create_graph, nu=nu - 1, batch_mode=batch_mode, return_intermediate=return_intermediate)
+        if return_intermediate:
+            temp = (*temp2, (nu, temp))
+        else:
+            temp = temp2
+    else:
+        if return_intermediate:
+            temp = ((nu, temp),)
+    return temp
 
 def solve_linear_system(A,b,sparse=False):
     return torch.solve(b,A).solution
