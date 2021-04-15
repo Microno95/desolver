@@ -46,10 +46,10 @@ class RichardsonIntegratorTemplate(IntegratorTemplate):
 
     def __init__(self):
         raise NotImplementedError("Do not initialise this class directly!")
-        
-    def dense_output(self):
-        raise NotImplementedError("Do not use this class directly! How did you initialise it??")
 
+    def dense_output(self):
+        return self.__interpolant_times, self.__interpolants
+        
     def adaptive_richardson(self, rhs, t, y, constants, timestep):
         dt0, (dt_z, dy_z) = self.step(0, rhs, t, y, timestep, constants, 1)
         if dt_z < timestep:
@@ -79,10 +79,15 @@ class RichardsonIntegratorTemplate(IntegratorTemplate):
     def step(self, int_num, rhs, initial_time, initial_state, timestep, constants, num_intervals):
         dt_now, dstate_now = 0.0, 0.0
         dtstep = timestep / num_intervals
+        self.__interpolants = []
+        self.__interpolant_times = []
         for interval in range(num_intervals):
             dt, (dt_z, dy_z) = self.basis_integrators[int_num](rhs, initial_time + dt_now, initial_state + dstate_now, constants, dtstep)
             dt_now     = dt_now     + dt_z
             dstate_now = dstate_now + dy_z
+            __interp_t, __interp = self.basis_integrators[int_num].dense_output()
+            self.__interpolant_times.append(__interp_t)
+            self.__interpolants.append(__interp)
         return dtstep, (dt_now, dstate_now)
 
     def forward(self, rhs, initial_time, initial_state, constants, timestep):

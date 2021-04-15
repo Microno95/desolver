@@ -265,6 +265,7 @@ def logical_xor(a, b, out=None, where=True):
 
 nonzero = numpy.nonzero
 argsort = numpy.argsort
+gather  = numpy.take 
 
 def solve_linear_system(A,b,overwrite_a=False,overwrite_b=False,check_finite=False,sparse=False):
     if sparse:

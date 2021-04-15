@@ -2,9 +2,10 @@ import desolver as de
 import desolver.backend as D
 import numpy as np
 import pytest
+from .common import ffmt_param
 
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@ffmt_param
 def test_getter_setters(ffmt):
     D.set_float_fmt(ffmt)
 
@@ -87,7 +88,7 @@ def test_getter_setters(ffmt):
     assert (not bool(a.constants))
 
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@ffmt_param
 def test_integration_and_representation(ffmt):
     D.set_float_fmt(ffmt)
 
@@ -123,7 +124,7 @@ def test_integration_and_representation(ffmt):
     assert (len(a.t) == len(a))
 
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@ffmt_param
 def test_integration_and_nearest_float_no_dense_output(ffmt):
     D.set_float_fmt(ffmt)
 
@@ -158,7 +159,7 @@ def test_integration_and_nearest_float_no_dense_output(ffmt):
     assert (D.abs(a.t[-2] - a[2 * D.pi].t) <= D.abs(a.dt))
 
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@ffmt_param
 def test_no_events(ffmt):
     D.set_float_fmt(ffmt)
 
@@ -187,7 +188,7 @@ def test_no_events(ffmt):
     assert (len(a.events) == 0)
 
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@ffmt_param
 def test_wrong_t0(ffmt):
     with pytest.raises(ValueError):
         D.set_float_fmt(ffmt)
@@ -215,7 +216,7 @@ def test_wrong_t0(ffmt):
         a.t0 = 2 * D.pi
 
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@ffmt_param
 def test_wrong_tf(ffmt):
     with pytest.raises(ValueError):
         D.set_float_fmt(ffmt)
@@ -236,7 +237,7 @@ def test_wrong_tf(ffmt):
         a.tf = 0.0
 
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@ffmt_param
 def test_not_enough_time_values(ffmt):
     with pytest.raises(ValueError):
         D.set_float_fmt(ffmt)
@@ -264,7 +265,7 @@ def test_not_enough_time_values(ffmt):
         a.tf = 0.0
 
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@ffmt_param
 def test_dt_dir_fix(ffmt):
     D.set_float_fmt(ffmt)
 
@@ -289,7 +290,7 @@ def test_dt_dir_fix(ffmt):
                      atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
 
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@ffmt_param
 def test_non_callable_rhs(ffmt):
     with pytest.raises(TypeError):
         D.set_float_fmt(ffmt)

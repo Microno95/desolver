@@ -152,7 +152,8 @@ class DenseOutput(object):
     """
     def __init__(self, t_eval, y_interpolants):
         if t_eval is None and y_interpolants is None:
-            self.t_eval         = [0.0]
+            self.t_eval         = [D.array(0.0)]
+            self.__t_eval_arr   = D.stack(self.t_eval)
             self.y_interpolants = []
         else:
             if t_eval is None or y_interpolants is None:
@@ -160,44 +161,59 @@ class DenseOutput(object):
             elif len(t_eval) != len(y_interpolants) + 1:
                 raise ValueError("The number of evaluation times and interpolants must be equal!")
             else:
-                self.t_eval         = list(t_eval)
+                self.t_eval         = [D.asarray(t) for t in t_eval]
+                self.__t_eval_arr   = D.stack(self.t_eval)
                 self.y_interpolants = y_interpolants
+        
+    def find_interval(self, t):
+        return min(deutil.search_bisection(self.t_eval, t), len(self.y_interpolants) - 1)
+        
+    def find_interval_vec(self, t):
+        out = deutil.search_bisection_vec(self.__t_eval_arr, t)
+        out[out > len(self.y_interpolants) - 1] = len(self.y_interpolants) - 1
+        return out
         
     def __call__(self, t):
         if len(D.shape(t)) > 0:
-            ret_vals = D.zeros_like(D.asarray(t))
-            flat_t   = D.reshape(D.asarray(t), (-1,))
-            _y_test  = self.y_interpolants[0](self.t_eval[0])
-            flat_y   = D.stack([D.empty_like(_y_test) for _ in range(len(flat_t))])
-            for idx, _t in enumerate(flat_t):
-                tidx = min(deutil.search_bisection(self.t_eval, _t), len(self.y_interpolants) - 1)
-                flat_y[idx] = self.y_interpolants[tidx](_t)
-            return D.reshape(flat_y, D.shape(t) + D.shape(flat_y)[1:])
+            __flat_t  = D.reshape(D.asarray(t), (-1,))
+            __indices = self.find_interval_vec(__flat_t)
+            y_vals   = D.stack([
+                self.y_interpolants[idx](_t) for idx,_t in zip(__indices, __flat_t)
+            ], axis=0)
+            return D.reshape(y_vals, D.shape(t) + D.shape(y_vals)[1:])
         else:
-            tidx = min(deutil.search_bisection(self.t_eval, t), len(self.y_interpolants) - 1)
+            tidx = self.find_interval(t)
             return self.y_interpolants[tidx](t)
     
     def add_interpolant(self, t, y_interp):
-        try:
-            y_interp(self.t_eval[-1])
-        except:
-            raise
-        try:
-            y_interp(t)
-        except:
-            raise
-        if (t - self.t_eval[-1]) < 0:
-            self.t_eval.insert(0, t)
-            self.y_interpolants.insert(0, y_interp)
+        if isinstance(t, list) and isinstance(y_interp, list):
+            assert (len(t) == len(y_interp))
+            for idx in range(len(t)):
+                self.add_interpolant(t[idx], y_interp[idx])
+        elif (isinstance(t, list) and not isinstance(y_interp, list)) or (not isinstance(t, list) and isinstance(y_interp, list)):
+            raise TypeError("Expected both t and y_interp to be lists, but got type(t)={}, type(y_interp)={}".format(type(t), type(y_interp)))
         else:
-            self.t_eval.append(t)
-            self.y_interpolants.append(y_interp)
+            try:
+                y_interp(self.t_eval[-1])
+            except:
+                raise
+            try:
+                y_interp(t)
+            except:
+                raise
+            if (t - self.t_eval[-1]) < 0:
+                self.t_eval.insert(0, D.asarray(t))
+                self.__t_eval_arr = D.stack(self.t_eval)
+                self.y_interpolants.insert(0, y_interp)
+            else:
+                self.t_eval.append(D.asarray(t))
+                self.__t_eval_arr = D.stack(self.t_eval)
+                self.y_interpolants.append(y_interp)
     
     def remove_interpolant(self, idx):
-        if idx < 0:
-            return self.t_eval.pop(idx), self.y_interpolants.pop(idx+1)
-        else:
-            return self.t_eval.pop(idx+1), self.y_interpolants.pop(idx)
+        out = self.t_eval.pop(idx),   self.y_interpolants.pop(idx)
+        self.__t_eval_arr = D.stack(self.t_eval)
+        return out
     
     def __len__(self):
         return len(self.t_eval) - 1
@@ -743,15 +759,7 @@ class OdeSystem(object):
         self.initialise_integrator(preserve_states=preserve_states)
                 
     def get_step_interpolant(self):
-        "Computes the 3rd order Hermite polynomial interpolant over one step."
-        return CubicHermiteInterp(
-                    self.__t[self.counter-1], 
-                    self.__t[self.counter], 
-                    self.__y[self.counter-1], 
-                    self.__y[self.counter],
-                    self.equ_rhs(self.__t[self.counter-1], self.__y[self.counter-1], **self.constants),
-                    self.equ_rhs(self.__t[self.counter], self.__y[self.counter], **self.constants)
-                )
+        return self.integrator.dense_output()
     
     @property
     def integration_status(self):
@@ -896,10 +904,10 @@ class OdeSystem(object):
                 self.counter += 1
 
                 if events is not None or self.__dense_output:
-                    self.__sol.add_interpolant(self.__t[self.counter], self.get_step_interpolant())
-                    if len(self.__sol) > 2 and not self.__dense_output:
-                        self.__sol.remove_interpolant(0)
-
+                    __pre_length = len(self.__sol)
+                    __t_interp, __y_interp = self.get_step_interpolant()
+                    self.__sol.add_interpolant(__t_interp, __y_interp)
+                    
                     if events is not None:
                         next_time  = self.__t[self.counter]
                         next_state = self.__y[self.counter]
@@ -920,6 +928,7 @@ class OdeSystem(object):
                             else:
                                 true_positive = (prev_time + dTime <= root) & (root <= self.__t[self.counter]) 
                                 
+#                             print(root, prev_time, prev_time + dTime, true_positive, ev(root, sol_tuple[0](root), **self.constants))
                             if true_positive:
                                 ev_state = StateTuple(t=root, y=self.__sol(root), event=ev)
                                 if not self.__events or last_occurence[ev_idx] == -1:
@@ -929,9 +938,6 @@ class OdeSystem(object):
                                     last_occurence[ev_idx] = len(self.__events)
                                     self.__events.append(ev_state)
                                     
-                        if not self.__dense_output:
-                            self.__sol.remove_interpolant(len(self.__sol) - 1)
-
                         if end_int:
                             self.integrate(roots[-1])
                             self.__int_status = 2
@@ -942,6 +948,10 @@ class OdeSystem(object):
                             self.__t[self.counter+1] = prev_time  + dTime 
                             self.__y[self.counter+1] = prev_state + dState
                             self.counter += 1
+                            
+                    if not self.__dense_output:
+                        for _ in range(__pre_length-1):
+                            self.__sol.remove_interpolant(0)
                 
                 steps += 1
                 

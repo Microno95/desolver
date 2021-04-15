@@ -26,16 +26,10 @@ class ExplicitIntegrator(IntegratorTemplate):
         self.dState     = D.zeros(self.dim, dtype=self.dtype)
         self.dTime      = D.zeros(tuple(), dtype=self.dtype)
         self.device     = device
-        
-    def dense_output(self, rhs, initial_time, initial_state):
-        return CubicHermiteInterp(
-            initial_time, 
-            initial_time + self.dTime, 
-            initial_state, 
-            initial_state + self.dState,
-            rhs(initial_time, initial_state),
-            rhs(initial_time + self.dTime, initial_state + self.dState)
-        )
+        self.initial_state = None
+        self.initial_rhs   = None
+        self.initial_time  = None
+        self.final_rhs     = None
     
 class ImplicitIntegrator(IntegratorTemplate):
     __implicit__ = True
@@ -53,16 +47,10 @@ class ImplicitIntegrator(IntegratorTemplate):
         self.dState     = D.zeros(self.dim, dtype=self.dtype)
         self.dTime      = D.zeros(tuple(), dtype=self.dtype)
         self.device     = device
-        
-    def dense_output(self, rhs, initial_time, initial_state):
-        return CubicHermiteInterp(
-            initial_time, 
-            initial_time + self.dTime, 
-            initial_state, 
-            initial_state + self.dState,
-            rhs(initial_time, initial_state),
-            rhs(initial_time + self.dTime, initial_state + self.dState)
-        )
+        self.initial_state = None
+        self.initial_rhs   = None
+        self.initial_time  = None
+        self.final_rhs     = None
 
 class ExplicitRungeKuttaIntegrator(ExplicitIntegrator):
     """
@@ -107,6 +95,9 @@ class ExplicitRungeKuttaIntegrator(ExplicitIntegrator):
         else:
             self.tableau     = D.to_type(self.tableau, dtype)
             self.final_state = D.to_type(self.final_state, dtype)
+            
+        self.__fsal = bool(D.all(self.tableau[-1, 1:] == self.final_state[0][1:]))
+        self.fsal   = self.__fsal
         
         if D.backend() == 'torch':
             self.aux         = self.aux.to(self.device)
@@ -120,13 +111,36 @@ class ExplicitRungeKuttaIntegrator(ExplicitIntegrator):
             raise NotImplementedError("In order to use the fixed step integrator, subclass this class and populate the butcher tableau")
         else:
             tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (self.aux.ndim - 1))
+            self.initial_state = D.copy(initial_state)
+            self.initial_time  = D.copy(initial_time)
+            self.initial_rhs   = None
+            if not self.__fsal:
+                self.final_rhs = None
 
             for stage in range(D.shape(self.aux)[0]):
-                current_state   = initial_state    + D.sum(timestep * self.tableau[stage][tableau_idx_expand] * self.aux, axis=0)
-                self.aux[stage] = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants)
+                current_state   = initial_state    + timestep * D.sum(self.tableau[stage][tableau_idx_expand] * self.aux, axis=0)
+                if self.__fsal and self.final_rhs is not None and stage == 0:
+                    self.aux[stage] = self.final_rhs
+                else:
+                    self.aux[stage] = rhs(initial_time + self.tableau[stage, 0]*timestep, current_state, **constants)
                 
-            self.dState = timestep * D.sum(self.final_state[0][tableau_idx_expand] * self.aux, axis=0)
+                if stage == 0 and D.sum(self.tableau[0]) == 0.0:
+                    self.initial_rhs = self.aux[0]
+                elif self.__fsal and stage == D.shape(self.aux)[0] - 1:
+                    self.final_rhs   = self.aux[stage]
+            
+            if self.__fsal:
+                self.dState = self.aux[-1] / timestep
+            else:
+                self.dState = timestep * D.sum(self.final_state[0][tableau_idx_expand] * self.aux, axis=0)
+                
             self.dTime  = D.copy(timestep)
+                
+            if self.initial_rhs is None:
+                self.initial_rhs = rhs(initial_time, initial_state, **constants)
+                
+            if self.final_rhs is None:
+                self.final_rhs = rhs(initial_time + self.dTime, initial_state + self.dState, **constants)
             
             if self.adaptive:
                 diff = timestep * self.get_error_estimate(tableau_idx_expand)
@@ -137,9 +151,20 @@ class ExplicitRungeKuttaIntegrator(ExplicitIntegrator):
             return timestep, (self.dTime, self.dState)
         
     def get_error_estimate(self, tableau_idx_expand):
-        return D.sum(self.final_state[1][tableau_idx_expand]* self.aux, axis=0) - D.sum(self.final_state[0][tableau_idx_expand]* self.aux, axis=0)
+        return D.sum(self.final_state[1][tableau_idx_expand] * self.aux, axis=0) - D.sum(self.final_state[0][tableau_idx_expand] * self.aux, axis=0)
 
     __call__ = forward
+    
+    def dense_output(self):
+        return (self.initial_time + self.dTime, 
+                utilities.interpolation.CubicHermiteInterp(
+                    self.initial_time, 
+                    self.initial_time + self.dTime, 
+                    self.initial_state, 
+                    self.initial_state + self.dState,
+                    self.initial_rhs,
+                    self.final_rhs
+                ))
 
 class ExplicitSymplecticIntegrator(ExplicitIntegrator):
     """
@@ -205,19 +230,35 @@ class ExplicitSymplecticIntegrator(ExplicitIntegrator):
             nmsk = self.nmsk
 
             current_time  = D.copy(initial_time)
-            current_state = D.copy(initial_state)
             self.dState  *= 0.0
+            self.initial_state = D.copy(initial_state)
+            self.initial_time  = D.copy(initial_time)
+            self.initial_rhs   = None
+            self.final_rhs     = None
 
             for stage in range(D.shape(self.tableau)[0]):
-                aux          = rhs(current_time, initial_state + self.dState, **constants) * timestep
+                aux          = timestep * rhs(current_time, initial_state + self.dState, **constants)
                 current_time = current_time + timestep * self.tableau[stage, 0]
                 self.dState += aux * self.tableau[stage, 1] * msk + aux * self.tableau[stage, 2] * nmsk
                 
             self.dTime = D.copy(timestep)
+            self.initial_rhs = rhs(current_time, initial_state, **constants)
+            self.final_rhs   = rhs(initial_time + self.dTime, initial_state + self.dState, **constants)
             
             return self.dTime, (self.dTime, self.dState)
         
     __call__ = forward
+    
+    def dense_output(self):
+        return (self.initial_time + self.dTime, 
+                utilities.interpolation.CubicHermiteInterp(
+                    self.initial_time, 
+                    self.initial_time + self.dTime, 
+                    self.initial_state, 
+                    self.initial_state + self.dState,
+                    self.initial_rhs,
+                    self.final_rhs
+                ))
     
 class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
     """
@@ -270,15 +311,16 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             self.tableau     = self.tableau.to(self.device)
             self.final_state = self.final_state.to(self.device)
             
-        self.niter0 = 0
-        self.niter1 = 0
-            
     def forward(self, rhs, initial_time, initial_state, constants, timestep):
         if self.tableau is None:
             raise NotImplementedError("In order to use the fixed step integrator, subclass this class and populate the butcher tableau")
         else:
             tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (self.aux.ndim - 1))
 
+        self.initial_state = D.copy(initial_state)
+        self.initial_time  = D.copy(initial_time)
+        self.initial_rhs   = None
+        self.final_rhs     = None
         aux_shape = self.aux.shape
         
         def nfun(next_state):
@@ -312,6 +354,7 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
         initial_guess = D.zeros_like(self.aux)
         
         midpoint_guess = rhs(initial_time, initial_state, **constants)
+        self.initial_rhs   = midpoint_guess
         midpoint_guess = 0.5 * timestep * (midpoint_guess + rhs(initial_time + 0.5 * timestep, initial_state + 0.5 * timestep * midpoint_guess, **constants))
         
         initial_guess = D.to_float(initial_guess + (0.5*midpoint_guess + 0.5*self.dState)[None])
@@ -324,12 +367,9 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
             nfun_jac = __nfun_jac
             sparsity = 1.0 - D.sum(D.abs(D.to_float(nfun_jac(initial_guess))) > 0) / (self.tableau.shape[0]*self.numel)**2
             
-        aux_root, (success, self.niter1, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=125, sparse=sparsity >= 0.7)
+        aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=125, sparse=sparsity >= 0.7)
         if not success and prec > D.max(D.abs(self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))))):
-            raise exception_types.FailedToMeetTolerances("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, 32*D.epsilon(), self.niter1))
-            
-        if self.niter0 == 0:
-            self.niter0 = self.niter1
+            raise exception_types.FailedToMeetTolerances("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, 32*D.epsilon(), num_iter))
             
         self.aux    = D.reshape(aux_root, aux_shape)
 #         if initial_state.dtype == object:
@@ -340,14 +380,15 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
         self.dState = timestep * D.sum(self.final_state[0][tableau_idx_expand] * self.aux, axis=0)
         self.dTime  = D.copy(timestep)
         
+        if self.final_rhs is None:
+            self.final_rhs = rhs(initial_time + self.dTime, initial_state + self.dState, **constants)
+        
         if self.adaptive:
             diff =  timestep * self.get_error_estimate(tableau_idx_expand)
             timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, timestep)
             if redo_step:
                 timestep, (self.dTime, self.dState) = self(rhs, initial_time, initial_state, constants, timestep)
 
-        self.niter0 = self.niter1
-                
         return timestep, (self.dTime, self.dState)
         
     def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.8):
@@ -371,6 +412,17 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
         return D.sum(self.final_state[1][tableau_idx_expand]* self.aux, axis=0) - D.sum(self.final_state[0][tableau_idx_expand]* self.aux, axis=0)
 
     __call__ = forward
+    
+    def dense_output(self):
+        return (self.initial_time + self.dTime, 
+                utilities.interpolation.CubicHermiteInterp(
+                    self.initial_time, 
+                    self.initial_time + self.dTime, 
+                    self.initial_state, 
+                    self.initial_state + self.dState,
+                    self.initial_rhs,
+                    self.final_rhs
+                ))
     
 def generate_richardson_integrator(basis_integrator):
     """
@@ -423,6 +475,9 @@ def generate_richardson_integrator(basis_integrator):
 
             if D.backend() == 'torch':
                 self.aux = self.aux.to(self.device)
+            
+            self.__interpolants = None
+            self.__interpolant_times = None
         
     RichardsonExtrapolatedIntegrator.__name__ = RichardsonExtrapolatedIntegrator.__qualname__ = "RichardsonExtrapolated_{}_Integrator".format(basis_integrator.__name__)
     

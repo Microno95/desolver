@@ -9,6 +9,7 @@ __all__ = [
     'convert_suffix',
     'warning',
     'search_bisection',
+    'search_bisection_vec',
     'BlockTimer'
 ]
 
@@ -226,6 +227,56 @@ def search_bisection(array, val):
         else:
             jupper = jmid
             
+    return jlower
+
+def search_bisection_vec(array, val):
+    """Finds the indices of the nearest values in array to each val. Uses the bisection method.
+
+    Parameters
+    ----------
+    array : array of numeric values
+        list to search, assumes the list is sorted (will not work if it isn't sorted!)
+    val : array of numeric values
+        numeric values to find the nearest value in array.
+
+    Returns
+    -------
+    array(int)
+        returns the indices of the positions in the array with the value closest to val
+
+    Examples
+    --------
+    
+    >>> list_to_search = [1,2,3,4,5]
+    >>> val_to_find    = [1.5,3.5]
+    >>> idx = search_bisection(list_to_search, val_to_find)
+    >>> idx, list_to_search[idx]
+    ([0,2], [1,3])
+    
+    """
+    
+    val    = D.asarray(val)
+    array  = D.asarray(array)
+    jlower = D.zeros_like(val, dtype=D.int64)
+    jupper = D.ones_like(val, dtype=D.int64)*(len(array) - 1)
+    
+    indices = D.zeros_like(val, dtype=D.int64)
+    msk1    = val <= D.gather(array, jlower)
+    msk2    = val >= D.gather(array, jupper)
+    indices[msk1] = jlower[msk1]
+    indices[msk2] = jupper[msk2]
+    
+    not_conv = (jupper - jlower) > 1
+    
+    while D.any(not_conv):
+        jmid = (jupper + jlower) // 2
+        mid_vals = D.gather(array, jmid)
+        msk1 = val >  mid_vals
+        msk2 = val <= mid_vals
+        jlower[msk1] = jmid[msk1]
+        jupper[msk2] = jmid[msk2]
+        not_conv = (jupper - jlower) > 1
+        
     return jlower
 
 class BlockTimer():

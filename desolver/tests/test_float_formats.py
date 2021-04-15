@@ -2,32 +2,13 @@ import pytest
 import desolver as de
 import desolver.backend as D
 import numpy as np
+from .common import ffmt_param, integrator_param, richardson_param, device_param
 
-integrator_set = set(de.available_methods(False).values())
-integrator_set = sorted(integrator_set, key=lambda x: x.__name__)
-explicit_integrator_set = [
-    pytest.param(intg, marks=pytest.mark.explicit) for intg in integrator_set if not intg.__implicit__
-]
-implicit_integrator_set = [
-    pytest.param(intg, marks=pytest.mark.implicit) for intg in integrator_set if intg.__implicit__
-]
-
-
-if D.backend() == 'torch':
-    devices_set = [pytest.param('cpu', marks=pytest.mark.cpu)]
-    import torch
-    if torch.cuda.is_available():
-        devices_set.insert(0, pytest.param('cuda', marks=pytest.mark.gpu))
-else:
-    devices_set = [None]
-
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
-@pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
-@pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
-@pytest.mark.parametrize('device', devices_set)
+@ffmt_param
+@integrator_param
+@richardson_param
+@device_param
 def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolation, device):
-    if integrator.__implicit__ and use_richardson_extrapolation:
-        pytest.skip("Implicit methods are unstable with richardson extrapolation")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -50,7 +31,7 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
     if D.backend() == 'torch':
         y_init = y_init.to(device)
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=D.pi/64, rtol=D.epsilon() ** 0.5,
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, D.pi / 4), dt=D.pi/64, rtol=D.epsilon() ** 0.5,
                      atol=D.epsilon() ** 0.5)
 
     method = integrator
@@ -77,13 +58,11 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
     print("{} backend test passed successfully!".format(D.backend()))
     
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
-@pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
-@pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
-@pytest.mark.parametrize('device', devices_set)
+@ffmt_param
+@integrator_param
+@richardson_param
+@device_param
 def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapolation, device):
-    if integrator.__implicit__ and use_richardson_extrapolation:
-        pytest.skip("Implicit methods are unstable with richardson extrapolation")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -115,7 +94,7 @@ def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapola
     if D.backend() == 'torch':
         y_init = y_init.contiguous().to(device)
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=D.pi/64, rtol=D.epsilon()**0.5,
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, D.pi / 4), dt=D.pi/64, rtol=D.epsilon()**0.5,
                      atol=D.epsilon()**0.5)
 
     method = integrator

@@ -13,6 +13,20 @@ def test_bisection_search():
 
     for idx, i in enumerate(l1):
         assert (de.utilities.search_bisection(l1, i) == idx)
+
+
+def test_bisection_search_vec():
+    l1 = [0.0, 1.0, 2.0, 3.0, 5.0, 10.0]
+    l2 = [0.2, 1.2, 2.2, 3.2, 5.2, 9.2]
+    expected_l2 = [0, 1, 2, 3, 4, 4]
+    l3 = [0.9, 1.9, 2.9, 3.9, 5.9, 9.9]
+    expected_l3 = [0, 1, 2, 3, 4, 4]
+    l4 = [0.2, 9.9, 2.3, 5.5]
+    expected_l4 = [0, 4, 2, 4]
+    
+    assert (D.all(de.utilities.search_bisection_vec(l1, l2) == D.asarray(expected_l2)))
+    assert (D.all(de.utilities.search_bisection_vec(l1, l3) == D.asarray(expected_l3)))
+    assert (D.all(de.utilities.search_bisection_vec(l1, l4) == D.asarray(expected_l4)))
         
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())        

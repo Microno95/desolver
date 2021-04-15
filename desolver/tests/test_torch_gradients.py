@@ -2,32 +2,14 @@ import pytest
 import desolver as de
 import desolver.backend as D
 import numpy as np
-
-integrator_set = set(de.available_methods(False).values())
-integrator_set = sorted(integrator_set, key=lambda x: x.__name__)
-explicit_integrator_set = [
-    pytest.param(intg, marks=pytest.mark.explicit) for intg in integrator_set if not intg.__implicit__
-]
-implicit_integrator_set = [
-    pytest.param(intg, marks=pytest.mark.implicit) for intg in integrator_set if intg.__implicit__
-]
-
-
-if D.backend() == 'torch':
-    devices_set = [pytest.param('cpu', marks=pytest.mark.cpu)]
-    import torch
-    if torch.cuda.is_available():
-        devices_set.insert(0, pytest.param('cuda', marks=pytest.mark.gpu))
-else:
-    devices_set = [None]
+from .common import ffmt_param, integrator_param, richardson_param, device_param, dt_param, dense_output_param
     
 @pytest.mark.torch_gradients
-# @pytest.mark.skip(reason="Test too slow, needs refactoring")
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
-@pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
-@pytest.mark.parametrize('use_richardson_extrapolation', [False])
-@pytest.mark.parametrize('device', devices_set)
+@ffmt_param
+@integrator_param
+@richardson_param
+@device_param
 def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, device):
     D.set_float_fmt(ffmt)
     if integrator.__symplectic__:
@@ -90,12 +72,11 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
 
     
 @pytest.mark.torch_gradients
-# @pytest.mark.skip(reason="Test too slow, needs refactoring")
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
-@pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
-@pytest.mark.parametrize('use_richardson_extrapolation', [False])
-@pytest.mark.parametrize('device', devices_set)
+@ffmt_param
+@integrator_param
+@richardson_param
+@device_param
 def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolation, device):
     D.set_float_fmt(ffmt)
     if integrator.__implicit__ and use_richardson_extrapolation:
@@ -157,10 +138,10 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
 
 @pytest.mark.torch_gradients
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
-@pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
-@pytest.mark.parametrize('use_richardson_extrapolation', [False])
-@pytest.mark.parametrize('device', devices_set)
+@ffmt_param
+@integrator_param
+@richardson_param
+@device_param
 def test_gradients_complex(ffmt, integrator, use_richardson_extrapolation, device):
     D.set_float_fmt(ffmt)
     if integrator.__implicit__ and use_richardson_extrapolation:

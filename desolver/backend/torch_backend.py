@@ -359,7 +359,10 @@ def nonzero(a):
         return (torch.nonzero(a),)
 
 
-argsort = torch.argsort
+argsort = axis_reg(torch.argsort)
+
+def gather(arr, indices, axis=0):
+    return torch.gather(arr, dim=axis, index=indices)
 
 
 def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True):
