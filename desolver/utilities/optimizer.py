@@ -304,7 +304,7 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=50, jac_upda
     for __d in xshape:
         xdim *= __d
     x  = D.reshape(x0, (xdim, 1))
-    if D.backend() == 'numpy':
+    if D.backend() == 'numpy' and "gdual_double" in D.available_float_fmt():
         is_vectorised = D.any(D.array([type(i[0]) == D.gdual_vdouble for i in x], dtype=D.bool))
         is_vectorised = is_vectorised or "vdouble" in D.float_fmt()
         is_gdual      = D.any(D.array([type(i[0]) in [D.gdual_double, D.gdual_vdouble, object] for i in x], dtype=D.bool))

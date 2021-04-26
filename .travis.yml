@@ -9,9 +9,9 @@ python:
   - nightly
 
 env:
-  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=false                      PYTEST_FLAGS='--run_implicit --run_explicit'
-  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=true                       PYTEST_FLAGS='--run_implicit --run_explicit'
-  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients' PYTEST_FLAGS='--run_implicit --run_explicit'
+  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=false
+  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=true
+  - DES_BACKEND='torch'
 
 jobs:
   include:
@@ -95,7 +95,7 @@ jobs:
     env: PATH=/c/Python36:/c/Python36/Scripts:$PATH DES_BACKEND=numpy PYAUDI_AVAILABLE=true
   exclude:
   - python: 3.5
-    env: DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients' PYTEST_FLAGS='--run_implicit --run_explicit'
+    env: DES_BACKEND='torch'
   - os: osx
     env: PYAUDI_AVAILABLE=true
   - python: 3.8-dev
@@ -131,7 +131,7 @@ install:
 
 # command to run tests
 script:
-  - pytest --cov-report=xml --cov=desolver $PYTEST_FLAGS $RUN_TORCH_GRADIENTS
+  - pytest --cov-report=xml --cov=desolver --run_implicit --run_explicit --run_torch_gradients
 
 # command to upload coverage statistics
 after_success:
