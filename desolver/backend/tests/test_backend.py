@@ -1171,7 +1171,7 @@ class TestPyAudiErfc(PyAudiTestCase):
 class TestPyAudiMatrixInv(PyAudiMatrixTestCase):
     def do(self, A):
         Ainv = D.matrix_inv(A)
-        assert (D.max(D.abs(D.to_float(Ainv@A - D.eye(A.shape[0])))) <= 64*D.epsilon())
+        assert (D.max(D.abs(D.to_float(Ainv@A - D.eye(A.shape[0])))) <= 256*D.epsilon())
 
 class TestPyAudiMatrixInvExceptions(PyAudiMatrixTestCase):
     def do(self, A):
@@ -1183,9 +1183,9 @@ class TestPyAudiMatrixInvExceptions(PyAudiMatrixTestCase):
 class TestPyAudiQRDecomposition(PyAudiMatrixTestCase):
     def do(self, A):
         Q,R = D.qr(A)
-        assert(D.max(D.abs(D.to_float(Q@R - A))) <= 32*D.epsilon())
+        assert(D.max(D.abs(D.to_float(Q@R - A))) <= 256*D.epsilon())
             
 class TestPyAudiLinearSolver(PyAudiLinearSystemTestCase):
     def do(self, A, b):
         x = D.solve_linear_system(A, b)
-        assert (D.max(D.abs(D.to_float(A@x - b))) <= 32*D.epsilon())
+        assert (D.max(D.abs(D.to_float(A@x - b))) <= 256*D.epsilon())
