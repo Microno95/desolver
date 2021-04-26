@@ -109,7 +109,7 @@ def test_brentsrootvec(ffmt, tol):
         torch.autograd.set_detect_anomaly(True)
 
     if ffmt == 'gdual_vdouble':
-        return
+        pytest.skip("Root-finding is ill-conceived with vectorised gduals")
     
     for _ in range(10):
         slope_list = D.array(np.copysign(np.random.uniform(0.9, 1.1, size=25), np.random.uniform(-1, 1, size=25)))
@@ -140,6 +140,7 @@ def test_brentsrootvec(ffmt, tol):
 def test_newtonraphson(ffmt, tol):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
+    np.random.seed(30)
     
     if tol is not None:
         tol = tol * D.epsilon()
@@ -152,7 +153,7 @@ def test_newtonraphson(ffmt, tol):
         torch.autograd.set_detect_anomaly(False)
 
     if ffmt == 'gdual_vdouble':
-        return
+        pytest.skip("Root-finding is ill-conceived with vectorised gduals")
     
     for _ in range(10):
         ac_prod = D.array(np.random.uniform(0.9, 1.1))
@@ -161,38 +162,44 @@ def test_newtonraphson(ffmt, tol):
         c = ac_prod / a
         b = D.sqrt(0.01 + 4 * ac_prod)
 
-        gt_root = -b / (2 * a) - 0.1 / (2 * a)
+        gt_root1 = -b / (2 * a) - 0.1 / (2 * a)
+        gt_root2 = -b / (2 * a) + 0.1 / (2 * a)
 
-        ub = -b / (2 * a)
-        lb = -b / (2 * a) - 1.0 / (2 * a)
+        ub = -b / (2 * a) - 0.2 / (2 * a)
+        lb = -b / (2 * a) - 0.4 / (2 * a)
         
         x0  = D.array(np.random.uniform(ub, lb))
 
         fun = lambda x: a * x ** 2 + b * x + c
         jac = lambda x: 2 * a * x + b
 
-        assert (D.to_numpy(D.to_float(D.abs(fun(gt_root)))) <= 32 * D.epsilon())
+        assert (D.to_numpy(D.to_float(D.abs(fun(gt_root1)))) <= 32 * D.epsilon())
+        assert (D.to_numpy(D.to_float(D.abs(fun(gt_root2)))) <= 32 * D.epsilon())
 
-        root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=jac, tol=tol, verbose=True, maxiter=50)
-
-        print(success, prec <= tol if tol is not None else D.epsilon(), tol, root, gt_root, x0, root - gt_root, 32*D.epsilon(), num_iter, prec)
+        root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=jac, tol=tol, verbose=True)
+        
+        if tol is None:
+            tol = D.epsilon()
+        conv_root1 = np.allclose(D.to_numpy(D.to_float(gt_root1)), D.to_numpy(D.to_float(root)), 128*tol, 32*tol)
+        conv_root2 = np.allclose(D.to_numpy(D.to_float(gt_root2)), D.to_numpy(D.to_float(root)), 128*tol, 32*tol)
+        print(conv_root1, conv_root2, root, gt_root1, gt_root2, x0, root - gt_root1, root - gt_root2, num_iter, prec)
         
         assert (success)
-        assert (np.allclose(D.to_numpy(D.to_float(gt_root)), D.to_numpy(D.to_float(root)), 32 * D.epsilon(),
-                            32 * D.epsilon()))
-        assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32 * D.epsilon())
+        assert (conv_root1 or conv_root2)
+        assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32*tol)
 
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('tol',  [None, 40, 1])
 def test_newtonraphson_estimated_jac(ffmt, tol):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
+    np.random.seed(20)
 
     if tol is not None:
         tol = tol * D.epsilon()
 
     if ffmt == 'gdual_vdouble':
-        return
+        pytest.skip("Root-finding is ill-conceived with vectorised gduals")
     
     for _ in range(10):
         ac_prod = D.array(np.random.uniform(0.9, 1.1))
@@ -201,33 +208,88 @@ def test_newtonraphson_estimated_jac(ffmt, tol):
         c = ac_prod / a
         b = D.sqrt(0.01 + 4 * ac_prod)
 
-        gt_root = -b / (2 * a) - 0.1 / (2 * a)
+        gt_root1 = -b / (2 * a) - 0.1 / (2 * a)
+        gt_root2 = -b / (2 * a) + 0.1 / (2 * a)
 
-        ub = -b / (2 * a)
-        lb = -b / (2 * a) - 1.0 / (2 * a)
+        ub = -b / (2 * a) - 0.2 / (2 * a)
+        lb = -b / (2 * a) - 0.4 / (2 * a)
         
         x0  = D.array(np.random.uniform(ub, lb))
 
         fun = lambda x: a * x**2 + b * x + c
         jac = de.utilities.JacobianWrapper(fun)
 
-        assert (D.to_numpy(D.to_float(D.abs(fun(gt_root)))) <= 32 * D.epsilon())
+        assert (D.to_numpy(D.to_float(D.abs(fun(gt_root1)))) <= 32 * D.epsilon())
+        assert (D.to_numpy(D.to_float(D.abs(fun(gt_root2)))) <= 32 * D.epsilon())
 
-        root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=jac, tol=tol, verbose=True, maxiter=50)
+        root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=jac, tol=tol, verbose=True)
 
-        print(root, gt_root, x0, root - gt_root, 32*D.epsilon(), num_iter, prec)
+        if tol is None:
+            tol = D.epsilon()
+        conv_root1 = np.allclose(D.to_numpy(D.to_float(gt_root1)), D.to_numpy(D.to_float(root)), 128*tol, 32*tol)
+        conv_root2 = np.allclose(D.to_numpy(D.to_float(gt_root2)), D.to_numpy(D.to_float(root)), 128*tol, 32*tol)
+        print(conv_root1, conv_root2, root, gt_root1, gt_root2, x0, root - gt_root1, root - gt_root2, num_iter, prec)
         
         assert (success)
-        assert (np.allclose(D.to_numpy(D.to_float(gt_root)), D.to_numpy(D.to_float(root)), 32 * D.epsilon(),
-                            32 * D.epsilon()))
-        assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32 * D.epsilon())
+        assert (conv_root1 or conv_root2)
+        assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32*tol)
 
+        
+@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@pytest.mark.parametrize('tol',  [None, 40, 1])
+@pytest.mark.parametrize('dim',  [1, 5, 10, 100, 250])
+def test_newtonraphson_dims(ffmt, tol, dim):
+    print("Set dtype to:", ffmt)
+    D.set_float_fmt(ffmt)
+    np.random.seed(30)
+    
+    if tol is not None:
+        tol = tol * D.epsilon()
+
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(False)
+
+    if ffmt == 'gdual_vdouble':
+        pytest.skip("Root-finding is ill-conceived with vectorised gduals")
+    
+    shift = D.array(np.random.uniform(1, 10, size=(dim,)))
+    exponent = D.array(np.random.uniform(1, 5, size=(dim,)))
+    gt_root1 =  shift**(1/exponent)
+    gt_root2 = -shift**(1/exponent)
+    
+    def fun(x):
+        return x**exponent - shift
+    
+    def jac(x):
+        return D.diag(exponent*D.reshape(x, (-1,))**(exponent-1))
+    
+    x0 = D.array(np.random.uniform(1, 3, size=(dim,)))
+    print(gt_root1, gt_root2)
+    print(x0)
+    print(fun(x0))
+    print(jac(x0))
+    
+    root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=jac, tol=tol, verbose=True)
+        
+    if tol is None:
+        tol = D.epsilon()
+    assert (success)
+    conv_root1 = D.stack([D.array(np.allclose(D.to_numpy(D.to_float(r1)), D.to_numpy(D.to_float(r)), 128*tol, 32*tol), dtype=D.bool) for r, r1 in zip(root, gt_root1)])
+    conv_root2 = D.stack([D.array(np.allclose(D.to_numpy(D.to_float(r2)), D.to_numpy(D.to_float(r)), 128*tol, 32*tol), dtype=D.bool) for r, r2 in zip(root, gt_root2)])
+    assert (D.all(conv_root1 | conv_root2))
+
+    
 @pytest.mark.skipif(D.backend() != 'torch', reason="Pytorch backend required to test jacobian via AD")
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('tol',  [None, 40, 1])
 def test_newtonraphson_pytorch_jacobian(ffmt, tol):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
+    np.random.seed(21)
 
     if tol is not None:
         tol = tol * D.epsilon()
@@ -240,7 +302,7 @@ def test_newtonraphson_pytorch_jacobian(ffmt, tol):
         torch.autograd.set_detect_anomaly(False)
 
     if ffmt == 'gdual_vdouble':
-        return
+        pytest.skip("Root-finding is ill-conceived with vectorised gduals")
     
     for _ in range(10):
         ac_prod = D.array(np.random.uniform(0.9, 1.1))
@@ -249,22 +311,72 @@ def test_newtonraphson_pytorch_jacobian(ffmt, tol):
         c = ac_prod / a
         b = D.sqrt(0.01 + 4 * ac_prod)
 
-        gt_root = -b / (2 * a) - 0.1 / (2 * a)
+        gt_root1 = -b / (2 * a) - 0.1 / (2 * a)
+        gt_root2 = -b / (2 * a) + 0.1 / (2 * a)
 
-        ub = -b / (2 * a)
-        lb = -b / (2 * a) - 1.0 / (2 * a)
+        ub = -b / (2 * a) - 0.2 / (2 * a)
+        lb = -b / (2 * a) - 0.4 / (2 * a)
         
         x0  = D.array(np.random.uniform(ub, lb))
 
         fun = lambda x: a * x ** 2 + b * x + c
 
-        assert (D.to_numpy(D.to_float(D.abs(fun(gt_root)))) <= 32 * D.epsilon())
+        assert (D.to_numpy(D.to_float(D.abs(fun(gt_root1)))) <= 32 * D.epsilon())
+        assert (D.to_numpy(D.to_float(D.abs(fun(gt_root2)))) <= 32 * D.epsilon())
 
-        root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, tol=tol, verbose=True, maxiter=50, use_preconditioner=False)
+        root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, tol=tol, verbose=True)
 
-        print(root, gt_root, x0, root - gt_root, 32*D.epsilon(), num_iter, prec)
+        if tol is None:
+            tol = D.epsilon()
+        conv_root1 = np.allclose(D.to_numpy(D.to_float(gt_root1)), D.to_numpy(D.to_float(root)), 128*tol, 32*tol)
+        conv_root2 = np.allclose(D.to_numpy(D.to_float(gt_root2)), D.to_numpy(D.to_float(root)), 128*tol, 32*tol)
+        print(conv_root1, conv_root2, root, gt_root1, gt_root2, x0, root - gt_root1, root - gt_root2, num_iter, prec)
         
         assert (success)
-        assert (np.allclose(D.to_numpy(D.to_float(gt_root)), D.to_numpy(D.to_float(root)), 32 * D.epsilon(),
-                            32 * D.epsilon()))
-        assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32 * D.epsilon())
+        assert (conv_root1 or conv_root2)
+        assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32*tol)
+
+        
+@pytest.mark.skipif(D.backend() != 'torch', reason="Pytorch backend required to test jacobian via AD")
+@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@pytest.mark.parametrize('tol',  [None, 40, 1])
+@pytest.mark.parametrize('dim',  [1, 5, 10, 100, 250])
+def test_newtonraphson_dims_pytorch_jacobian(ffmt, tol, dim):
+    print("Set dtype to:", ffmt)
+    D.set_float_fmt(ffmt)
+    np.random.seed(30)
+    
+    if tol is not None:
+        tol = tol * D.epsilon()
+
+    if D.backend() == 'torch':
+        import torch
+
+        torch.set_printoptions(precision=17)
+
+        torch.autograd.set_detect_anomaly(False)
+
+    if ffmt == 'gdual_vdouble':
+        pytest.skip("Root-finding is ill-conceived with vectorised gduals")
+    
+    shift = D.array(np.random.uniform(1, 10, size=(dim,)))
+    exponent = D.array([2]*dim)
+    gt_root1 =  shift**(1/exponent)
+    gt_root2 = -shift**(1/exponent)
+    
+    def fun(x):
+        return x**exponent - shift
+    
+    x0 = D.array(gt_root1) + D.array(np.random.uniform(-1e-4, 1e-4, size=(dim,)))
+    print(gt_root1, gt_root2)
+    print(x0)
+    print(fun(x0))
+    
+    root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=None, tol=tol, verbose=True, maxiter=200)
+        
+    if tol is None:
+        tol = D.epsilon()
+    assert (success)
+    conv_root1 = D.stack([D.array(np.allclose(D.to_numpy(D.to_float(r1)), D.to_numpy(D.to_float(r)), 128*tol, 32*tol), dtype=D.bool) for r, r1 in zip(root, gt_root1)])
+    conv_root2 = D.stack([D.array(np.allclose(D.to_numpy(D.to_float(r2)), D.to_numpy(D.to_float(r)), 128*tol, 32*tol), dtype=D.bool) for r, r2 in zip(root, gt_root2)])
+    assert (D.all(conv_root1 | conv_root2))

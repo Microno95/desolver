@@ -121,7 +121,7 @@ def test_dense_output(ffmt, use_richardson_extrapolation):
 
     if use_richardson_extrapolation:
         a.method = de.integrators.generate_richardson_integrator(a.method)
-    a.rtol = a.atol = 2*D.epsilon()
+    a.rtol = a.atol = D.epsilon()**0.75
     a.integrate()
     
     assert (a.integration_status == "Integration completed successfully.")

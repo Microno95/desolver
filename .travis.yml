@@ -9,14 +9,9 @@ python:
   - nightly
 
 env:
-  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=false                      PYTEST_FLAGS='--run_implicit'
-  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=true                       PYTEST_FLAGS='--run_implicit'
-  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients' PYTEST_FLAGS='--run_implicit'
-  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS=''                      PYTEST_FLAGS='--run_implicit'
-  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=false                      PYTEST_FLAGS='--run_explicit'
-  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=true                       PYTEST_FLAGS='--run_explicit'
-  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients' PYTEST_FLAGS='--run_explicit'
-  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS=''                      PYTEST_FLAGS='--run_explicit'
+  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=false                      PYTEST_FLAGS='--run_implicit --run_explicit'
+  - DES_BACKEND='numpy' PYAUDI_AVAILABLE=true                       PYTEST_FLAGS='--run_implicit --run_explicit'
+  - DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients' PYTEST_FLAGS='--run_implicit --run_explicit'
 
 jobs:
   include:
@@ -100,13 +95,7 @@ jobs:
     env: PATH=/c/Python36:/c/Python36/Scripts:$PATH DES_BACKEND=numpy PYAUDI_AVAILABLE=true
   exclude:
   - python: 3.5
-    env: DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients' PYTEST_FLAGS='--run_explicit'
-  - python: 3.5
-    env: DES_BACKEND='torch' RUN_TORCH_GRADIENTS='' PYTEST_FLAGS='--run_explicit'
-  - python: 3.5
-    env: DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients' PYTEST_FLAGS='--run_implicit'
-  - python: 3.5
-    env: DES_BACKEND='torch' RUN_TORCH_GRADIENTS='' PYTEST_FLAGS='--run_implicit'
+    env: DES_BACKEND='torch' RUN_TORCH_GRADIENTS='--run_torch_gradients' PYTEST_FLAGS='--run_implicit --run_explicit'
   - os: osx
     env: PYAUDI_AVAILABLE=true
   - python: 3.8-dev

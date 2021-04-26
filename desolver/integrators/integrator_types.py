@@ -351,7 +351,7 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
                 __jac = D.reshape(__jac, tuple())
             return __jac
             
-        initial_guess = D.zeros_like(self.aux)
+        initial_guess = D.copy(self.aux)
         
         midpoint_guess = rhs(initial_time, initial_state, **constants)
         self.initial_rhs   = midpoint_guess
@@ -362,12 +362,10 @@ class ImplicitRungeKuttaIntegrator(ImplicitIntegrator):
         if rhs.jac_is_wrapped_rhs and D.backend() == 'torch':
             nfun_jac = None
             initial_guess.requires_grad = True
-            sparsity = 1.0 - D.sum(D.jacobian(nfun(initial_guess), initial_guess) > 0) / (self.tableau.shape[0]*self.numel)**2
         else:
             nfun_jac = __nfun_jac
-            sparsity = 1.0 - D.sum(D.abs(D.to_float(nfun_jac(initial_guess))) > 0) / (self.tableau.shape[0]*self.numel)**2
             
-        aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=125, sparse=sparsity >= 0.7)
+        aux_root, (success, num_iter, prec) = utilities.optimizer.newtonraphson(nfun, initial_guess, jac=nfun_jac, verbose=False, tol=None, maxiter=70)
         if not success and prec > D.max(D.abs(self.atol + self.rtol * D.max(D.abs(D.to_float(initial_state))))):
             raise exception_types.FailedToMeetTolerances("Step size too large, cannot solve system to the tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, 32*D.epsilon(), num_iter))
             

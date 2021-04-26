@@ -1,4 +1,5 @@
 import numpy
+import scipy.optimize
 from .. import backend as D
 from . import utilities
 
@@ -261,14 +262,9 @@ def preconditioner(A, tol=None):
         I = I.to(A)
     Pinv = D.zeros_like(A)
     A2   = A*A
-    nA   = 0.5 * (D.sum(A2, axis=0) + D.sum(A2, axis=1))
-    for i in range(D.shape(A)[0]):
-        if float(nA[i]) > 32*D.epsilon():
-            Pinv[i,i] = 1/nA[i]
-        else:
-            Pinv[i,i] = 1.0
-    nPinv = D.norm(Pinv@A)
-    Pinv  = Pinv / nPinv
+    nA   = 0.5 * (D.sum(A2, axis=0)**0.5 + D.sum(A2, axis=1)**0.5)
+    nA   = (nA > 32*D.epsilon())*nA + (nA <= 32*D.epsilon())
+    Pinv = D.diag(nA)
         
     Ik = Pinv@A
     for _ in range(3):
@@ -299,65 +295,118 @@ def estimate_cond(A):
         out = D.ones_like(out)
     return out
 
-def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=10000, sparse=False, use_preconditioner=True):
+def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=50, jac_update_rate=20, use_scipy=True):
     if tol is None:
-        if D.epsilon() <= 1e-5:
-            tol = 32*D.epsilon()
-        else:
-            tol = D.epsilon()
-    if tol < 32*D.epsilon() and D.epsilon() <= 1e-5:
-        tol = 32*D.epsilon()
+        tol = 2*D.epsilon()
     tol = D.to_float(tol)
+    xshape = D.shape(x0)
+    xdim   = 1
+    for __d in xshape:
+        xdim *= __d
+    x  = D.reshape(x0, (xdim, 1))
+    if D.backend() == 'numpy':
+        is_vectorised = D.any(D.array([type(i[0]) == D.gdual_vdouble for i in x], dtype=D.bool))
+        is_vectorised = is_vectorised or "vdouble" in D.float_fmt()
+        is_gdual      = D.any(D.array([type(i[0]) in [D.gdual_double, D.gdual_vdouble, object] for i in x], dtype=D.bool))
+        is_gdual      = is_gdual or "gdual" in D.float_fmt() or x.dtype == object
+    else:
+        is_vectorised = False
+        is_gdual      = False
+    
+    fshape = D.shape(f(x0))
+    fdim   = 1
+    for __d in fshape:
+        fdim *= __d
+        
+    def fun(x, __f=None):
+        if D.backend() == 'torch' and not x.requires_grad:
+            x.requires_grad = True
+        return D.reshape(f(D.reshape(x, xshape)), (fdim, 1))
+    
     if jac is None:
-        jac_provided = False
-        jac = utilities.JacobianWrapper(f, atol=tol, rtol=tol)
-    else:
-        jac_provided = True
-    no_dim = D.shape(D.reshape(x0, (-1,))) == (1,)
-    if D.backend() == 'torch':
-        has_grad = x0.requires_grad
-        if not has_grad:
-            x0.requires_grad = True
-    if not no_dim:
-        x = D.reshape(x0, (-1,))
-    else:
-        x = D.reshape(x0, tuple())
-    w_relax = 0.5
-    prec    = numpy.inf
-    for iteration in range(maxiter):
         if D.backend() == 'torch':
-            F0  = f(x)
-            if not jac_provided:
-                Jf0 = D.jacobian(F0, x)
-            else:
-                Jf0 = jac(x)
-            F0  = F0
+            def fun_jac(x, __f=None):
+                if __f is None:
+                    __f = fun(x)
+                return D.reshape(D.jacobian(__f, x), (fdim, xdim))
         else:
-            F0  = f(x)
-            Jf0 = jac(x).astype(D.float64)
-        if no_dim:
-            dx = -D.reshape(F0, tuple()) / D.reshape(Jf0, tuple())
+            fun_jac = utilities.JacobianWrapper(fun, atol=tol, rtol=tol)
+    else:
+        jac_shape = D.shape(jac(x0))
+        if is_gdual or jac_shape != (fdim, xdim):
+            def fun_jac(x, __f=None):
+                __j = D.reshape(jac(D.reshape(x, xshape)), (fdim, xdim))
+                if is_gdual and not is_vectorised:
+                    __j = D.to_float(__j)
+                return __j
         else:
-            F0 = -D.reshape(F0, (-1, 1))
-            if Jf0.dtype != object and use_preconditioner and estimate_cond(Jf0) > 100:
-                Pinv = preconditioner(Jf0, tol=tol)
-                Jf0 = Pinv@Jf0
-                F0  = Pinv@F0
-            if D.backend() == 'numpy':
-                dx = D.solve_linear_system(Jf0, F0, sparse=sparse, overwrite_a=True, overwrite_b=True)
-            else:
-                dx = D.solve_linear_system(Jf0, F0, sparse=sparse)
+            fun_jac = lambda y, **kwargs: jac(y)
+        
+    if use_scipy and D.backend() == 'numpy' and not is_vectorised and not is_gdual:
+        res = scipy.optimize.root(lambda __x: fun(__x)[:, 0], x[:,0], jac=fun_jac, tol=tol)
+        init_iter = res.nfev + res.njev
+        x = D.reshape(res.x, (xdim, 1))
+        if res.success:
+            return D.reshape(res.x, xshape), (res.success, init_iter, D.abs(res.qtf))
+    else:
+        init_iter = 0
+    
+    w_relax = 0.5
+    F0      = fun(x)
+    Jf0     = fun_jac(x, __f=F0)
+    F1, Jf1 = D.copy(F0), D.copy(Jf0)
+    Fn0     = D.to_float((F1.T@F1).item()**0.5)
+    Fn1     = D.to_float(Fn0)
+    dx      = D.zeros_like(x)
+    dxn     = D.to_float((dx.T@dx).item()**0.5)
+    I       = D.diag(D.ones_like(D.diag(Jf1)))
+    iteration = 0
+    fail_iter = 0
+    
+    for iteration in range(init_iter, maxiter):
         if verbose:
-            print("[{iteration}]: x = {x}, dx = {dx}, F = {F0}, Jf = {Jf0}".format(**locals()))
-            if D.backend() == 'torch':
-                dx_by_x0 = D.jacobian(dx, x0)
-                x_by_x0  = D.jacobian(x, x0)
-                print("[additional info]: dx/x0 = {dx_by_x0}, x/x0 = {x_by_x0}".format(**locals()))
+            df =  F1 -  F0
+            dJ = Jf1 - Jf0
+            df = (df.T@df).item()**0.5
+            dJ = D.sum(dJ**2)**0.5
+            print("[{iteration}]: x = {x}, f = {F1}, ||dx|| = {dxn}, ||F|| = {Fn1}, ||dF|| = {df}, ||dJ|| = {dJ}".format(**locals()))
             print()
-        x = x+D.reshape(dx, D.shape(x))
-        prec = D.max(D.to_float(D.abs(dx)))
-        if prec < tol or not D.all(D.isfinite(D.to_float(x))):
+        if 'vdouble' not in D.float_fmt() and estimate_cond(Jf1) > 100:
+            P = preconditioner(Jf1)
+        else:
+            P = I
+        sparse = (1.0 - D.sum(D.abs(D.to_float(Jf1)) > 0) / (xdim * fdim)) <= 0.7
+        dx  = D.reshape(D.solve_linear_system(P@Jf1, -P@F1, sparse=sparse), (xdim, 1))
+        x_best = x
+        no_progress = True
+        F0  = F1
+        Fn0 = Fn1
+        for __dx in [dx/m for m in [1.0,2.0,4.0,8.0]]:
+            __x  = x + __dx
+            __f  = fun(__x)
+            __fn = D.to_float((__f.T@__f).item()**0.5)
+            if __fn < Fn1:
+                x   = __x
+                dx  = __dx
+                F1  = __f
+                Fn1 = __fn
+                no_progress = False
+                break
+        dxn = D.to_float((dx.T@dx).item()**0.5)
+        if no_progress:
+            fail_iter += 1
+        if iteration % jac_update_rate == 0 or no_progress:
+            Jf0, Jf1 = Jf0, fun_jac(x, __f=F1)
+        else:
+#             Jf0, Jf1 = D.copy(Jf1), Jf1 + ((F1 - F0) - Jf1@dx)@dx.T/dxn
+            y_ex = Jf1@dx
+            y_is = (F1 - F0)
+            kI = (y_is - y_ex) / D.sum(y_ex.T@y_ex)
+            Jf0, Jf1 = Jf1, D.reshape((1 + kI*Jf1*dx)*Jf1, (fdim, xdim))
+        if Fn1 <= tol or dxn <= 32*D.max(D.abs(D.to_float(x) * tol)) or not D.all(D.isfinite(D.to_float(dx))) or fail_iter > 10:
+            if verbose:
+                print("[finished]: ||F|| = {Fn1}, ||dx|| = {dxn}, x = {x}, F = {F0}".format(**locals()))
             break
-    return x, (prec <= tol, iteration, prec)
+    return x, (Fn1 <= tol or dxn <= 32*D.max(D.abs(x * tol)), iteration, Fn1)
 
 

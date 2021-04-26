@@ -154,6 +154,7 @@ class DenseOutput(object):
         if t_eval is None and y_interpolants is None:
             self.t_eval         = [D.array(0.0)]
             self.__t_eval_arr   = D.stack(self.t_eval)
+            self.__t_eval_arr_stale = False
             self.y_interpolants = []
         else:
             if t_eval is None or y_interpolants is None:
@@ -163,13 +164,21 @@ class DenseOutput(object):
             else:
                 self.t_eval         = [D.asarray(t) for t in t_eval]
                 self.__t_eval_arr   = D.stack(self.t_eval)
+                self.__t_eval_arr_stale = False
                 self.y_interpolants = y_interpolants
+        
+    @property
+    def t_eval_arr(self):
+        if self.__t_eval_arr_stale:
+            self.__t_eval_arr = D.stack(self.t_eval)
+            self.__t_eval_arr_stale = False
+        return self.__t_eval_arr
         
     def find_interval(self, t):
         return min(deutil.search_bisection(self.t_eval, t), len(self.y_interpolants) - 1)
         
     def find_interval_vec(self, t):
-        out = deutil.search_bisection_vec(self.__t_eval_arr, t)
+        out = deutil.search_bisection_vec(self.t_eval_arr, t)
         out[out > len(self.y_interpolants) - 1] = len(self.y_interpolants) - 1
         return out
         
@@ -203,12 +212,13 @@ class DenseOutput(object):
                 raise
             if (t - self.t_eval[-1]) < 0:
                 self.t_eval.insert(0, D.asarray(t))
-                self.__t_eval_arr = D.stack(self.t_eval)
                 self.y_interpolants.insert(0, y_interp)
             else:
                 self.t_eval.append(D.asarray(t))
-                self.__t_eval_arr = D.stack(self.t_eval)
                 self.y_interpolants.append(y_interp)
+            if D.backend() == 'torch':
+                self.t_eval = [i.to(D.asarray(t)) for i in self.t_eval]
+            self.__t_eval_arr_stale = True
     
     def remove_interpolant(self, idx):
         out = self.t_eval.pop(idx),   self.y_interpolants.pop(idx)
@@ -350,6 +360,19 @@ class DiffRHS(object):
         if not self.jac_is_wrapped_rhs:
             __new_diff_rhs.hook_jacobian_call(copy.deepcopy(self.__jac, memo))
         return __new_diff_rhs
+
+    __base_attributes = ["rhs", "equ_repr", "md_repr", "nfev", "njev", "__jac", "__jac_is_wrapped_rhs", "__jac_wrapped_rhs_order", "__jac_time"]
+    
+    def __getattr__(self, name):
+        return getattr(self.rhs, name)
+    
+    def __setattr__(self, name, val):
+        if name.replace("_DiffRHS", "") in self.__base_attributes:
+            self.__dict__[name] = val
+        elif name == "jac":
+            self.hook_jacobian_call(val)
+        else:
+            self.rhs.__dict__[name] = val
 
 def rhs_prettifier(equ_repr=None, md_repr=None):
     def rhs_wrapper(rhs):

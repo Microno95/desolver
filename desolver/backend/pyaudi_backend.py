@@ -78,10 +78,11 @@ float_fmts.update({
 
 def to_float(x):
     if isinstance(numpy.asanyarray(x).reshape(-1)[0], gdual_vdouble):
-        if numpy.asanyarray(x).ndim > 0:
+        __ndim = numpy.asanyarray(x).ndim
+        if __ndim > 0:
             unstacked = [to_float(i) for i in numpy.asanyarray(x)]
             max_dim   = builtins.max(builtins.map(shape, unstacked), key=len)
-            return numpy.stack([numpy.resize(i, max_dim) for i in unstacked]).astype(float64)
+            return numpy.stack([numpy.resize(i, max_dim) for i in unstacked], axis=0).astype(float64)
         else:
             return numpy.array(numpy.asanyarray(x).item().constant_cf).astype(float64)
     else:
@@ -107,8 +108,12 @@ def logsumexp(x1, *args, **kwargs):
         return scipy.special.logsumexp(x1, *args, **kwargs)
     
 def __matrix_inv_helper(A_in, tol=epsilon()):
-    if shape(A_in)[0] != shape(A_in)[1]:
+    if shape(A_in)[-2] != shape(A_in)[-1]:
         raise numpy.linalg.LinAlgError("Matrix is not square, inversion is not possible")
+    if len(shape(A_in)) > 2:
+        return reshape(stack([
+            __matrix_inv_helper(__A) for __A in reshape(A_in, (-1, shape(A_in)[-2], shape(A_in)[-1]))
+        ]), shape(A_in))
     detA = numpy.linalg.det(to_float(A_in))
     if detA == 0:
         raise numpy.linalg.LinAlgError("Matrix has a determinant of {} which makes it non-invertible".format(detA))
@@ -125,27 +130,25 @@ def __matrix_inv_helper(A_in, tol=epsilon()):
             # No pivot in this column, pass to next column
             k = k + 1
         else:
-            A[h], A[i_max] = copy(A[i_max]), copy(A[h])
-            P[h], P[i_max] = copy(P[i_max]), copy(P[h])
-            for i in range(h+1, shape(A)[0]):
-                f = A[i, k] / A[h, k]
-                A[i, :] = A[i, :] - f * A[h, :]
-                I[i, :] = I[i, :] - f * I[h, :]
+            A[h], A[i_max] = A[i_max], copy(A[h])
+            P[h], P[i_max] = P[i_max], copy(P[h])
+            f = A[h+1:, k] / A[h, k]
+            A[h+1:, :] = A[h+1:, :] - f[:,None] * A[h, :][None,:]
+            I[h+1:, :] = I[h+1:, :] - f[:,None] * I[h, :][None,:]
             # Increase pivot row and column
             h = h + 1
             k = k + 1
     for k in range(shape(A)[1]-1, -1, -1):
         I[k, :] = I[k, :] / A[k, k]
         A[k, :] = A[k, :] / A[k, k]
-        for i in range(k):
-            f       = (A[i,k] / A[k,k])
-            A[i, :] = A[i, :] - f*A[k,:]
-            I[i, :] = I[i, :] - f*I[k, :]
+        f       = (A[:k,k] / A[k,k])
+        A[:k, :] = A[:k, :] - f[:,None]*A[k,:][None,:]
+        I[:k, :] = I[:k, :] - f[:,None]*I[k, :][None,:]
         
     I = I@P
     Ident = eye(shape(A)[0], dtype=A.dtype)
     Ik = I@A_in
-    for _ in range(25):
+    for ref in range(30):
         AI = A_in@I
         Wn = -147*Ident + AI@(53*Ident + AI@(-11*Ident + AI))
         I = 0.25*I@(32*Ident + AI@(-113*Ident + AI@(231*Ident + AI@(-301*Ident + AI@(259*Ident + AI@Wn)))))
@@ -189,13 +192,12 @@ def __qr_householder(A_in, overwrite_a=False):
     I = eye(n, dtype=A.dtype)
     Q = copy(I)
     for idx in range(n):
-        v  = copy(A[idx:, idx:idx+1])
+        v  = A[idx:, idx][:, None]
         dA = (v.T@v)**0.5
-        fA00 = float(A[idx, idx])
-        if fA00 < 0:
+        if float(A[idx, idx]) < 0:
             v[0] = v[0] - dA
-        elif fA00 > 0:
-            v[0] = v[0] + dA    
+        else:
+            v[0] = v[0] + dA         
         vn = (v.T@v)**0.5
         if float(vn) > 0.0:
             v = v / vn
@@ -203,6 +205,42 @@ def __qr_householder(A_in, overwrite_a=False):
         A[idx:, :] = H@A[idx:, :]
         Q[:, idx:] = Q[:, idx:]@H
     return Q,A
+
+def __qr_householder_vdouble(A_in, overwrite_a=False):
+    n = A_in.shape[0]
+    if n == 1:
+        return 1, A_in, A_in
+    if overwrite_a:
+        A = A_in
+    else:
+        A = copy(A_in)
+    I = eye(n, dtype=A.dtype)
+    Q = copy(I)
+    for idx in range(n):
+        v  = A[idx:, idx][:, None]
+        dA = (v.T@v)**0.5
+        neg_mask = (to_float(A[idx, idx]) < 0).astype(float64).tolist()
+        if not isinstance(neg_mask, list):
+            neg_mask = [neg_mask]
+        neg_mask = gdual_vdouble(neg_mask)
+        corr     = -dA * neg_mask + dA * (1 - neg_mask)            
+        v[0] = v[0] + corr
+        vn = (v.T@v)**0.5
+        pos_mask = gdual_vdouble((to_float(vn[0,0]) > 0.0).astype(float64).tolist())
+        v = v / (vn * pos_mask + (1 - pos_mask))
+        H = I[idx:, idx:] - 2*v@v.T
+        A[idx:, :] = H@A[idx:, :]
+        Q[:, idx:] = Q[:, idx:]@H
+    return Q,A
+
+def qr(A, overwrite_a=False):
+    if len(A) < 20:
+        return __qr_gramschmidt(A)
+    else:
+        if float_fmt() == 'gdual_vdouble':
+            return __qr_householder_vdouble(A, overwrite_a=overwrite_a)
+        else:
+            return __qr_householder(A, overwrite_a=overwrite_a)
 
 def __backward_substitution(U, b, overwrite_b=False):
     if overwrite_b:
@@ -229,55 +267,25 @@ def __forward_substitution(L, b, overwrite_b=False):
             x[idx] = x[idx] - sum(L[idx, :idx]*x[:idx, 0])
             x[idx] = x[idx] / L[idx, idx]
         return x
-    
-def __lu(A, overwrite_a=False):
-    if shape(A)[0] != shape(A)[1]:
-        raise numpy.linalg.LinAlgError("Matrix is not square, inversion is not possible")
-    detA = numpy.linalg.det(to_float(A))
-    if detA == 0:
-        raise numpy.linalg.LinAlgError("Matrix has a determinant of {} which makes it non-invertible".format(detA))
-    P = eye(shape(A)[0], dtype=A.dtype)
-    L = eye(shape(A)[0], dtype=A.dtype)
-    if overwrite_a:
-        U = A
-    else:
-        U = copy(A)
-    h = 0 # Initialization of the pivot row
-    k = 0 # Initialization of the pivot column
-
-    while h < shape(U)[0] and k < shape(U)[1]:
-        # Find the k-th pivot: 
-        i_max = h + argmax(abs(to_float(U[h:, k])))
-        if to_float(U[i_max, k]) == 0:
-            # No pivot in this column, pass to next column
-            k = k + 1
-        else:
-            U[h], U[i_max] = U[i_max], copy(U[h])
-            P[h], P[i_max] = P[i_max], copy(P[h])
-            for i in range(h+1, shape(A)[0]):
-                f = U[i, k] / U[h, k]
-                L[i, :] = L[i, :] + f * L[h, :]
-                U[i, :] = U[i, :] - f * U[h, :]
-            # Increase pivot row and column
-            h = h + 1
-            k = k + 1
-    return P,L,U
 
 def __solve_linear_system_helper(A, b, overwrite_a=False):
-    if len(A) < 30:
-        if A.dtype == object:
-            if len(A) < 10:
-                Q,R = __qr_gramschmidt(A)
+    if shape(A)[0] < 30 or float_fmt() == "gdual_vdouble":
+        if float_fmt() == "gdual_vdouble":
+            Q,R = qr(A)
+        else:
+            Q,R = scipy.linalg.qr(to_float(A), overwrite_a=overwrite_a)
+        bhat = Q.T@b
+        y = __backward_substitution(R,bhat,overwrite_b=False)
+        residual = bhat - R@y
+        for _ in range(5):
+            if max(abs(to_float(residual))) > 2*epsilon():
+                y = y + __backward_substitution(R,residual,overwrite_b=False)
+                residual = bhat - R@y
             else:
-                Q,R = __qr_householder(A, overwrite_a=overwrite_a)
-        else:
-            Q,R = scipy.linalg.qr(A, overwrite_a=overwrite_a)
-        return __backward_substitution(R,Q.T@b,overwrite_b=True)
+                break
+        return y
     else:
-        if A.dtype == object:
-            P,L,U = __lu(A, overwrite_a=overwrite_a)
-        else:
-            P,L,U = scipy.linalg.lu(A, overwrite_a=overwrite_a)
+        P,L,U = scipy.linalg.lu(to_float(A), overwrite_a=overwrite_a)
         y = P@b
         y = __forward_substitution(L,y,overwrite_b=True)
         return __backward_substitution(U,y,overwrite_b=True)
@@ -289,7 +297,7 @@ def __solve_linear_system_dispatcher(A, b, overwrite_a=False, overwrite_b=False,
         else:
             assert A.shape[:-2] == b.shape[:-2], "Batched system must have compatible shapes for A and b!"
             return reshape(stack([
-                __solve_linear_system_helper(A_batch, b_atch, overwrite_a=overwrite_a, *args, **kwargs) for A_batch_b_batch in zip(reshape(A, (-1, *shape(A)[-2:])), reshape(b, (-1, *shape(b)[-2:])))
+                __solve_linear_system_helper(A_batch, b_batch, overwrite_a=overwrite_a, *args, **kwargs) for A_batch, b_batch in zip(reshape(A, (-1, *shape(A)[-2:])), reshape(b, (-1, *shape(b)[-2:])))
             ]), shape(b))
     else:
         if sparse:
@@ -306,40 +314,5 @@ def eval_weights(x, weights):
         return reshape(array(list(map(lambda y: eval_weights(y, weights), ravel(x)))), x.shape)
     else:
         return x
-
-# gdual_real128 Definitions
-# try:
-#     gdual_real128 = pyaudi.gdual_real128
-#     gdual_real128.__float__ = lambda self: float(repr(self.constant_cf))
-#     #    gdual_real128.__int__     = lambda self: int(float(repr(self.constant_cf)))
-#     gdual_real128.__abs__ = lambda self: pyaudi.abs(self)
-#     gdual_real128.sqrt = lambda self: pyaudi.sqrt(self)
-#     gdual_real128.exp = lambda self: pyaudi.exp(self)
-#     gdual_real128.expm1 = lambda self: pyaudi.exp(self) - 1.0
-#     gdual_real128.log = lambda self: pyaudi.log(self)
-#     gdual_real128.log10 = lambda self: pyaudi.log(self) / pyaudi.log(gdual_real128(10.0))
-#     gdual_real128.log1p = lambda self: pyaudi.log(self + 1.0)
-#     gdual_real128.log2 = lambda self: pyaudi.log(self) / pyaudi.log(gdual_real128(2.0))
-#     gdual_real128.cos = lambda self: pyaudi.cos(self)
-#     gdual_real128.sin = lambda self: pyaudi.sin(self)
-#     gdual_real128.tan = lambda self: pyaudi.tan(self)
-#     gdual_real128.cosh = lambda self: pyaudi.cosh(self)
-#     gdual_real128.sinh = lambda self: pyaudi.sinh(self)
-#     gdual_real128.tanh = lambda self: pyaudi.tanh(self)
-#     gdual_real128.arccos = lambda self: pyaudi.acos(self)
-#     gdual_real128.arcsin = lambda self: pyaudi.asin(self)
-#     gdual_real128.arctan = lambda self: pyaudi.atan(self)
-#     gdual_real128.arctan2 = lambda self, x2: __atan2_helper(self, x2)
-#     gdual_real128.erf = lambda self: pyaudi.erf(self)
-#     gdual_real128.erfc = lambda self: 1.0 - pyaudi.erf(self)
-#
-#     float_fmts.update({
-#         'gdual_real128': gdual_real128,
-#     })
-# except AttributeError:
-#     pass
-# except Exception as e:
-#     print("Unable to load pyaudi.gdual_real128", file=sys.stderr)
-#     print("\t\tError raised is:", file=sys.stderr)
-#     print(e, file=sys.stderr)
-#     pass
+        
+        

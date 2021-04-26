@@ -870,9 +870,7 @@ def test_gradients_higher_nu():
     a = D.array([1.0], requires_grad=True)
     b = a * a
     assert (D.all(D.jacobian(b, a, nu=2, batch_mode=False) == D.array([2.0])))
-    
 
-@pytest.mark.skipif("gdual_double" not in D.available_float_fmt(), reason="Can't test dispatch without pyaudi overload")
 def test_matrix_inv():
     A  = D.array([
         [-1.0,  3/2],
@@ -880,12 +878,7 @@ def test_matrix_inv():
     ], dtype=D.float64)
     Ainv = D.matrix_inv(A)
     assert (D.max(D.abs(D.to_float(Ainv@A - D.eye(2)))) <= 8*D.epsilon())
-    with pytest.raises(np.linalg.LinAlgError):
-        D.matrix_inv(D.zeros((2,3), dtype=D.float64))
-    with pytest.raises(np.linalg.LinAlgError):
-        D.matrix_inv(D.zeros((5,2,3), dtype=D.float64))
 
-@pytest.mark.skipif("gdual_double" not in D.available_float_fmt(), reason="Can't test dispatch without pyaudi overload")
 def test_matrix_inv_bigger():
     for diag_size in range(2, 101):
         np.random.seed(15)
@@ -896,34 +889,134 @@ def test_matrix_inv_bigger():
             A = D.array(D.cast_to_float_fmt(A))
             Ainv = D.matrix_inv(A)
             assert (D.max(D.abs(D.to_float(Ainv@A - D.eye(diag_size)))) <= 4*D.epsilon()**0.5), "Matrix inversion failed for diagonal with size: " + str(diag_size)
+    
+@pytest.mark.skipif(D.backend() != 'numpy', reason="Different interface for linalg errors")
+def test_matrix_inv_exceptions():
+    with pytest.raises(np.linalg.LinAlgError):
+        D.matrix_inv(D.zeros((2,3), dtype=D.float64))
+    with pytest.raises(np.linalg.LinAlgError):
+        D.matrix_inv(D.zeros((5,2,3), dtype=D.float64))
 
 class PyAudiTestCase:
     @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_double' not in D.available_float_fmt(), reason="PyAudi Tests")
     def test_gdual_double(self):
+        D.set_float_fmt('gdual_double')
         x1 = D.gdual_double(-0.5, 'x', 5)
         x2 = D.gdual_double(0.5, 'y', 5)
         self.do(x1, x2)
 
-    @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_double' not in D.available_float_fmt(), reason="PyAudi Tests")
+    @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_vdouble' not in D.available_float_fmt(), reason="PyAudi Tests")
     def test_gdual_vdouble(self):
+        D.set_float_fmt('gdual_vdouble')
         x1 = D.gdual_vdouble([-0.5, -0.5], 'x', 5)
         x2 = D.gdual_vdouble([0.5, 0.5], 'y', 5)
         self.do(x1, x2)
         
+class PyAudiMatrixTestCase:
     @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_double' not in D.available_float_fmt(), reason="PyAudi Tests")
     def test_gdual_double_matrix(self):
+        D.set_float_fmt('gdual_double')
         A  = D.array([
             [D.gdual_double(-1.0, 'a11', 5), D.gdual_double( 3/2, 'a12', 5)],
             [D.gdual_double( 1.0, 'a21', 5), D.gdual_double(-1.0, 'a22', 5)],
         ])
-        self.do_matrix(A)
+        self.do(A)
         
-    def do(self, x1, x2):
+    @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_double' not in D.available_float_fmt(), reason="PyAudi Tests")
+    def test_gdual_double_matrix_big(self):
+        D.set_float_fmt('gdual_double')
+        np.random.seed(23)
+        A1 = self.generate_random_nondegenerate_matrix(4)
+        
+        A = []
+        for idx in range(A1.shape[0]):
+            A.append([])
+            for jdx in range(A1.shape[1]):
+                A[idx].append(D.gdual_double(A1[idx,jdx], 'a{}{}'.format(idx+1,jdx+1), 1))
+        A = D.array(A)
+        self.do(A)
+        
+    def generate_random_nondegenerate_matrix(self, size):
+        A = np.random.normal(size=(size,size))
+        while np.abs(np.linalg.det(D.to_float(A))) <= 1e-5:
+            A = np.random.normal(size=(size,size), std=250.0)
+        return A
+        
+    def do(self, A):
         pass
-    
-    def do_matrix(self, A):
+        
+class PyAudiLinearSystemTestCase:
+    @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_double' not in D.available_float_fmt(), reason="PyAudi Tests")
+    def test_gdual_double_solve_linear(self):
+        D.set_float_fmt('gdual_double')
+        A  = D.array([
+            [D.gdual_double(-1.0, 'a11', 5), D.gdual_double( 3/2, 'a12', 5)],
+            [D.gdual_double( 1.0, 'a21', 5), D.gdual_double(-1.0, 'a22', 5)],
+        ])
+        b = D.array([
+            [D.gdual_double(1.0, 'b1', 5)],
+            [D.gdual_double(1.0, 'b2', 5)]
+        ])
+        self.do(A, b)
+        
+    @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_vdouble' not in D.available_float_fmt(), reason="PyAudi Tests")
+    def test_gdual_vdouble_solve_linear(self):
+        D.set_float_fmt('gdual_vdouble')
+        A  = D.array([
+            [D.gdual_vdouble([-1.0, 1/2], 'a11', 5), D.gdual_vdouble([ 3/2,  3/2], 'a12', 5)],
+            [D.gdual_vdouble([ 1.0, 1.0], 'a21', 5), D.gdual_vdouble([-1.0, -1.0], 'a22', 5)],
+        ])
+        b = D.array([
+            [D.gdual_vdouble([1.0, -1.0], 'b1', 5)],
+            [D.gdual_vdouble([1.0,  1.0], 'b2', 5)]
+        ])
+        self.do(A, b)
+        
+    @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_double' not in D.available_float_fmt(), reason="PyAudi Tests")
+    def test_gdual_double_solve_linear_big(self):
+        D.set_float_fmt('gdual_double')
+        np.random.seed(22)
+        A1 = self.generate_random_nondegenerate_matrix(60)
+        
+        A = []
+        b = []
+        for idx in range(A1.shape[0]):
+            A.append([])
+            for jdx in range(A1.shape[1]):
+                A[idx].append(D.gdual_double(A1[idx,jdx], 'a{}{}'.format(idx+1,jdx+1), 1))
+            b.append([D.gdual_double(1.0, 'b{}'.format(idx+1), 1)])
+                
+        A = D.array(A)
+        b = D.array(b)
+        self.do(A, b)
+        
+    @pytest.mark.skipif(D.backend() != 'numpy' or 'gdual_vdouble' not in D.available_float_fmt(), reason="PyAudi Tests")
+    def test_gdual_vdouble_solve_linear_big(self):
+        D.set_float_fmt('gdual_vdouble')
+        np.random.seed(22)
+        A1 = self.generate_random_nondegenerate_matrix(12)
+        A2 = self.generate_random_nondegenerate_matrix(12)
+        
+        A = []
+        b = []
+        for idx in range(A1.shape[0]):
+            A.append([])
+            for jdx in range(A1.shape[1]):
+                A[idx].append(D.gdual_vdouble([A1[idx,jdx], A2[idx,jdx]], 'a{}{}'.format(idx+1,jdx+1), 1))
+            b.append([D.gdual_vdouble([1.0, -1.0], 'b{}'.format(idx+1), 1)])
+                
+        A = D.array(A)
+        b = D.array(b)
+        self.do(A, b)
+        
+    def generate_random_nondegenerate_matrix(self, size):
+        A = np.random.normal(size=(size,size))
+        while np.abs(np.linalg.det(D.to_float(A))) <= 1e-5:
+            A = np.random.normal(size=(size,size), std=250.0)
+        return A
+        
+    def do(self, A, b):
         pass
-
 
 class TestPyAudiFloat(PyAudiTestCase):
     def do(self, x1, x2):
@@ -1075,12 +1168,24 @@ class TestPyAudiErfc(PyAudiTestCase):
         res = x1.erfc()
         assert (res == 1.0 - pd.erf(x1))
 
-class TestPyAudiMatrixInv(PyAudiTestCase):
-    def do_matrix(self, A):
+class TestPyAudiMatrixInv(PyAudiMatrixTestCase):
+    def do(self, A):
         Ainv = D.matrix_inv(A)
-        assert (D.max(D.abs(D.to_float(Ainv@A - D.eye(A.shape[0])))) <= 8*D.epsilon())
-        
+        assert (D.max(D.abs(D.to_float(Ainv@A - D.eye(A.shape[0])))) <= 64*D.epsilon())
+
+class TestPyAudiMatrixInvExceptions(PyAudiMatrixTestCase):
+    def do(self, A):
         with pytest.raises(np.linalg.LinAlgError):
-            self.do_matrix(D.zeros((2,3)))
+            D.matrix_inv(D.zeros((2,3)))
         with pytest.raises(np.linalg.LinAlgError):
-            self.do_matrix(D.zeros((5,2,3)))
+            D.matrix_inv(D.zeros((5,2,3)))
+
+class TestPyAudiQRDecomposition(PyAudiMatrixTestCase):
+    def do(self, A):
+        Q,R = D.qr(A)
+        assert(D.max(D.abs(D.to_float(Q@R - A))) <= 32*D.epsilon())
+            
+class TestPyAudiLinearSolver(PyAudiLinearSystemTestCase):
+    def do(self, A, b):
+        x = D.solve_linear_system(A, b)
+        assert (D.max(D.abs(D.to_float(A@x - b))) <= 32*D.epsilon())

@@ -80,8 +80,8 @@ class LobattoIIIB2(ImplicitRungeKuttaIntegrator):
     __alt_names__  = tuple()
     
     tableau = numpy.array(
-        [[0.0,   0.5,  -0.5],
-         [1.0,   0.5,   0.5]], dtype=numpy.float64
+        [[0.5,   0.5,  0.0],
+         [0.5,   0.5,  0.0]], dtype=numpy.float64
     )
 
     final_state = numpy.array(
@@ -106,13 +106,13 @@ class LobattoIIIB4(ImplicitRungeKuttaIntegrator):
     
 class LobattoIIIC2(ImplicitRungeKuttaIntegrator):
     order = 2
-    __adaptive__   = False
+    __adaptive__   = True
     __symplectic__ = False
     __alt_names__  = tuple()
     
     tableau = numpy.array(
-        [[0.5,   0.5,   0  ],
-         [0.5,   0.5,   0  ]], dtype=numpy.float64
+        [[0.0,   0.5,   -0.5],
+         [1.0,   0.5,    0.5]], dtype=numpy.float64
     )
 
     final_state = numpy.array(
@@ -143,7 +143,7 @@ class BackwardEuler(ImplicitRungeKuttaIntegrator):
     __alt_names__  = tuple()
     
     tableau = numpy.array(
-        [[1.0, 0.0]], dtype=numpy.float64
+        [[1.0, 1.0]], dtype=numpy.float64
     )
 
     final_state = numpy.array(

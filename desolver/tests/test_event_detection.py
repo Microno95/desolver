@@ -2,14 +2,16 @@ import desolver as de
 import desolver.backend as D
 import numpy as np
 import pytest
+from copy import deepcopy
 from .common import ffmt_set, integrator_param, richardson_param, device_param, dt_param, dense_output_param
 
+ffmt_set_copy = deepcopy(ffmt_set)
 
-if 'float16' in ffmt_set:
-    ffmt_set.remove('float16')
-    ffmt_set.insert(0, pytest.param('float16', marks=pytest.mark.skip(reason="Event detection with float16 types is too imprecise for consistent results")))
+if 'float16' in ffmt_set_copy:
+    ffmt_set_copy.remove('float16')
+    ffmt_set_copy.insert(0, pytest.param('float16', marks=pytest.mark.skip(reason="Event detection with float16 types is too imprecise for consistent results")))
         
-ffmt_param         = pytest.mark.parametrize('ffmt', ffmt_set)
+ffmt_param = pytest.mark.parametrize('ffmt', ffmt_set_copy)
 
 @ffmt_param
 @integrator_param
@@ -18,6 +20,8 @@ ffmt_param         = pytest.mark.parametrize('ffmt', ffmt_set)
 @dt_param
 # @dense_output_param
 def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation, device, dt, dense_output=False):
+    if use_richardson_extrapolation and integrator.__implicit__:
+        pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -75,6 +79,8 @@ def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation, 
 @dt_param
 # @dense_output_param
 def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation, device, dt, dense_output=False):
+    if use_richardson_extrapolation and integrator.__implicit__:
+        pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -152,6 +158,8 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
 @dt_param
 # @dense_output_param
 def test_event_detection_close_roots(ffmt, integrator, use_richardson_extrapolation, device, dt, dense_output=False):
+    if use_richardson_extrapolation and integrator.__implicit__:
+        pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -218,6 +226,8 @@ def test_event_detection_close_roots(ffmt, integrator, use_richardson_extrapolat
 @dt_param
 # @dense_output_param
 def test_event_detection_numerous_events(ffmt, integrator, use_richardson_extrapolation, device, dt, dense_output=False):
+    if use_richardson_extrapolation and integrator.__implicit__:
+        pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':

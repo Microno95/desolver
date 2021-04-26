@@ -11,11 +11,11 @@ from .common import ffmt_param, integrator_param, richardson_param, device_param
 @richardson_param
 @device_param
 def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, device):
+    if use_richardson_extrapolation and integrator.__implicit__:
+        pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
     if integrator.__symplectic__:
         pytest.skip("Exponential decay system is not in the form compatible with symplectic integrators")
-    if integrator.__implicit__ and use_richardson_extrapolation:
-        pytest.skip("Implicit methods are unstable with richardson extrapolation")
     print("Testing {} float format".format(D.float_fmt()))
 
     import torch
@@ -78,9 +78,9 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
 @richardson_param
 @device_param
 def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolation, device):
+    if use_richardson_extrapolation and integrator.__implicit__:
+        pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
-    if integrator.__implicit__ and use_richardson_extrapolation:
-        pytest.skip("Implicit methods are unstable with richardson extrapolation")
 
     print("Testing {} float format".format(D.float_fmt()))
 
@@ -143,9 +143,9 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
 @richardson_param
 @device_param
 def test_gradients_complex(ffmt, integrator, use_richardson_extrapolation, device):
+    if use_richardson_extrapolation and integrator.__implicit__:
+        pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
-    if integrator.__implicit__ and use_richardson_extrapolation:
-        pytest.skip("Implicit methods are unstable with richardson extrapolation")
 
     print("Testing {} float format".format(D.float_fmt()))
 

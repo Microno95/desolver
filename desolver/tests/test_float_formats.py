@@ -9,6 +9,8 @@ from .common import ffmt_param, integrator_param, richardson_param, device_param
 @richardson_param
 @device_param
 def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolation, device):
+    if use_richardson_extrapolation and integrator.__implicit__:
+        pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -63,6 +65,8 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
 @richardson_param
 @device_param
 def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapolation, device):
+    if use_richardson_extrapolation and integrator.__implicit__:
+        pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -90,6 +94,8 @@ def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapola
         return D.sum(de_mat[:, :, None, None, None] * state, axis=1) + extra[:, None, None, None]
 
     y_init = D.array([[[[1., 0.]]*1]*1]*3).T
+    
+    print(rhs(0.0, y_init).shape)
     
     if D.backend() == 'torch':
         y_init = y_init.contiguous().to(device)
