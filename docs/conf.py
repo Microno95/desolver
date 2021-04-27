@@ -24,7 +24,7 @@ copyright = '2021, Ekin Ozturk'
 author = 'Ekin Ozturk'
 
 # The full version, including alpha/beta/rc tags
-release = '4.2.0'
+release = '4.3.0'
 
 
 # -- General configuration ---------------------------------------------------

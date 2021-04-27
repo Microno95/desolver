@@ -32,7 +32,7 @@ with open(os.path.join(setup_py_path, "README.rst"), "r") as fh:
     long_description = fh.read()
 
 name    = 'desolver'
-release = '4.2.0'
+release = '4.3.0'
 version = ".".join(release.split(".")[:2])
     
 setup(name=name,
