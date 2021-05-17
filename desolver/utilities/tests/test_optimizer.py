@@ -240,6 +240,8 @@ def test_nonlinear_root_estimated_jac(solver, ffmt, tol):
 @pytest.mark.parametrize('tol',  [None, 40, 1])
 @pytest.mark.parametrize('dim',  [1, 5, 10, 100, 250])
 def test_nonlinear_root_dims(solver, ffmt, tol, dim):
+    if "gdual" in ffmt and dim > 100:
+        pytest.skip("Optimizing high dimensional systems with gduals is too slow")
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
     np.random.seed(30)
@@ -291,7 +293,7 @@ def test_nonlinear_root_dims(solver, ffmt, tol, dim):
 
     
 @pytest.mark.skipif(D.backend() != 'torch', reason="Pytorch backend required to test jacobian via AD")
-@pytest.mark.parametrize('solver', [de.utilities.optimizer.newtonraphson, de.utilities.optimizer.newtontrustregion])
+@pytest.mark.parametrize('solver', [de.utilities.optimizer.newtonraphson, de.utilities.optimizer.newtontrustregion, de.utilities.optimizer.nonlinear_roots])
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('tol',  [None, 40, 1])
 def test_nonlinear_root_pytorch_jacobian(solver, ffmt, tol):

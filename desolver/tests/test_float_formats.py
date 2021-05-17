@@ -11,8 +11,8 @@ from .common import ffmt_param, integrator_param, richardson_param, device_param
 def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolation, device):
     if use_richardson_extrapolation and integrator.implicit:
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
-    if "gdual_vdouble" in ffmt and integrator.implicit and integrator.tableau.shape[0] > 4:
-        pytest.skip("Many stage implicit integrators are too slow with gduals")
+    if "gdual_vdouble" in ffmt and integrator.implicit:
+        pytest.skip("Many stage implicit integrators are too slow with vectorised gduals")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -69,8 +69,8 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
 def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapolation, device):
     if use_richardson_extrapolation and integrator.implicit:
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
-    if "gdual_vdouble" in ffmt and integrator.implicit and integrator.tableau.shape[0] > 4:
-        pytest.skip("Many stage implicit integrators are too slow with gduals")
+    if "gdual_vdouble" in ffmt and integrator.implicit:
+        pytest.skip("Many stage implicit integrators are too slow with vectorised gduals")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
