@@ -133,11 +133,10 @@ def test_brentsrootvec(ffmt, tol):
         assert (all(map((lambda i: D.to_numpy(D.to_float(D.abs(i))) <= 32 * D.epsilon()),
                         map((lambda x: x[0](x[1])), zip(fun_list, root_list)))))
 
-
-
+@pytest.mark.parametrize('solver', [de.utilities.optimizer.newtonraphson, de.utilities.optimizer.newtontrustregion, de.utilities.optimizer.nonlinear_roots])
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('tol',  [None, 40, 1])
-def test_newtonraphson(ffmt, tol):
+def test_nonlinear_root(solver, ffmt, tol):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
     np.random.seed(30)
@@ -176,7 +175,7 @@ def test_newtonraphson(ffmt, tol):
         assert (D.to_numpy(D.to_float(D.abs(fun(gt_root1)))) <= 32 * D.epsilon())
         assert (D.to_numpy(D.to_float(D.abs(fun(gt_root2)))) <= 32 * D.epsilon())
 
-        root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=jac, tol=tol, verbose=True)
+        root, (success, num_iter, nfev, njev, prec) = solver(fun, x0, jac=jac, tol=tol, verbose=True, use_scipy=False)
         
         if tol is None:
             tol = D.epsilon()
@@ -188,9 +187,10 @@ def test_newtonraphson(ffmt, tol):
         assert (conv_root1 or conv_root2)
         assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32*tol)
 
+@pytest.mark.parametrize('solver', [de.utilities.optimizer.newtonraphson, de.utilities.optimizer.newtontrustregion, de.utilities.optimizer.nonlinear_roots])
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('tol',  [None, 40, 1])
-def test_newtonraphson_estimated_jac(ffmt, tol):
+def test_nonlinear_root_estimated_jac(solver, ffmt, tol):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
     np.random.seed(20)
@@ -222,7 +222,7 @@ def test_newtonraphson_estimated_jac(ffmt, tol):
         assert (D.to_numpy(D.to_float(D.abs(fun(gt_root1)))) <= 32 * D.epsilon())
         assert (D.to_numpy(D.to_float(D.abs(fun(gt_root2)))) <= 32 * D.epsilon())
 
-        root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=jac, tol=tol, verbose=True)
+        root, (success, num_iter, nfev, njev, prec) = solver(fun, x0, jac=jac, tol=tol, verbose=True, use_scipy=False)
 
         if tol is None:
             tol = D.epsilon()
@@ -235,10 +235,11 @@ def test_newtonraphson_estimated_jac(ffmt, tol):
         assert (D.to_numpy(D.to_float(D.abs(fun(root)))) <= 32*tol)
 
         
+@pytest.mark.parametrize('solver', [de.utilities.optimizer.newtonraphson, de.utilities.optimizer.newtontrustregion, de.utilities.optimizer.nonlinear_roots])
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('tol',  [None, 40, 1])
 @pytest.mark.parametrize('dim',  [1, 5, 10, 100, 250])
-def test_newtonraphson_dims(ffmt, tol, dim):
+def test_nonlinear_root_dims(solver, ffmt, tol, dim):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
     np.random.seed(30)
@@ -257,7 +258,7 @@ def test_newtonraphson_dims(ffmt, tol, dim):
         pytest.skip("Root-finding is ill-conceived with vectorised gduals")
     
     shift = D.array(np.random.uniform(1, 10, size=(dim,)))
-    exponent = D.array(np.random.uniform(1, 5, size=(dim,)))
+    exponent = D.array(np.random.randint(1, 5, size=(dim,)))
     gt_root1 =  shift**(1/exponent)
     gt_root2 = -shift**(1/exponent)
     
@@ -269,24 +270,31 @@ def test_newtonraphson_dims(ffmt, tol, dim):
     
     x0 = D.array(np.random.uniform(1, 3, size=(dim,)))
     print(gt_root1, gt_root2)
+    print(fun(gt_root1), fun(gt_root2))
     print(x0)
     print(fun(x0))
     print(jac(x0))
     
-    root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=jac, tol=tol, verbose=True)
-        
+    root, (success, num_iter, nfev, njev, prec) = solver(fun, x0, jac=jac, tol=tol, verbose=True, use_scipy=False)
+
+    root = root.reshape(x0.shape)
+
     if tol is None:
         tol = D.epsilon()
     assert (success)
     conv_root1 = D.stack([D.array(np.allclose(D.to_numpy(D.to_float(r1)), D.to_numpy(D.to_float(r)), 128*tol, 32*tol), dtype=D.bool) for r, r1 in zip(root, gt_root1)])
     conv_root2 = D.stack([D.array(np.allclose(D.to_numpy(D.to_float(r2)), D.to_numpy(D.to_float(r)), 128*tol, 32*tol), dtype=D.bool) for r, r2 in zip(root, gt_root2)])
+    print(root)
+    print(conv_root1)
+    print(conv_root2)
     assert (D.all(conv_root1 | conv_root2))
 
     
 @pytest.mark.skipif(D.backend() != 'torch', reason="Pytorch backend required to test jacobian via AD")
+@pytest.mark.parametrize('solver', [de.utilities.optimizer.newtonraphson, de.utilities.optimizer.newtontrustregion])
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('tol',  [None, 40, 1])
-def test_newtonraphson_pytorch_jacobian(ffmt, tol):
+def test_nonlinear_root_pytorch_jacobian(solver, ffmt, tol):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
     np.random.seed(21)
@@ -324,7 +332,7 @@ def test_newtonraphson_pytorch_jacobian(ffmt, tol):
         assert (D.to_numpy(D.to_float(D.abs(fun(gt_root1)))) <= 32 * D.epsilon())
         assert (D.to_numpy(D.to_float(D.abs(fun(gt_root2)))) <= 32 * D.epsilon())
 
-        root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, tol=tol, verbose=True)
+        root, (success, num_iter, nfev, njev, prec) = solver(fun, x0, tol=tol, verbose=True, use_scipy=False)
 
         if tol is None:
             tol = D.epsilon()
@@ -338,10 +346,11 @@ def test_newtonraphson_pytorch_jacobian(ffmt, tol):
 
         
 @pytest.mark.skipif(D.backend() != 'torch', reason="Pytorch backend required to test jacobian via AD")
+@pytest.mark.parametrize('solver', [de.utilities.optimizer.newtonraphson, de.utilities.optimizer.newtontrustregion, de.utilities.optimizer.nonlinear_roots])
 @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 @pytest.mark.parametrize('tol',  [None, 40, 1])
 @pytest.mark.parametrize('dim',  [1, 5, 10, 100, 250])
-def test_newtonraphson_dims_pytorch_jacobian(ffmt, tol, dim):
+def test_nonlinear_root_dims_pytorch_jacobian(solver, ffmt, tol, dim):
     print("Set dtype to:", ffmt)
     D.set_float_fmt(ffmt)
     np.random.seed(30)
@@ -372,7 +381,7 @@ def test_newtonraphson_dims_pytorch_jacobian(ffmt, tol, dim):
     print(x0)
     print(fun(x0))
     
-    root, (success, num_iter, prec) = de.utilities.optimizer.newtonraphson(fun, x0, jac=None, tol=tol, verbose=True, maxiter=200)
+    root, (success, num_iter, nfev, njev, prec) = solver(fun, x0, jac=None, tol=tol, verbose=True, maxiter=200, use_scipy=False)
         
     if tol is None:
         tol = D.epsilon()

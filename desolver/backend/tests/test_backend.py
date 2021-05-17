@@ -4,6 +4,8 @@ import numpy as np
 import desolver as de
 import desolver.backend as D
 
+pytestmark = pytest.mark.backend
+
 
 @pytest.mark.parametrize('ffmt', list(i for i in D.available_float_fmt() if not i.startswith('gdual')))
 def test_contract_first_ndims_case_1(ffmt):

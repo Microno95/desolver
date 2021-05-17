@@ -113,12 +113,12 @@ def test_integration_and_representation(ffmt):
 
     print(str(a))
     print(repr(a))
-    assert (D.max(D.abs(a.sol(a.t[0]) - y_init)) <= 8 * D.epsilon() ** 0.5)
-    assert (D.max(D.abs(a.sol(a.t[-1]) - analytic_soln(a.t[-1], y_init))) <= 8 * D.epsilon() ** 0.5)
-    assert (D.max(D.abs(a.sol(a.t).T - analytic_soln(a.t, y_init))) <= 8 * D.epsilon() ** 0.5)
+    assert (D.max(D.abs(D.to_float(a.sol(a.t[0])) - D.to_float(y_init))) <= 8 * D.epsilon() ** 0.5)
+    assert (D.max(D.abs(D.to_float(a.sol(a.t[-1])) - D.to_float(analytic_soln(a.t[-1], y_init)))) <= 8 * D.epsilon() ** 0.5)
+    assert (D.max(D.abs(D.to_float(a.sol(a.t).T) - D.to_float(analytic_soln(a.t, y_init)))) <= 8 * D.epsilon() ** 0.5)
 
     for i in a:
-        assert (D.max(D.abs(i.y - analytic_soln(i.t, y_init))) <= 8 * D.epsilon() ** 0.5)
+        assert (D.max(D.abs(D.to_float(i.y) - D.to_float(analytic_soln(i.t, y_init)))) <= 8 * D.epsilon() ** 0.5)
 
     assert (len(a.y) == len(a))
     assert (len(a.t) == len(a))

@@ -5,6 +5,9 @@ import pytest
 
 def pytest_addoption(parser):
     parser.addoption(
+        "--skip_backend", action="store_true", default=False, help="skip backend tests"
+    )
+    parser.addoption(
         "--run_implicit", action="store_true", default=False, help="run implicit integrator tests"
     )
     parser.addoption(
@@ -22,6 +25,7 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
+    config.addinivalue_line("markers", "backend: mark test as implicit integrator test")
     config.addinivalue_line("markers", "implicit: mark test as implicit integrator test")
     config.addinivalue_line("markers", "explicit: mark test as explicit integrator test")
     config.addinivalue_line("markers", "torch_gradients: mark test as pytorch gradient test")
@@ -30,6 +34,13 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
+    if config.getoption("--skip_backend"):
+        skip_backend = pytest.mark.skip(reason="backend tests marked as skip")
+        for item in items:
+            if "backend" in item.keywords:
+                item.add_marker(skip_backend)
+    else:
+        pass
     if config.getoption("--run_implicit"):
         # --run_implicit given in cli: do not skip implicit integrator tests
         pass

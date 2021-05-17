@@ -9,8 +9,10 @@ from .common import ffmt_param, integrator_param, richardson_param, device_param
 @richardson_param
 @device_param
 def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolation, device):
-    if use_richardson_extrapolation and integrator.__implicit__:
+    if use_richardson_extrapolation and integrator.implicit:
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
+    if "gdual_vdouble" in ffmt and integrator.implicit and integrator.tableau.shape[0] > 4:
+        pytest.skip("Many stage implicit integrators are too slow with gduals")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -49,10 +51,10 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
         a.integrate(eta=True)
 
         print("Average step-size:", D.mean(D.abs(D.array(a.t[1:]) - D.array(a.t[:-1]))))
-        max_diff = D.max(D.abs(analytic_soln(a.t[-1], y_init) - a.y[-1]))
+        max_diff = D.max(D.abs(D.to_float(analytic_soln(a.t[-1], y_init) - a.y[-1])))
         if a.integrator.adaptive:
             assert max_diff <= method_tolerance, "{} Failed with max_diff from analytical solution = {}".format(a.integrator, max_diff)
-        if a.integrator.__implicit__:
+        if a.integrator.implicit:
             assert rhs.analytic_jacobian_called and a.njev > 0, "Analytic jacobian was called as part of integration"
         a.reset()
     print("")
@@ -65,8 +67,10 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
 @richardson_param
 @device_param
 def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapolation, device):
-    if use_richardson_extrapolation and integrator.__implicit__:
+    if use_richardson_extrapolation and integrator.implicit:
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
+    if "gdual_vdouble" in ffmt and integrator.implicit and integrator.tableau.shape[0] > 4:
+        pytest.skip("Many stage implicit integrators are too slow with gduals")
     D.set_float_fmt(ffmt)
 
     if D.backend() == 'torch':
@@ -115,7 +119,7 @@ def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapola
 
         a.integrate(eta=True)
 
-        max_diff = D.max(D.abs(analytic_soln(a.t[-1], y_init) - a.y[-1]))
+        max_diff = D.max(D.abs(D.to_float(analytic_soln(a.t[-1], y_init) - a.y[-1])))
         if a.integrator.adaptive:
             assert max_diff <= method_tolerance, "{} Failed with max_diff from analytical solution = {}".format(a.integrator, max_diff)
         a.reset()

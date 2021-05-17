@@ -11,10 +11,10 @@ from .common import ffmt_param, integrator_param, richardson_param, device_param
 @richardson_param
 @device_param
 def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, device):
-    if use_richardson_extrapolation and integrator.__implicit__:
+    if use_richardson_extrapolation and integrator.implicit:
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
-    if integrator.__symplectic__:
+    if integrator.symplectic:
         pytest.skip("Exponential decay system is not in the form compatible with symplectic integrators")
     print("Testing {} float format".format(D.float_fmt()))
 
@@ -36,7 +36,6 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
 
     y_init = D.array(5.0, requires_grad=True)
     csts   = dict(k=D.array(1.0, device=device))
-    dt     = max(0.5*(D.epsilon() ** 0.5)**(1.0/(max(2,integrator.order-1))), 5e-2)
     
     def true_solution_decay(t, initial_state, k):
         return initial_state * D.exp(-k*t)
@@ -50,8 +49,9 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
         y_init = D.ones((1,), requires_grad=True).to(device)
         y_init = y_init*D.e
 
-        a = de.OdeSystem(rhs, y_init, t=(0, 1.0), dt=dt, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=csts)
+        a = de.OdeSystem(rhs, y_init, t=(0, 1.0), rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=csts)
         a.set_method(method)
+        a.dt = max(0.5 * (D.epsilon() ** 0.5) ** (1.0 / (max(2, a.integrator.order - 1))), 5e-2)
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
         
         a.integrate(eta=True)
@@ -78,7 +78,7 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
 @richardson_param
 @device_param
 def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolation, device):
-    if use_richardson_extrapolation and integrator.__implicit__:
+    if use_richardson_extrapolation and integrator.implicit:
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
 
@@ -97,7 +97,6 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
     
     csts = dict(k=1.0, m=1.0)
     T    = 2*D.pi*D.sqrt(D.array(csts['m']/csts['k'])).to(device)
-    dt   = max(0.5*(D.epsilon() ** 0.5)**(1.0/(max(2,integrator.order-1))), 5e-2)
     
     def true_solution_sho(t, initial_state, k, m):
         w2 = D.array(k/m).to(device)
@@ -117,8 +116,9 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
     with de.utilities.BlockTimer(section_label="Integrator Tests"):
         y_init = D.array([1., 1.], requires_grad=True).to(device)
 
-        a = de.OdeSystem(rhs, y_init, t=(0, T), dt=T*dt, rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=csts)
+        a = de.OdeSystem(rhs, y_init, t=(0, T), rtol=D.epsilon()**0.5, atol=D.epsilon()**0.5, constants=csts)
         a.set_method(method)
+        a.dt = T*max(0.5*(D.epsilon() ** 0.5)**(1.0/(max(2, a.integrator.order-1))), 5e-2)
         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
         
         a.integrate(eta=True)
@@ -143,7 +143,7 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
 @richardson_param
 @device_param
 def test_gradients_complex(ffmt, integrator, use_richardson_extrapolation, device):
-    if use_richardson_extrapolation and integrator.__implicit__:
+    if use_richardson_extrapolation and integrator.implicit:
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
 

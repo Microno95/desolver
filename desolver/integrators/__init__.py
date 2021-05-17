@@ -38,7 +38,8 @@ __implicit_integration_methods__ = [
     RadauIA3,
     RadauIA5,
     RadauIIA3,
-    RadauIIA5
+    RadauIIA5,
+    RadauIIA19
 ]
 
 __available_methods.update(dict(

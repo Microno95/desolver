@@ -6,10 +6,10 @@ import pytest
 integrator_set = set(de.available_methods(False).values())
 integrator_set = sorted(integrator_set, key=lambda x: x.__name__)
 explicit_integrator_set = [
-    pytest.param(intg, marks=pytest.mark.explicit) for intg in integrator_set if not intg.__implicit__
+    pytest.param(intg, marks=pytest.mark.explicit) for intg in integrator_set if not intg.implicit
 ]
 implicit_integrator_set = [
-    pytest.param(intg, marks=pytest.mark.implicit) for intg in integrator_set if intg.__implicit__
+    pytest.param(intg, marks=pytest.mark.implicit) for intg in integrator_set if intg.implicit
 ]
 
 
@@ -26,7 +26,7 @@ ffmt_set = D.available_float_fmt()
 
 ffmt_param         = pytest.mark.parametrize('ffmt', ffmt_set)
 integrator_param   = pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
-richardson_param   = pytest.mark.parametrize('use_richardson_extrapolation', [True, False])
+richardson_param   = pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 device_param       = pytest.mark.parametrize('device', devices_set)
 dt_param           = pytest.mark.parametrize('dt', dt_set)
 dense_output_param = pytest.mark.parametrize('dense_output', [True, False])
@@ -63,13 +63,21 @@ def set_up_basic_system(integrator=None, hook_jacobian=False):
         ])
 
     y_init = D.array([1., 0.])
+    if D.float_fmt() == "gdual_vdouble":
+        y_init = D.array([
+            D.gdual_vdouble([i]*2, 'y0', 1) for i in D.reshape(y_init, (-1, ))
+        ]).reshape(D.shape(y_init))
+    elif D.float_fmt() == "gdual_double":
+        y_init = D.array([
+            D.gdual_double(i, 'y0', 2) for i in D.reshape(y_init, (-1, ))
+        ]).reshape(D.shape(y_init))
 
     a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon()**0.75,
                      atol=D.epsilon()**0.75)
     a.set_kick_vars(D.array([0,1],dtype=D.bool))
     if integrator is None:
         integrator = a.method
-    dt = (D.epsilon() ** 0.5)**(1.0/(2+integrator.order))/(2*D.pi)
+    dt = (D.epsilon() ** 0.5)**(1.0/(2+a.integrator.order))/(2*D.pi)
     a.dt = dt
 
     return de_mat, rhs, analytic_soln, y_init, dt, a

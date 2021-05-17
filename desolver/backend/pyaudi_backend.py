@@ -1,6 +1,7 @@
 import numpy
 import pyaudi
-import scipy
+import scipy.linalg
+import scipy.sparse
 import scipy.special
 import builtins
 
@@ -77,14 +78,22 @@ float_fmts.update({
 
 
 def to_float(x):
-    if isinstance(numpy.asanyarray(x).reshape(-1)[0], gdual_vdouble):
-        __ndim = numpy.asanyarray(x).ndim
+    if numpy.asanyarray(x).dtype == object:
+        __shape = numpy.asanyarray(x).shape
+        __ndim = len(__shape)
         if __ndim > 0:
-            unstacked = [to_float(i) for i in numpy.asanyarray(x)]
-            max_dim   = builtins.max(builtins.map(shape, unstacked), key=len)
-            return numpy.stack([numpy.resize(i, max_dim) for i in unstacked], axis=0).astype(float64)
+            unstacked = [to_float(i) for i in numpy.asanyarray(x).ravel()]
+            max_dim = builtins.max(builtins.map(shape, unstacked), key=len)
+            __shape_perm = list(range(__ndim + len(max_dim)))
+            if len(max_dim) > 0:
+                __shape_perm = [__shape_perm[-1], *__shape_perm[:-1]]
+            ret = numpy.stack([numpy.resize(i, max_dim) for i in unstacked], axis=0).reshape(*__shape, *max_dim).astype(float64)
+            return ret.transpose(__shape_perm)
         else:
-            return numpy.array(numpy.asanyarray(x).item().constant_cf).astype(float64)
+            if isinstance(numpy.asanyarray(x).item(), gdual_vdouble):
+                return numpy.array(numpy.asanyarray(x).item().constant_cf, dtype=float64)
+            else:
+                return numpy.array(float(numpy.asanyarray(x).item())).astype(float64)
     else:
         return numpy.asanyarray(x).astype(float64)
 
@@ -114,8 +123,11 @@ def __matrix_inv_helper(A_in, tol=epsilon()):
         return reshape(stack([
             __matrix_inv_helper(__A) for __A in reshape(A_in, (-1, shape(A_in)[-2], shape(A_in)[-1]))
         ]), shape(A_in))
-    detA = numpy.linalg.det(to_float(A_in))
-    if detA == 0:
+    floatA = to_float(A_in)
+    detA = stack([
+        numpy.linalg.det(iA) for iA in reshape(floatA, (-1, *shape(floatA)[-2:]))
+    ]).reshape(*shape(floatA)[:-2], -1)
+    if any(detA == 0):
         raise numpy.linalg.LinAlgError("Matrix has a determinant of {} which makes it non-invertible".format(detA))
     A = copy(A_in)
     I = eye(shape(A)[0], dtype=A.dtype)
@@ -275,11 +287,11 @@ def __solve_linear_system_helper(A, b, overwrite_a=False):
         else:
             Q,R = scipy.linalg.qr(to_float(A), overwrite_a=overwrite_a)
         bhat = Q.T@b
-        y = __backward_substitution(R,bhat,overwrite_b=False)
+        y = __backward_substitution(R, bhat, overwrite_b=False)
         residual = bhat - R@y
         for _ in range(5):
             if max(abs(to_float(residual))) > 2*epsilon():
-                y = y + __backward_substitution(R,residual,overwrite_b=False)
+                y = y + __backward_substitution(R, residual, overwrite_b=False)
                 residual = bhat - R@y
             else:
                 break
@@ -287,23 +299,23 @@ def __solve_linear_system_helper(A, b, overwrite_a=False):
     else:
         P,L,U = scipy.linalg.lu(to_float(A), overwrite_a=overwrite_a)
         y = P@b
-        y = __forward_substitution(L,y,overwrite_b=True)
-        return __backward_substitution(U,y,overwrite_b=True)
+        y = __forward_substitution(L, y,overwrite_b=True)
+        return __backward_substitution(U, y, overwrite_b=True)
     
 def __solve_linear_system_dispatcher(A, b, overwrite_a=False, overwrite_b=False, check_finite=False, sparse=False, *args, **kwargs):
     if A.dtype == object or b.dtype == object:
         if len(shape(A)) == 2:
             return __solve_linear_system_helper(A, b, overwrite_a=overwrite_a, *args, **kwargs)
         else:
-            assert A.shape[:-2] == b.shape[:-2], "Batched system must have compatible shapes for A and b!"
+            assert (shape(A)[-2] == shape(b)[-2]), "Batched system must have compatible shapes for A and b!"
             return reshape(stack([
                 __solve_linear_system_helper(A_batch, b_batch, overwrite_a=overwrite_a, *args, **kwargs) for A_batch, b_batch in zip(reshape(A, (-1, *shape(A)[-2:])), reshape(b, (-1, *shape(b)[-2:])))
             ]), shape(b))
     else:
         if sparse:
-            return scipy.sparse.linalg.spsolve(scipy.sparse.csc_matrix(A),b)
+            return scipy.sparse.linalg.spsolve(scipy.sparse.csc_matrix(A), b)
         else:
-            return scipy.linalg.solve(A,b,overwrite_a=overwrite_a,overwrite_b=overwrite_b,check_finite=check_finite)
+            return scipy.linalg.solve(A, b, overwrite_a=overwrite_a, overwrite_b=overwrite_b, check_finite=check_finite)
     
 solve_linear_system = __solve_linear_system_dispatcher
 

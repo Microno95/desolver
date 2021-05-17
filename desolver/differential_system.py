@@ -725,15 +725,17 @@ class OdeSystem(object):
         integrator_kwargs['atol'] = self.atol
         integrator_kwargs['rtol'] = self.rtol
             
-        if self.method.__symplectic__ and not self.method.__implicit__:
+        if self.method.symplectic and not self.method.implicit:
             integrator_kwargs['staggered_mask'] = self.staggered_mask
             
         if self.integrator:
             old_states_exist = True
-            old_dState      = self.integrator.dState
-            old_dTime       = self.integrator.dTime
+            old_dState = self.integrator.dState
+            old_dTime = self.integrator.dTime
         else:
             old_states_exist = False
+            old_dState = None
+            old_dTime = None
         self.integrator = self.method(self.dim, **integrator_kwargs)
         if old_states_exist and preserve_states:
             self.integrator.dState = old_dState
