@@ -2,6 +2,8 @@ from .integrator_template import IntegratorTemplate, RichardsonIntegratorTemplat
 from .. import backend as D
 from .. import utilities
 from .. import exception_types
+import math
+import builtins
 import abc
 
 __all__ = [
@@ -13,6 +15,7 @@ __all__ = [
 
 
 class RungeKuttaIntegrator(IntegratorTemplate, abc.ABC):
+    implicit = None
     def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
         super().__init__()
         self.dim = sys_dim
@@ -85,7 +88,7 @@ class RungeKuttaIntegrator(IntegratorTemplate, abc.ABC):
         self.step(rhs=rhs, initial_time=initial_time, initial_state=initial_state,
                   constants=constants, timestep=timestep)
 
-        if self.adaptive:
+        if self.adaptive or self.implicit:
             diff = timestep * self.get_error_estimate()
             timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, timestep)
             if redo_step:
@@ -281,6 +284,7 @@ class ExplicitSymplecticIntegrator(RungeKuttaIntegrator):
         return self.dTime, (self.dTime, self.dState)
 
 
+
 class ImplicitRungeKuttaIntegrator(RungeKuttaIntegrator):
     """
     A base class for all implicit Runge-Kutta methods with arbitrary Butcher Tableau.
@@ -316,6 +320,24 @@ class ImplicitRungeKuttaIntegrator(RungeKuttaIntegrator):
 
     def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
         super().__init__(sys_dim, dtype, rtol, atol, device)
+        self.solver_dict = dict(
+            tau0=0, tau1=0, niter0=0, niter1=0
+        )
+
+    def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.8):
+        timestep_from_error, redo_step = super().update_timestep(initial_state, dState, diff, initial_time, timestep, tol)
+        if self.solver_dict['niter0'] != 0:
+            Tk0, CTk0 = D.log(self.solver_dict['tau0']), math.log(self.solver_dict['niter0'])
+            Tk1, CTk1 = D.log(self.solver_dict['tau1']), math.log(self.solver_dict['niter1'])
+            dCTk = (CTk1 - CTk0) / (Tk1 - Tk0)
+            tau2 = timestep * D.exp(-tol * dCTk)
+        else:
+            tau2 = timestep
+        if tau2 < timestep_from_error:
+            timestep = tau2
+        else:
+            timestep = timestep_from_error
+        return timestep, redo_step
 
     def step(self, rhs, initial_time, initial_state, constants, timestep):
         aux_shape = self.aux.shape
@@ -379,6 +401,10 @@ class ImplicitRungeKuttaIntegrator(RungeKuttaIntegrator):
             raise exception_types.FailedToMeetTolerances(
                 "Step size too large, cannot solve system to the "
                 "tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, desired_tol, num_iter))
+        self.solver_dict.update(dict(
+            tau0=self.solver_dict['tau1'], tau1=timestep,
+            niter0=self.solver_dict['niter0'], niter1=num_iter
+        ))
 
         self.aux = D.reshape(aux_root, aux_shape)
         self.dState = timestep * D.sum(self.final_state[0][self.tableau_idx_expand] * self.aux, axis=0)

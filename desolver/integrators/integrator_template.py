@@ -27,7 +27,7 @@ class IntegratorTemplate(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol):
+    def update_timestep(self, initial_state, diff, initial_time, timestep, tol):
         pass
 
     def get_error_estimate(self):

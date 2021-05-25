@@ -238,7 +238,7 @@ def test_event_detection_close_roots(ffmt, integrator, use_richardson_extrapolat
         assert (a.events[1].event == second_y_event)
         assert (a.events[0].event == first_y_event)
         print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
-                                                                                               a.t[-1] - D.pi / 8))
+                                                                                               a.t[-1] - D.pi / 7))
 
 
 @pytest.mark.skip("Too slow, needs refactoring")
