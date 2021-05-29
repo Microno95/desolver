@@ -318,23 +318,23 @@ class ImplicitRungeKuttaIntegrator(RungeKuttaIntegrator):
     def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
         super().__init__(sys_dim, dtype, rtol, atol, device)
         self.solver_dict.update(dict(
-            tau0=0, tau1=0, niter0=0, niter1=0,
-            nfev0=0, nfev1=0, njev0=0, njev1=0
+            tau0=0, tau1=0, niter0=1, niter1=1,
+            nfev0=1, nfev1=1, njev0=1, njev1=1
         ))
 
     def update_timestep(self):
         timestep = self.solver_dict['timestep']
         safety_factor = self.solver_dict['safety_factor']
         timestep_from_error, redo_step = super().update_timestep()
-        if self.solver_dict['niter0'] != 0:
+        if self.solver_dict['tau0'] != 0:
             Tk0, CTk0 = D.log(self.solver_dict['tau0']), math.log(self.solver_dict['niter0'])
             Tk1, CTk1 = D.log(self.solver_dict['tau1']), math.log(self.solver_dict['niter1'])
-            dnCTk = (CTk1 - CTk0)
-            ddCTk = (Tk1 - Tk0)
+            dnCTk = D.array(CTk1 - CTk0)
+            ddCTk = D.array(Tk1 - Tk0)
             if ddCTk > 0:
                 dCTk = dnCTk / ddCTk
             else:
-                dCTk = 0.0
+                dCTk = D.array(0.0)
             tau2 = timestep * D.exp(-safety_factor * dCTk)
         else:
             tau2 = timestep
@@ -409,10 +409,10 @@ class ImplicitRungeKuttaIntegrator(RungeKuttaIntegrator):
                 "Step size too large, cannot solve system to the "
                 "tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, desired_tol, num_iter))
         self.solver_dict.update(dict(
-            tau0=self.solver_dict['tau1'], tau1=timestep,
-            njev0=self.solver_dict['njev1'], njev1=njev,
-            nfev0=self.solver_dict['nfev1'], nfev1=nfev,
-            niter0=self.solver_dict['niter1'], niter1=num_iter
+            tau0=self.solver_dict['tau1'], tau1=D.abs(timestep),
+            njev0=self.solver_dict['njev1'], njev1=njev+1,
+            nfev0=self.solver_dict['nfev1'], nfev1=nfev+1,
+            niter0=self.solver_dict['niter1'], niter1=num_iter+1
         ))
 
         self.aux = D.reshape(aux_root, aux_shape)

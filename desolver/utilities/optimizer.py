@@ -7,7 +7,6 @@ from . import utilities
 __all__ = [
     'brentsroot',
     'brentsrootvec',
-    'newtonraphson',
     'newtontrustregion',
     'nonlinear_roots'
 ]
@@ -370,7 +369,8 @@ def broyden_update_jac(B, dx, df, Binv=None):
     else:
         return B_new
 
-def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac_update_rate=20, use_scipy=True):
+
+def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac_update_rate=20, initial_trust_region=None):
     if tol is None:
         tol = 2 * D.epsilon()
     tol = float(tol)
@@ -434,18 +434,6 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac_upd
                 njev += 1
                 return jac(x)
 
-    if use_scipy and D.backend() == 'numpy' and not is_vectorised and not is_gdual:
-        res = scipy.optimize.root(lambda __x: fun(__x)[:, 0], x[:, 0], jac=fun_jac, tol=tol)
-        nfev = res.nfev
-        njev = res.njev
-        init_iter = res.nfev + res.njev
-        x = D.reshape(res.x, (xdim, 1))
-        F = fun(x)
-        if res.success:
-            return x, (res.success, init_iter, nfev, njev, D.to_float(F.T@F).item()**0.5)
-    else:
-        init_iter = 0
-
     w_relax = 0.5
     F0 = fun(x)
     Jf0 = fun_jac(x, __f=F0)
@@ -464,158 +452,11 @@ def newtonraphson(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac_upd
         Jinv = D.copy(I)
     if D.norm(D.to_float(Jinv @ Jf1 - I)) < 0.5:
         Jinv = iterative_inverse_7th(Jf1, Jinv, maxiter=3)
+    trust_region = 5.0 if initial_trust_region is None else initial_trust_region
     iteration = 0
     fail_iter = 0
 
-    for iteration in range(init_iter, maxiter):
-        if verbose:
-            df = F1 - F0
-            dJ = Jf1 - Jf0
-            df = (df.T @ df).item() ** 0.5
-            dJ = D.sum(dJ ** 2) ** 0.5
-            print(
-                "[{iteration}]: x = {x}, f = {F1}, ||dx|| = {dxn}, ||F|| = {Fn1}, ||dF|| = {df}, ||dJ|| = {dJ}".format(
-                    **locals()))
-            print()
-        sparse = (1.0 - D.sum(D.abs(D.to_float(Jf1)) > 0) / (xdim * fdim)) <= 0.7
-        dx = D.reshape(D.solve_linear_system(Jinv @ Jf1, -Jinv @ F1, sparse=sparse), (xdim, 1))
-        no_progress = True
-        F0 = F1
-        Fn0 = Fn1
-        for __dx in [dx / m for m in [1.0, 2.0, 4.0, 8.0]]:
-            __x = x + __dx
-            __f = fun(__x)
-            __fn = D.norm(D.to_float(__f)).reshape(tuple())
-            if __fn < Fn1:
-                x = __x
-                dx = __dx
-                F1 = __f
-                Fn1 = __fn
-                no_progress = False
-                break
-        dxn = D.norm(D.to_float(dx)).reshape(tuple())
-        if no_progress:
-            fail_iter += 1
-        if iteration % jac_update_rate == 0 or no_progress:
-            Jf0, Jf1 = Jf0, fun_jac(x, __f=F1)
-            if not is_vectorised:
-                if Jf1.dtype not in [D.float32, D.float64, object]:
-                    Jinv = D.to_type(D.matrix_inv(D.to_type(Jf1, dtype=D.float64)), Jf1.dtype)
-                else:
-                    Jinv = D.matrix_inv(Jf1)
-            else:
-                Jinv = D.copy(I)
-        else:
-            # Jf0, Jf1 = D.copy(Jf1), Jf1 + ((F1 - F0) - Jf1@dx)@dx.T/dxn
-            Jf0, (Jf1, Jinv) = Jf1, broyden_update_jac(Jf1, dx, F1 - F0, Jinv)
-        if Fn1 <= tol or dxn <= 4 * D.max(D.abs(D.to_float(x) * tol)) or not D.all(D.isfinite(D.to_float(dx))) or fail_iter > 10:
-            if verbose:
-                print("[finished]: ||F|| = {Fn1}, ||dx|| = {dxn}, x = {x}, F = {F0}".format(**locals()))
-            break
-    if D.backend() == 'torch' and not x0.requires_grad:
-        x = x.detach()
-    return x, (Fn1 <= 4 * fdim * tol or dxn <= 4 * D.max(D.abs(D.to_float(x) * tol)), iteration, nfev, njev, Fn1)
-
-
-def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac_update_rate=20, use_scipy=True):
-    if tol is None:
-        tol = 2 * D.epsilon()
-    tol = float(tol)
-    xshape = D.shape(x0)
-    xdim = 1
-    for __d in xshape:
-        xdim *= __d
-    x = D.reshape(x0, (xdim, 1))
-    if D.backend() == 'numpy' and "gdual_double" in D.available_float_fmt():
-        is_vectorised = D.any(D.array([type(i[0]) == D.gdual_vdouble for i in x], dtype=D.bool))
-        is_vectorised = is_vectorised or "vdouble" in D.float_fmt()
-        is_gdual = D.any(D.array([type(i[0]) in [D.gdual_double, D.gdual_vdouble, object] for i in x], dtype=D.bool))
-        is_gdual = is_gdual or "gdual" in D.float_fmt() or x.dtype == object
-    else:
-        is_vectorised = False
-        is_gdual = False
-
-    nfev = 0
-    njev = 0
-
-    fshape = D.shape(f(x0))
-    fdim = 1
-    for __d in fshape:
-        fdim *= __d
-
-    def fun(x, __f=None):
-        nonlocal nfev
-        if D.backend() == 'torch' and not x.requires_grad:
-            x.requires_grad = True
-        nfev += 1
-        return D.reshape(f(D.reshape(x, xshape)), (fdim, 1))
-
-    if jac is None:
-        if D.backend() == 'torch':
-            def fun_jac(x, __f=None):
-                nonlocal njev
-                if __f is None:
-                    __f = fun(x)
-                njev += 1
-                return D.reshape(D.jacobian(__f, x), (fdim, xdim))
-        else:
-            __fun_jac = utilities.JacobianWrapper(fun, atol=tol, rtol=tol, flat=True)
-
-            def fun_jac(x, __f=None):
-                nonlocal njev, __fun_jac
-                njev += 1
-                return __fun_jac(x)
-    else:
-        jac_shape = D.shape(jac(x0))
-        if is_gdual or jac_shape != (fdim, xdim):
-            def fun_jac(x, __f=None):
-                nonlocal njev
-                __j = D.reshape(jac(D.reshape(x, xshape)), (fdim, xdim))
-                if is_gdual and not is_vectorised:
-                    __j = D.to_float(__j)
-                njev += 1
-                return __j
-        else:
-            def fun_jac(x, __f=None):
-                nonlocal njev, jac
-                njev += 1
-                return jac(x)
-
-    if use_scipy and D.backend() == 'numpy' and not is_vectorised and not is_gdual:
-        res = scipy.optimize.root(lambda __x: fun(__x)[:, 0], x[:, 0], jac=fun_jac, tol=tol)
-        nfev = res.nfev
-        njev = res.njev
-        init_iter = res.nfev + res.njev
-        x = D.reshape(res.x, (xdim, 1))
-        F = fun(x)
-        if res.success:
-            return x, (res.success, init_iter, nfev, njev, D.to_float(F.T@F).item()**0.5)
-    else:
-        init_iter = 0
-
-    w_relax = 0.5
-    F0 = fun(x)
-    Jf0 = fun_jac(x, __f=F0)
-    F1, Jf1 = D.copy(F0), D.copy(Jf0)
-    Fn0 = D.norm(D.to_float(F1)).reshape(tuple())
-    Fn1 = D.to_float(Fn0)
-    dx = D.zeros_like(x)
-    dxn = D.norm(D.to_float(dx)).reshape(tuple())
-    I = D.diag(D.ones_like(D.diag(Jf1)))
-    if not is_vectorised:
-        if Jf1.dtype not in [D.float32, D.float64, object]:
-            Jinv = D.to_type(D.matrix_inv(D.to_type(Jf1, dtype=D.float64)), Jf1.dtype)
-        else:
-            Jinv = D.matrix_inv(Jf1)
-    else:
-        Jinv = D.copy(I)
-    if D.norm(D.to_float(Jinv @ Jf1 - I)) < 0.5:
-        Jinv = iterative_inverse_7th(Jf1, Jinv, maxiter=3)
-    trust_region = 5.0
-    iteration = 0
-    fail_iter = 0
-
-    for iteration in range(init_iter, maxiter):
+    for iteration in range(0, maxiter):
         if verbose:
             df = F1 - F0
             dJ = Jf1 - Jf0
@@ -658,7 +499,7 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
                 trust_region *= 0.8 * 0.5 / tr_ratio
             elif tr_ratio < 0.25:
                 trust_region *= 0.25 / tr_ratio
-        if no_progress:
+        if iteration % jac_update_rate == 0 or no_progress:
             Jf0, Jf1 = Jf0, fun_jac(x, __f=F1)
             if not is_vectorised:
                 if Jf1.dtype not in [D.float32, D.float64, object]:
@@ -836,5 +677,5 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
         else:
             x = D.reshape(x0, (xdim, 1))
 
-    return newtonraphson(fun, x, jac=fun_jac, tol=tol, verbose=verbose, maxiter=maxiter, jac_update_rate=10, use_scipy=use_scipy)
+    return newtontrustregion(fun, x, jac=fun_jac, tol=tol, verbose=verbose, maxiter=maxiter, jac_update_rate=10, initial_trust_region=0.0)
 
