@@ -496,15 +496,6 @@ class RadauIIA19(ImplicitRungeKuttaIntegrator):
         else:
             return D.zeros_like(self.dState)
 
-    def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.8):
-        err_estimate = D.max(D.abs(D.to_float(diff)))
-        relerr = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state) + self.rtol * D.abs(dState / timestep)))
-        corr = 1.0
-        if err_estimate != 0:
-            corr = corr * tol * (relerr / err_estimate) ** (1.0 / 10.0)
-        if corr != 0:
-            timestep = corr * timestep
-        if err_estimate > relerr:
-            return timestep, True
-        else:
-            return timestep, False
+    def update_timestep(self):
+        self.solver_dict['order'] = 10.0
+        return super().update_timestep()
