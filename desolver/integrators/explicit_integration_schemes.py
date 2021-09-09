@@ -1,6 +1,6 @@
 import numpy
 
-from .integrator_types import ExplicitRungeKuttaIntegrator, ExplicitSymplecticIntegrator
+from .integrator_types import RungeKuttaIntegrator, ExplicitSymplecticIntegrator
 from .. import backend as D
 
 __all__ = [
@@ -17,10 +17,11 @@ __all__ = [
     'HeunEulerSolver',
     'SymplecticEulerSolver',
     'BABs9o7HSolver',
-    'ABAs5o6HSolver'
+    'ABAs5o6HSolver',
+    'DOPRI45'
 ]
 
-class RK1412Solver(ExplicitRungeKuttaIntegrator):
+class RK1412Solver(RungeKuttaIntegrator):
     """
     The derived class that implements the Adaptive Runge-Kutta 14(12) method using
     the coefficients defined by Feagin.
@@ -30,9 +31,7 @@ class RK1412Solver(ExplicitRungeKuttaIntegrator):
     [1] Feagin, Terry. "HIGH-ORDER EXPLICIT RUNGE-KUTTA METHODS USING W-SYMMETRY." Neural, Parallel & Scientific Computations 20, no. 3-4 (2012): 437-458.
     """
     
-    @property
-    def order(self):
-        return 14.0
+    __order__ = 14.0
     
     __alt_names__ = ("Explicit RK1412", "RK1412", "Runge-Kutta 14(12)", "RK1412Feag")
     
@@ -81,7 +80,7 @@ class RK1412Solver(ExplicitRungeKuttaIntegrator):
         
 
 
-class RK108Solver(ExplicitRungeKuttaIntegrator):
+class RK108Solver(RungeKuttaIntegrator):
     """
     The derived class that implements the Adaptive Runge-Kutta 10(8) method using
     the coefficients defined by Feagin.
@@ -91,9 +90,7 @@ class RK108Solver(ExplicitRungeKuttaIntegrator):
     [1] Feagin, Terry. "HIGH-ORDER EXPLICIT RUNGE-KUTTA METHODS USING W-SYMMETRY." Neural, Parallel & Scientific Computations 20, no. 3-4 (2012): 437-458.
     """
     
-    @property
-    def order(self):
-        return 10.0
+    __order__ = 10.0
     
     __alt_names__ = ("Explicit RK108", "RK108", "Runge-Kutta 10(8)", "RK108Feag")
 
@@ -125,7 +122,7 @@ class RK108Solver(ExplicitRungeKuttaIntegrator):
 #     def get_error_estimate(self, dState, dTime, aux, tableau_idx_expand):
 #         return (aux[0] - aux[-1]) / 360 + (dState - aux[-1]) / dTime # D.sum(self.final_state[1][tableau_idx_expand] * aux, axis=0) * dTime / 1000 # 
 
-class RK8713MSolver(ExplicitRungeKuttaIntegrator):
+class RK8713MSolver(RungeKuttaIntegrator):
     """
     The derived class that implements the Adaptive Runge-Kutta 8(7) method using
     the coefficients defined by Dormand and Prince.
@@ -135,9 +132,7 @@ class RK8713MSolver(ExplicitRungeKuttaIntegrator):
     [1] Prince, P.J., and J.R. Dormand. ‘High Order Embedded Runge-Kutta Formulae’. Journal of Computational and Applied Mathematics 7, no. 1 (March 1981): 67–75. https://doi.org/10.1016/0771-050X(81)90010-3 .
     """
     
-    @property
-    def order(self):
-        return 8.0
+    __order__ = 8.0
     
     __alt_names__ = ("Explicit RK8713M", "RK87", "Runge-Kutta 8(7)", "RK8713M")
 
@@ -162,7 +157,7 @@ class RK8713MSolver(ExplicitRungeKuttaIntegrator):
          [0., 14005451/335480064, 0.0, 0.0, 0.0, 0.0, -59238493/1068277825, 181606767/758867731,   561292985/797845732, -1041891430/1371343529, 760417239/1151165299, 118820643/751138087, -528747749/2220607170, 1/4]], dtype=numpy.float64
     )
     
-class RK45CKSolver(ExplicitRungeKuttaIntegrator):
+class RK45CKSolver(RungeKuttaIntegrator):
     """
     The derived class that implements the Adaptive Runge-Kutta 4(5) method using
     the coefficients defined by Cash and Karp.
@@ -172,9 +167,7 @@ class RK45CKSolver(ExplicitRungeKuttaIntegrator):
     [1] Cash, J. R., and Alan H. Karp. ‘A Variable Order Runge-Kutta Method for Initial Value Problems with Rapidly Varying Right-Hand Sides’. ACM Transactions on Mathematical Software 16, no. 3 (1 September 1990): 201–22. https://doi.org/10.1145/79505.79507 .
     """
 
-    @property
-    def order(self):
-        return 5.0
+    __order__ = 5.0
     
     __alt_names__ = ("Explicit RK45CK", "RK45CK", "Runge-Kutta-Cash-Karp", "RK45")
 
@@ -192,7 +185,7 @@ class RK45CKSolver(ExplicitRungeKuttaIntegrator):
          [0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ]], dtype=numpy.float64
     )
     
-class RK5Solver(ExplicitRungeKuttaIntegrator):
+class RK5Solver(RungeKuttaIntegrator):
     """
     The derived class that implements a 5th order Runge-Kutta method.
     This is simply the fifth order method embedded in RK45CK.
@@ -202,9 +195,7 @@ class RK5Solver(ExplicitRungeKuttaIntegrator):
     [1] Cash, J. R., and Alan H. Karp. ‘A Variable Order Runge-Kutta Method for Initial Value Problems with Rapidly Varying Right-Hand Sides’. ACM Transactions on Mathematical Software 16, no. 3 (1 September 1990): 201–22. https://doi.org/10.1145/79505.79507 .
     """
     
-    @property
-    def order(self):
-        return 5.0
+    __order__ = 5.0
     
     __alt_names__ = ("Explicit RK5", "RK5", "Runge-Kutta 5")
 
@@ -214,14 +205,12 @@ class RK5Solver(ExplicitRungeKuttaIntegrator):
         [[0., 37/378,     0, 250/621,     125/594,     0,         512/1771]], dtype=numpy.float64
     )
     
-class RK4Solver(ExplicitRungeKuttaIntegrator):
+class RK4Solver(RungeKuttaIntegrator):
     """
     The derived class that implements the classic 4th order Runge-Kutta method.
     """
     
-    @property
-    def order(self):
-        return 4.0
+    __order__ = 4.0
     
     __alt_names__ = ("Explicit RK4", "RK4", "Runge-Kutta 4")
 
@@ -236,14 +225,12 @@ class RK4Solver(ExplicitRungeKuttaIntegrator):
         [[0., 1/6, 1/3, 1/3, 1/6]], dtype=numpy.float64
     )
 
-class MidpointSolver(ExplicitRungeKuttaIntegrator):
+class MidpointSolver(RungeKuttaIntegrator):
     """
     The derived class that implements the midpoint method.
     """
     
-    @property
-    def order(self):
-        return 2.0
+    __order__ = 2.0
     
     __alt_names__ = ("Explicit Midpoint", "Midpoint")
 
@@ -256,14 +243,12 @@ class MidpointSolver(ExplicitRungeKuttaIntegrator):
         [[0,    0,   1]], dtype=numpy.float64
     )
 
-class HeunsSolver(ExplicitRungeKuttaIntegrator):
+class HeunsSolver(RungeKuttaIntegrator):
     """
     The derived class that implements Heun's method.
     """
     
-    @property
-    def order(self):
-        return 2.0
+    __order__ = 2.0
 
     __alt_names__ = ("Explicit Heun's", "Heun's")
 
@@ -276,14 +261,12 @@ class HeunsSolver(ExplicitRungeKuttaIntegrator):
         [[0,    1/4, 3/4]], dtype=numpy.float64
     )
 
-class EulerSolver(ExplicitRungeKuttaIntegrator):
+class EulerSolver(RungeKuttaIntegrator):
     """
     The derived class that implements the Euler method.
     """
     
-    @property
-    def order(self):
-        return 1.0
+    __order__ = 1.0
     
     __alt_names__ = ("Explicit Euler", "Euler")
 
@@ -295,14 +278,12 @@ class EulerSolver(ExplicitRungeKuttaIntegrator):
         [[0,    1]], dtype=numpy.float64
     )
 
-class EulerTrapSolver(ExplicitRungeKuttaIntegrator):
+class EulerTrapSolver(RungeKuttaIntegrator):
     """
     The derived class that implements the Euler-Trapezoidal method.
     """
     
-    @property
-    def order(self):
-        return 2.0
+    __order__ = 2.0
     
     __alt_names__ = ("Explicit Euler-Trapezoidal", "Euler-Trapezoidal", "Euler-Trap", "Predictor-Corrector Euler")
 
@@ -317,16 +298,14 @@ class EulerTrapSolver(ExplicitRungeKuttaIntegrator):
         [[0,   1/2, 0,    0,   1/2]], dtype=numpy.float64
     )
 
-class HeunEulerSolver(ExplicitRungeKuttaIntegrator):
+class HeunEulerSolver(RungeKuttaIntegrator):
     """
     The derived class that implements the adaptive Heun-Euler method.
     This is a 1st order method (Euler) with an embedded 
     2nd order method (Heun) that does adaptive timestepping.
     """
     
-    @property
-    def order(self):
-        return 2.0
+    __order__ = 2.0
     
     __alt_names__ = ("Explicit Adaptive Heun-Euler", "Adaptive Heun-Euler", "AHE")
 
@@ -347,9 +326,7 @@ class SymplecticEulerSolver(ExplicitSymplecticIntegrator):
     This is the simplest symplectic integration scheme.
     """
     
-    @property
-    def order(self):
-        return 1.0
+    __order__ = 1.0
     
     __alt_names__ = ("Explicit Symplectic Forward Euler", "Symplectic Forward Euler")
 
@@ -371,9 +348,7 @@ class BABs9o7HSolver(ExplicitSymplecticIntegrator):
     [1] Nielsen, Kristian Mads Egeris. ‘Efficient Fourth Order Symplectic Integrators for Near-Harmonic Separable Hamiltonian Systems’. ArXiv:1501.04345 [Physics, Physics:Quant-Ph], 9 February 2015. http://arxiv.org/abs/1501.04345 .
     """
     
-    @property
-    def order(self):
-        return 7.0
+    __order__ = 7.0
     
     __alt_names__ = ("Explicit BABS9O7H", "BABS9O7H")
 
@@ -412,9 +387,7 @@ class ABAs5o6HSolver(ExplicitSymplecticIntegrator):
     [1] Nielsen, Kristian Mads Egeris. ‘Efficient Fourth Order Symplectic Integrators for Near-Harmonic Separable Hamiltonian Systems’. ArXiv:1501.04345 [Physics, Physics:Quant-Ph], 9 February 2015. http://arxiv.org/abs/1501.04345 .
     """
     
-    @property
-    def order(self):
-        return 6.0
+    __order__ = 6.0
     
     __alt_names__ = ("Explicit ABAS5O6H", "ABAS5O6H")
 
@@ -432,3 +405,27 @@ class ABAs5o6HSolver(ExplicitSymplecticIntegrator):
        [ 0.                  , -0.6859195549562167  ,  0.                  ],
        [ 1.                  ,  0.                  ,  0.15585935917621682 ]]
    )
+
+class DOPRI45(RungeKuttaIntegrator):
+    """
+    The Dormand Prince integrator with 4th and 5th order accurate solutions
+    """
+
+    __order__ = 5.0
+
+    __alt_names__ = ("Dormand-Prince", )
+
+    tableau = numpy.array(
+        [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+         [0.2, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+         [0.3, 3/40, 9/40, 0.0, 0.0, 0.0, 0.0, 0.0],
+         [0.8, 44/45, -56/15, 32/9, 0.0, 0.0, 0.0, 0.0],
+         [8/9, 19372/6561, -25360/2187, 64448/6561, -212/729, 0.0, 0.0, 0.0],
+         [1.0, 9017/3168, -355/33, 46732/5247, 49/176, -5103/18656, 0.0, 0.0],
+         [1.0, 35/384, 0.0, 500/1113, 125/192, -2187/6784, 11/84, 0.0]], dtype=numpy.float64
+    )
+
+    final_state = numpy.array(
+        [[0.0, 35/384, 0.0, 500/1113, 125/192, -2187/6784, 11/84, 0.0],
+         [0.0, 5179/57600, 0.0, 7571/16695, 393/640, -92097/339200, 187/2100, 1/40]], dtype=numpy.float64
+    )

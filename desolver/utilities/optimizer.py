@@ -603,12 +603,17 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
         xdim *= __d
     x = D.reshape(x0, (xdim, 1))
 
-    fshape = D.shape(f(x0))
+    __f0 = f(x0)
+    __f0n = D.norm(D.to_float(D.reshape(__f0, (-1,))))
+    if __f0n <= tol:
+        return x0, (True, 1, 1, 0, __f0n)
+    fshape = D.shape(__f0)
     fdim = 1
     for __d in fshape:
         fdim *= __d
     nfev = 1
     njev = 0
+
     if D.backend() == 'numpy' and "gdual_double" in D.available_float_fmt():
         is_vectorised = D.any(D.array([type(i[0]) == D.gdual_vdouble for i in x], dtype=D.bool))
         is_vectorised = is_vectorised or "vdouble" in D.float_fmt()

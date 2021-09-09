@@ -9,9 +9,9 @@ from .common import ffmt_param, integrator_param, richardson_param, device_param
 @richardson_param
 @device_param
 def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolation, device):
-    if use_richardson_extrapolation and integrator.implicit:
+    if use_richardson_extrapolation and integrator.is_implicit():
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
-    if "gdual_vdouble" in ffmt and integrator.implicit:
+    if "gdual_vdouble" in ffmt and integrator.is_implicit():
         pytest.skip("Many stage implicit integrators are too slow with vectorised gduals")
     D.set_float_fmt(ffmt)
 
@@ -52,9 +52,9 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
 
         print("Average step-size:", D.mean(D.abs(D.array(a.t[1:]) - D.array(a.t[:-1]))))
         max_diff = D.max(D.abs(D.to_float(analytic_soln(a.t[-1], y_init) - a.y[-1])))
-        if a.integrator.adaptive:
+        if a.integrator.is_adaptive():
             assert max_diff <= method_tolerance, "{} Failed with max_diff from analytical solution = {}".format(a.integrator, max_diff)
-        if a.integrator.implicit:
+        if a.integrator.is_implicit():
             assert rhs.analytic_jacobian_called and a.njev > 0, "Analytic jacobian was called as part of integration"
         a.reset()
     print("")
@@ -67,9 +67,9 @@ def test_float_formats_typical_shape(ffmt, integrator, use_richardson_extrapolat
 @richardson_param
 @device_param
 def test_float_formats_atypical_shape(ffmt, integrator, use_richardson_extrapolation, device):
-    if use_richardson_extrapolation and integrator.implicit:
+    if use_richardson_extrapolation and integrator.is_implicit():
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
-    if "gdual_vdouble" in ffmt and integrator.implicit:
+    if "gdual_vdouble" in ffmt and integrator.is_implicit():
         pytest.skip("Many stage implicit integrators are too slow with vectorised gduals")
     D.set_float_fmt(ffmt)
 

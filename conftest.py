@@ -58,7 +58,7 @@ def pytest_collection_modifyitems(config, items):
             if "explicit" in item.keywords:
                 item.add_marker(skip_explicit)
     if config.getoption("--run_torch_gradients"):
-        # --run_explicit given in cli: do not skip slow tests
+        # --run_torch_gradients given in cli: do not skip tests for pytorch gradients
         pass
     else:
         skip_torch_gradients = pytest.mark.skip(reason="need --run_torch_gradients option to run")
@@ -66,18 +66,18 @@ def pytest_collection_modifyitems(config, items):
             if "torch_gradients" in item.keywords:
                 item.add_marker(skip_torch_gradients)
     if config.getoption("--run_gpu"):
-        # --run_explicit given in cli: do not skip slow tests
+        # --run_gpu given in cli: do not skip cuda device tests
         pass
     else:
-        skip_torch_gradients = pytest.mark.skip(reason="need --run_gpu option to run")
+        gpu = pytest.mark.skip(reason="need --run_gpu option to run")
         for item in items:
             if "gpu" in item.keywords:
-                item.add_marker(skip_torch_gradients)
+                item.add_marker(gpu)
     if config.getoption("--run_cpu"):
-        # --run_explicit given in cli: do not skip slow tests
+        # --run_cpu given in cli: do not skip cpu tests
         pass
     else:
-        skip_torch_gradients = pytest.mark.skip(reason="need --run_cpu option to run")
+        cpu = pytest.mark.skip(reason="need --run_cpu option to run")
         for item in items:
             if "cpu" in item.keywords:
-                item.add_marker(skip_torch_gradients)
+                item.add_marker(cpu)

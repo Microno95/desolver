@@ -22,7 +22,7 @@ ffmt_param = pytest.mark.parametrize('ffmt', ffmt_set_copy)
 @dt_param
 # @dense_output_param
 def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation, device, dt, dense_output=False):
-    if use_richardson_extrapolation and integrator.implicit:
+    if use_richardson_extrapolation and integrator.is_implicit():
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     if ffmt == 'gdual_vdouble':
         pytest.skip("gdual_vdouble type does not support event detection")
@@ -86,7 +86,7 @@ def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation, 
 @dt_param
 # @dense_output_param
 def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation, device, dt, dense_output=False):
-    if use_richardson_extrapolation and integrator.implicit:
+    if use_richardson_extrapolation and integrator.is_implicit():
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     if ffmt == 'gdual_vdouble':
         pytest.skip("gdual_vdouble type does not support event detection")
@@ -172,7 +172,7 @@ def test_event_detection_multiple(ffmt, integrator, use_richardson_extrapolation
 @dt_param
 # @dense_output_param
 def test_event_detection_close_roots(ffmt, integrator, use_richardson_extrapolation, device, dt, dense_output=False):
-    if use_richardson_extrapolation and integrator.implicit:
+    if use_richardson_extrapolation and integrator.is_implicit():
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     if ffmt == 'gdual_vdouble':
         pytest.skip("gdual_vdouble type does not support event detection")
@@ -250,7 +250,7 @@ def test_event_detection_close_roots(ffmt, integrator, use_richardson_extrapolat
 # @dense_output_param
 def test_event_detection_numerous_events(ffmt, integrator, use_richardson_extrapolation, device, dt,
                                          dense_output=False):
-    if use_richardson_extrapolation and integrator.implicit:
+    if use_richardson_extrapolation and integrator.is_implicit():
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     if ffmt == 'gdual_vdouble':
         pytest.skip("gdual_vdouble type does not support event detection")
@@ -316,7 +316,7 @@ def test_event_detection_numerous_events(ffmt, integrator, use_richardson_extrap
 # @pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 # @pytest.mark.parametrize('device', devices_set)
 # def test_event_detection_multiple_roots(ffmt, integrator, use_richardson_extrapolation, device):
-#     if integrator.implicit and use_richardson_extrapolation:
+#     if integrator.is_implicit() and use_richardson_extrapolation:
 #         pytest.skip("Implicit methods are unstable with richardson extrapolation")
 #     if ffmt == 'float16':
 #         pytest.skip("Event detection is unstable with {}".format(ffmt))

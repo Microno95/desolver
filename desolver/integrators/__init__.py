@@ -19,7 +19,8 @@ __explicit_integration_methods__ = [
     HeunEulerSolver,
     SymplecticEulerSolver,
     BABs9o7HSolver,
-    ABAs5o6HSolver
+    ABAs5o6HSolver,
+    DOPRI45
 ]
 
 __implicit_integration_methods__ = [

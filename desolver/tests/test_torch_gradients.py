@@ -11,7 +11,7 @@ from .common import ffmt_param, integrator_param, richardson_param, device_param
 @richardson_param
 @device_param
 def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, device):
-    if use_richardson_extrapolation and integrator.implicit:
+    if use_richardson_extrapolation and integrator.is_implicit():
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
     if integrator.symplectic:
@@ -78,7 +78,7 @@ def test_gradients_simple_decay(ffmt, integrator, use_richardson_extrapolation, 
 @richardson_param
 @device_param
 def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolation, device):
-    if use_richardson_extrapolation and integrator.implicit:
+    if use_richardson_extrapolation and integrator.is_implicit():
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
 
@@ -143,7 +143,7 @@ def test_gradients_simple_oscillator(ffmt, integrator, use_richardson_extrapolat
 @richardson_param
 @device_param
 def test_gradients_complex(ffmt, integrator, use_richardson_extrapolation, device):
-    if use_richardson_extrapolation and integrator.implicit:
+    if use_richardson_extrapolation and integrator.is_implicit():
         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
     D.set_float_fmt(ffmt)
 

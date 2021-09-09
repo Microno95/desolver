@@ -6,10 +6,10 @@ import pytest
 integrator_set = set(de.available_methods(False).values())
 integrator_set = sorted(integrator_set, key=lambda x: x.__name__)
 explicit_integrator_set = [
-    pytest.param(intg, marks=pytest.mark.explicit) for intg in integrator_set if not intg.implicit
+    pytest.param(intg, marks=pytest.mark.explicit) for intg in integrator_set if not intg.is_implicit()
 ]
 implicit_integrator_set = [
-    pytest.param(intg, marks=pytest.mark.implicit) for intg in integrator_set if intg.implicit
+    pytest.param(intg, marks=pytest.mark.implicit) for intg in integrator_set if intg.is_implicit()
 ]
 
 

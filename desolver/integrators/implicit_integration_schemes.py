@@ -1,13 +1,12 @@
 import numpy
 
-from .integrator_types import ImplicitRungeKuttaIntegrator
+from .integrator_types import RungeKuttaIntegrator
 from .. import backend as D
 
 
-class GaussLegendre4(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 4.0
+class GaussLegendre4(RungeKuttaIntegrator):
+    
+    __order__ = 4.0
 
     __alt_names__ = tuple()
 
@@ -27,10 +26,9 @@ class GaussLegendre4(ImplicitRungeKuttaIntegrator):
     del s
 
 
-class GaussLegendre6(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 6.0
+class GaussLegendre6(RungeKuttaIntegrator):
+    
+    __order__ = 6.0
 
     __alt_names__ = tuple()
 
@@ -51,10 +49,9 @@ class GaussLegendre6(ImplicitRungeKuttaIntegrator):
     del s
 
 
-class LobattoIIIA2(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 2.0
+class LobattoIIIA2(RungeKuttaIntegrator):
+    
+    __order__ = 2.0
 
     __alt_names__ = tuple()
 
@@ -70,10 +67,9 @@ class LobattoIIIA2(ImplicitRungeKuttaIntegrator):
     )
 
 
-class LobattoIIIA4(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 4.0
+class LobattoIIIA4(RungeKuttaIntegrator):
+    
+    __order__ = 4.0
 
     __alt_names__ = tuple()
 
@@ -90,10 +86,9 @@ class LobattoIIIA4(ImplicitRungeKuttaIntegrator):
     )
 
 
-class LobattoIIIB2(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 2.0
+class LobattoIIIB2(RungeKuttaIntegrator):
+    
+    __order__ = 2.0
 
     __alt_names__ = tuple()
 
@@ -109,10 +104,9 @@ class LobattoIIIB2(ImplicitRungeKuttaIntegrator):
     )
 
 
-class LobattoIIIB4(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 4.0
+class LobattoIIIB4(RungeKuttaIntegrator):
+    
+    __order__ = 4.0
 
     __alt_names__ = tuple()
 
@@ -129,10 +123,9 @@ class LobattoIIIB4(ImplicitRungeKuttaIntegrator):
     )
 
 
-class LobattoIIIC2(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 2.0
+class LobattoIIIC2(RungeKuttaIntegrator):
+    
+    __order__ = 2.0
 
     __alt_names__ = tuple()
 
@@ -148,10 +141,9 @@ class LobattoIIIC2(ImplicitRungeKuttaIntegrator):
     )
 
 
-class LobattoIIIC4(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 4.0
+class LobattoIIIC4(RungeKuttaIntegrator):
+    
+    __order__ = 4.0
 
     __alt_names__ = tuple()
 
@@ -169,10 +161,9 @@ class LobattoIIIC4(ImplicitRungeKuttaIntegrator):
     )
 
 
-class BackwardEuler(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 1.0
+class BackwardEuler(RungeKuttaIntegrator):
+    
+    __order__ = 1.0
 
     __alt_names__ = tuple()
 
@@ -187,10 +178,9 @@ class BackwardEuler(ImplicitRungeKuttaIntegrator):
     )
 
 
-class ImplicitMidpoint(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 2.0
+class ImplicitMidpoint(RungeKuttaIntegrator):
+    
+    __order__ = 2.0
 
     __alt_names__ = tuple()
 
@@ -205,10 +195,9 @@ class ImplicitMidpoint(ImplicitRungeKuttaIntegrator):
     )
 
 
-class CrankNicolson(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 2.0
+class CrankNicolson(RungeKuttaIntegrator):
+    
+    __order__ = 2.0
 
     __alt_names__ = tuple()
 
@@ -224,10 +213,9 @@ class CrankNicolson(ImplicitRungeKuttaIntegrator):
     )
 
 
-class DIRK3LStable(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 3.0
+class DIRK3LStable(RungeKuttaIntegrator):
+    
+    __order__ = 3.0
 
     __alt_names__ = tuple()
 
@@ -245,10 +233,9 @@ class DIRK3LStable(ImplicitRungeKuttaIntegrator):
     )
 
 
-class RadauIA3(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 3.0
+class RadauIA3(RungeKuttaIntegrator):
+    
+    __order__ = 3.0
 
     __alt_names__ = tuple()
 
@@ -264,10 +251,9 @@ class RadauIA3(ImplicitRungeKuttaIntegrator):
     )
 
 
-class RadauIA5(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 5.0
+class RadauIA5(RungeKuttaIntegrator):
+    
+    __order__ = 5.0
 
     __alt_names__ = tuple()
 
@@ -288,10 +274,9 @@ class RadauIA5(ImplicitRungeKuttaIntegrator):
     del s
 
 
-class RadauIIA3(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 3.0
+class RadauIIA3(RungeKuttaIntegrator):
+    
+    __order__ = 3.0
 
     __alt_names__ = tuple()
 
@@ -307,10 +292,9 @@ class RadauIIA3(ImplicitRungeKuttaIntegrator):
     )
 
 
-class RadauIIA5(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 5.0
+class RadauIIA5(RungeKuttaIntegrator):
+    
+    __order__ = 5.0
 
     __alt_names__ = tuple()
 
@@ -332,10 +316,9 @@ class RadauIIA5(ImplicitRungeKuttaIntegrator):
     del s
 
 
-class RadauIIA19(ImplicitRungeKuttaIntegrator):
-    @property
-    def order(self):
-        return 19.0
+class RadauIIA19(RungeKuttaIntegrator):
+    
+    __order__ = 19.0
 
     __alt_names__ = tuple()
 

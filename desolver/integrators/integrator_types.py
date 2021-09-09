@@ -7,16 +7,15 @@ import builtins
 import abc
 
 __all__ = [
-    'ExplicitRungeKuttaIntegrator',
+    'RungeKuttaIntegrator',
     'ExplicitSymplecticIntegrator',
-    'ImplicitRungeKuttaIntegrator',
     'generate_richardson_integrator'
 ]
 
 
-class RungeKuttaIntegrator(IntegratorTemplate, abc.ABC):
-    implicit = None
-
+class TableauIntegrator(IntegratorTemplate, abc.ABC):
+    tableau = None
+    __order__ = None
     def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
         super().__init__()
         self.dim = sys_dim
@@ -26,7 +25,6 @@ class RungeKuttaIntegrator(IntegratorTemplate, abc.ABC):
         self.rtol = rtol if rtol is not None else 32 * D.epsilon()
         self.atol = atol if atol is not None else 32 * D.epsilon()
         self.dtype = dtype
-        self.aux = D.zeros((D.shape(self.tableau)[0], *self.dim), dtype=self.dtype)
         self.dState = D.zeros(self.dim, dtype=self.dtype)
         self.dTime = D.zeros(tuple(), dtype=self.dtype)
         self.device = device
@@ -34,6 +32,7 @@ class RungeKuttaIntegrator(IntegratorTemplate, abc.ABC):
         self.initial_rhs = None
         self.initial_time = None
         self.final_rhs = None
+        self.__explicit = None
         self.__adaptive = False
         self.__fsal = False
         if dtype is None:
@@ -41,42 +40,120 @@ class RungeKuttaIntegrator(IntegratorTemplate, abc.ABC):
         else:
             self.tableau = D.to_type(self.tableau, dtype)
         if D.backend() == 'torch':
-            self.aux = self.aux.to(self.device)
             self.dState = self.dState.to(self.device)
             self.dTime = self.dTime.to(self.device)
             self.tableau = self.tableau.to(self.device)
-        if hasattr(self, "final_state"):
-            if dtype is None:
-                self.final_state = D.array(self.final_state)
-            else:
-                self.final_state = D.to_type(self.final_state, dtype)
-            if D.backend() == 'torch':
-                self.final_state = self.final_state.to(self.device)
-            self.__adaptive = (D.shape(self.final_state)[0] == 2)
-            self.__fsal = bool(D.all(self.tableau[-1, 1:] == self.final_state[0][1:]))
+
+    # Class properties for accessing attributes of the class #
+    @classmethod
+    def integrator_order(cls):
+        return cls.__order__
+    # ---- #
+
+    # Instance properties that are cached #
+    @property
+    def order(self):
+        return self.__class__.__order__
+
+    @property
+    def stages(self):
+        return self.tableau.shape[0]
+    # ---- #
+
+    @abc.abstractmethod
+    def step(self, rhs, initial_time, initial_state, constants, timestep):
+        pass
+
+    def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.8):
+        err_estimate = D.max(D.abs(D.to_float(diff)))
+        relerr = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state) + self.rtol * D.abs(dState / timestep)))
+        corr = 1.0
+        if err_estimate != 0:
+            corr = corr * tol * (relerr / err_estimate) ** (1.0 / self.order)
+        if corr != 0:
+            timestep = corr * timestep
+        if err_estimate > relerr:
+            return timestep, True
+        else:
+            return timestep, False
+
+
+class RungeKuttaIntegrator(TableauIntegrator):
+    final_state = None
+
+    def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
+        super().__init__(sys_dim=sys_dim, dtype=dtype, rtol=rtol, atol=atol, device=device)
+        if dtype is None:
+            self.final_state = D.array(self.final_state)
+        else:
+            self.final_state = D.to_type(self.final_state, dtype)
+        if D.backend() == 'torch':
+            self.final_state = self.final_state.to(self.device)
+        self.__adaptive = self.__class__.is_adaptive()
+        self.__fsal = self.__class__.is_fsal()
+        self.__explicit = self.__class__.is_explicit()
+        self.__explicit_stages = [col for col in range(self.stages) if D.all(self.tableau[col, col + 1:] == 0.0)]
+        self.__implicit_stages = [col for col in range(self.stages) if D.any(self.tableau[col, col + 1:] != 0.0)]
+
+        self.aux = D.zeros((self.stages, *self.dim), dtype=self.dtype)
+        if D.backend() == "torch":
+            self.aux = self.aux.to(self.device)
 
         self.tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (self.aux.ndim - 1))
-        self.solver_dict = dict(safety_factor=0.8, order=self.order, atol=self.atol, rtol=self.rtol)
+        if self.implicit:
+            self.solver_dict = dict(
+                tau0=0, tau1=0, niter0=0, niter1=0
+            )
+        else:
+            self.solver_dict = dict()
 
+    # Class properties for accessing attributes of the class #
+    @classmethod
+    def is_adaptive(cls):
+        return cls.final_state.shape[0] == 2
+
+    @classmethod
+    def is_explicit(cls):
+        return all([(cls.tableau[col, col + 1:] == 0.0).all() for col in range(cls.tableau.shape[0])])
+
+    @classmethod
+    def is_implicit(cls):
+        return any([(cls.tableau[col, col + 1:] != 0.0).any() for col in range(cls.tableau.shape[0])])
+
+    @classmethod
+    def is_fsal(cls):
+        return bool((cls.tableau[-1, 1:] == cls.final_state[0][1:]).all())
+    # ---- #
+
+    # Instance properties that are cached #
     @property
     def adaptive(self):
         return self.__adaptive
 
     @adaptive.setter
     def adaptive(self, other):
-        self.__adaptive = bool(other) & bool(D.all(self.tableau[-1, 1:] == self.final_state[0][1:]))
+        self.__adaptive = bool(other) & (D.shape(self.final_state)[0] == 2)
 
     @property
     def fsal(self):
         return self.__fsal
 
-    @abc.abstractmethod
-    def step(self, rhs, initial_time, initial_state, constants, timestep):
-        pass
+    @property
+    def explicit(self):
+        return self.__explicit
 
     @property
-    def order(self):
-        return -1
+    def implicit(self):
+        return not self.__explicit
+
+    @property
+    def explicit_stages(self):
+        return self.__explicit_stages
+
+    @property
+    def implicit_stages(self):
+        return self.__implicit_stages
+    # ---- #
 
     def __call__(self, rhs, initial_time, initial_state, constants, timestep):
         self.initial_state = D.copy(initial_state)
@@ -91,22 +168,14 @@ class RungeKuttaIntegrator(IntegratorTemplate, abc.ABC):
                   constants=constants, timestep=timestep)
 
         if self.adaptive or self.implicit:
-            self.solver_dict['diff'] = timestep * self.get_error_estimate()
-            self.solver_dict['initial_state'] = initial_state
-            self.solver_dict['initial_time'] = initial_time
-            self.solver_dict['timestep'] = self.dTime
-            self.solver_dict['atol'] = self.atol
-            self.solver_dict['rtol'] = self.rtol
-            self.solver_dict['dState'] = self.dState
-            timestep, redo_step = self.update_timestep()
+            diff = timestep * self.get_error_estimate()
+            timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, timestep)
             if redo_step:
                 for _ in range(64):
                     timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants,
                                                                     timestep)
-                    self.solver_dict['diff'] = timestep * self.get_error_estimate()
-                    self.solver_dict['timestep'] = self.dTime
-                    self.solver_dict['dState'] = self.dState
-                    timestep, redo_step = self.update_timestep()
+                    diff = timestep * self.get_error_estimate()
+                    timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, timestep)
                     if not redo_step:
                         break
                 if redo_step:
@@ -134,215 +203,23 @@ class RungeKuttaIntegrator(IntegratorTemplate, abc.ABC):
                     self.final_rhs
                 ))
 
-    def get_error_estimate(self):
-        if hasattr(self, "final_state") and self.adaptive:
-            p1 = D.sum(self.final_state[0][self.tableau_idx_expand] * self.aux, axis=0)
-            p2 = D.sum(self.final_state[1][self.tableau_idx_expand] * self.aux, axis=0)
-            return p1 - p2
-        else:
-            return D.zeros_like(self.dState)
-
-
-class ExplicitRungeKuttaIntegrator(RungeKuttaIntegrator):
-    """
-    A base class for all explicit Runge-Kutta methods with a lower triangular Butcher Tableau.
-
-    An ExplicitRungeKuttaIntegrator derived object corresponds to a
-    numerical integrator tailored to a particular dynamical system 
-    with an integration scheme defined by the Butcher tableau of the child
-    class.
-    
-    A child class that defines two sets of coefficients for final_state
-    is considered an adaptive method and uses the adaptive stepping 
-    based on the local error estimate derived from the two sets of 
-    final_state coefficients. Furthermore, local extrapolation is used.
-    
-    Attributes
-    ----------
-    tableau : numpy array, shape (N, N+1)
-        A numpy array with N stages and N+1 entries per stage where the first column 
-        is the timestep fraction and the remaining columns are the stage coefficients.
-        
-    final_state : numpy array, shape (k, N)
-        A numpy array with N+1 coefficients defining the final stage coefficients.
-        If k == 2, then the method is considered adaptive and the first row is
-        the lower order method and the second row is the higher order method
-        whose difference gives the local error of the numerical integration.
-        
-    symplectic : bool
-        True if the method is symplectic.
-    """
-
-    order = 1
-    implicit = False
-
-    def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
-        super().__init__(sys_dim, dtype, rtol, atol, device)
-
-    def step(self, rhs, initial_time, initial_state, constants, timestep):
-        for stage in range(D.shape(self.aux)[0]):
-            current_state = initial_state + timestep * D.sum(self.tableau[stage][self.tableau_idx_expand] * self.aux,
-                                                             axis=0)
-            if self.final_rhs is None:
-                self.aux[stage] = rhs(initial_time + self.tableau[stage, 0] * timestep, current_state, **constants)
-
-            if stage == 0 and D.sum(self.tableau[0]) == 0.0:
-                self.initial_rhs = self.aux[0]
-            elif self.fsal and stage == D.shape(self.aux)[0] - 1:
-                self.final_rhs = self.aux[stage]
-
-        if self.fsal:
-            self.dState = self.aux[-1] / timestep
-        else:
-            self.dState = timestep * D.sum(self.final_state[0][self.tableau_idx_expand] * self.aux, axis=0)
-
-        self.dTime = D.copy(timestep)
-
-        return timestep, (self.dTime, self.dState)
-
-
-class ExplicitSymplecticIntegrator(RungeKuttaIntegrator):
-    """
-    A base class for all symplectic numerical integration methods.
-
-    A ExplicitSymplecticIntegrator derived object corresponds to a
-    numerical integrator tailored to a particular dynamical system 
-    with an integration scheme defined by the sequence of drift-kick
-    coefficients in tableau.
-    
-    An explicit symplectic integrator may be considered as a sequence of carefully
-    picked drift and kick stages that build off the previous stage which is
-    the implementation considered here. A masking array of indices indicates
-    the drift and kick variables that are updated at each stage.
-    
-    In a system defined by a Hamiltonian of q and p (generalised position and
-    generalised momentum respectively), the drift stages update q and the kick
-    stages update p. For a conservative Hamiltonian, a symplectic method will
-    minimise the drift in the Hamiltonian during the integration.
-    
-    Attributes
-    ----------
-    tableau : numpy array, shape (N, N+1)
-        A numpy array with N stages and 3 entries per stage where the first column
-        is the timestep fraction and the remaining columns are the drift/kick coefficients.
-        
-    symplectic : bool
-        True if the method is symplectic.
-    """
-
-    implicit = False
-    symplectic = True
-
-    @property
-    def adaptive(self):
-        return False
-
-    @adaptive.setter
-    def adaptive(self, other):
-        pass
-
-    @property
-    def fsal(self):
-        return False
-
-    def __init__(self, sys_dim, dtype=None, staggered_mask=None, rtol=None, atol=None, device=None):
-        super().__init__(sys_dim, dtype, rtol, atol, device)
-        if staggered_mask is None:
-            staggered_mask = D.arange(sys_dim[0] // 2, sys_dim[0], dtype=D.int64)
-            self.staggered_mask = D.zeros(sys_dim, dtype=D.bool)
-            self.staggered_mask[staggered_mask] = 1
-        else:
-            self.staggered_mask = D.to_type(staggered_mask, D.bool)
-
-        self.msk = self.staggered_mask
-        self.nmsk = D.logical_not(self.staggered_mask)
-
-        if D.backend() == 'torch':
-            self.msk = self.msk.to(self.tableau)
-            self.nmsk = self.nmsk.to(self.tableau)
-
-    def step(self, rhs, initial_time, initial_state, constants, timestep):
-        msk = self.msk
-        nmsk = self.nmsk
-
-        current_time = D.copy(initial_time)
-        self.dState *= 0.0
-
-        for stage in range(D.shape(self.tableau)[0]):
-            if stage == 0:
-                self.initial_rhs = rhs(current_time, initial_state + self.dState, **constants)
-                aux = timestep * self.initial_rhs
+    def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.8):
+        timestep_from_error, redo_step = super().update_timestep(initial_state, dState, diff, initial_time, timestep,
+                                                                 tol)
+        if "niter0" in self.solver_dict.keys():
+            if self.solver_dict['niter0'] != 0:
+                Tk0, CTk0 = D.log(self.solver_dict['tau0']), math.log(self.solver_dict['niter0'])
+                Tk1, CTk1 = D.log(self.solver_dict['tau1']), math.log(self.solver_dict['niter1'])
+                dCTk = (CTk1 - CTk0) / (Tk1 - Tk0)
+                tau2 = timestep * D.exp(-tol * dCTk)
             else:
-                aux = timestep * rhs(current_time, initial_state + self.dState, **constants)
-            current_time = current_time + timestep * self.tableau[stage, 0]
-            self.dState += aux * self.tableau[stage, 1] * msk + aux * self.tableau[stage, 2] * nmsk
-
-        self.dTime = D.copy(timestep)
-
-        return self.dTime, (self.dTime, self.dState)
-
-
-class ImplicitRungeKuttaIntegrator(RungeKuttaIntegrator):
-    """
-    A base class for all implicit Runge-Kutta methods with arbitrary Butcher Tableau.
-
-    An ImplicitRungeKuttaIntegrator derived object corresponds to a
-    numerical integrator tailored to a particular dynamical system 
-    with an integration scheme defined by the Butcher tableau of the child
-    class.
-    
-    A child class that defines two sets of coefficients for final_state
-    is considered an adaptive method and uses the adaptive stepping 
-    based on the local error estimate derived from the two sets of 
-    final_state coefficients. Furthermore, local extrapolation is used.
-    
-    Attributes
-    ----------
-    tableau : numpy array, shape (N, N+1)
-        A numpy array with N stages and N+1 entries per stage where the first column 
-        is the timestep fraction and the remaining columns are the stage coefficients.
-        
-    final_state : numpy array, shape (k, N)
-        A numpy array with N+1 coefficients defining the final stage coefficients.
-        If k == 2, then the method is considered adaptive and the first row is
-        the lower order method and the second row is the higher order method
-        whose difference gives the local error of the numerical integration.
-        
-    symplectic : bool
-        True if the method is symplectic.
-    """
-
-    implicit = True
-    order = 1
-
-    def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
-        super().__init__(sys_dim, dtype, rtol, atol, device)
-        self.solver_dict.update(dict(
-            tau0=0, tau1=0, niter0=1, niter1=1,
-            nfev0=1, nfev1=1, njev0=1, njev1=1
-        ))
-
-    def update_timestep(self):
-        timestep = self.solver_dict['timestep']
-        safety_factor = self.solver_dict['safety_factor']
-        timestep_from_error, redo_step = super().update_timestep()
-        if self.solver_dict['tau0'] != 0:
-            Tk0, CTk0 = D.log(self.solver_dict['tau0']), math.log(self.solver_dict['niter0'])
-            Tk1, CTk1 = D.log(self.solver_dict['tau1']), math.log(self.solver_dict['niter1'])
-            dnCTk = D.array(CTk1 - CTk0)
-            ddCTk = D.array(Tk1 - Tk0)
-            if ddCTk > 0:
-                dCTk = dnCTk / ddCTk
+                tau2 = timestep
+            if tau2 < timestep_from_error:
+                return tau2, redo_step
             else:
-                dCTk = D.array(0.0)
-            tau2 = timestep * D.exp(-safety_factor * dCTk)
+                return timestep_from_error, redo_step
         else:
-            tau2 = timestep
-        if tau2 < timestep_from_error:
-            timestep = tau2
-        else:
-            timestep = timestep_from_error
-        return timestep, redo_step
+            return timestep_from_error, redo_step
 
     def step(self, rhs, initial_time, initial_state, constants, timestep):
         aux_shape = self.aux.shape
@@ -382,42 +259,185 @@ class ImplicitRungeKuttaIntegrator(RungeKuttaIntegrator):
                 __jac = D.reshape(__jac, tuple())
             return __jac
 
-        initial_guess = D.copy(self.aux)
+        # Initial guess using a conservative midpoint guess #
+        # initial_guess = D.copy(self.aux)
+        #
+        # midpoint_guess = D.stack([rhs(initial_time, initial_state, **constants)]*len(self.tableau))
+        # self.initial_rhs = midpoint_guess[0]
+        # midpoint_guess = D.stack([
+        #     0.5 * timestep * tbl[0] * (md + rhs(initial_time + 0.5 * timestep * tbl[0],
+        #                                         initial_state + 0.5 * timestep * tbl[0] * md,
+        #                                         **constants)) for tbl, md in zip(self.tableau, midpoint_guess)
+        # ])
+        #
+        # initial_guess = initial_guess + (0.5 * midpoint_guess + 0.5 * self.dState[None])
 
-        midpoint_guess = D.stack([rhs(initial_time, initial_state, **constants)] * len(self.tableau))
-        self.initial_rhs = midpoint_guess[0]
-        midpoint_guess = D.stack([
-            0.5 * timestep * tbl[0] * (md + rhs(initial_time + 0.5 * timestep * tbl[0],
-                                                initial_state + 0.5 * timestep * tbl[0] * md,
-                                                **constants)) for tbl, md in zip(self.tableau, midpoint_guess)
-        ])
+        # Initial guess from assuming method is explicit #
+        current_state = None
+        for stage in range(self.stages):
+            current_state = initial_state + timestep * D.sum(self.tableau[stage][self.tableau_idx_expand] * self.aux,
+                                                             axis=0)
 
-        initial_guess = initial_guess + (0.5 * midpoint_guess + 0.5 * self.dState[None])
+            if stage > 0 or self.final_rhs is None:
+                self.aux[stage] = rhs(initial_time + self.tableau[stage, 0] * timestep, current_state, **constants)
 
-        if rhs.jac_is_wrapped_rhs and D.backend() == 'torch':
-            nfun_jac = None
-            initial_guess.requires_grad = True
+            # print("Current State:", current_state)
+            # print("Auxiliary states:", self.aux)
+
+            if stage == 0 and D.sum(self.tableau[0]) == 0.0:
+                self.initial_rhs = self.aux[0]
+            elif self.fsal and stage == self.stages - 1:
+                self.final_rhs = self.aux[stage]
+
+        if self.implicit:
+            initial_guess = self.aux
+
+            if rhs.jac_is_wrapped_rhs and D.backend() == 'torch':
+                nfun_jac = None
+                initial_guess.requires_grad = True
+            else:
+                nfun_jac = __nfun_jac
+
+            desired_tol = D.max(D.abs(self.atol * 1e-1 + D.max(D.abs(D.to_float(self.rtol * 1e-1 * initial_state)))))
+            aux_root, (success, num_iter, _, _, prec) = utilities.optimizer.nonlinear_roots(nfun, initial_guess,
+                                                                                            jac=nfun_jac, verbose=False,
+                                                                                            tol=desired_tol, maxiter=30)
+
+            if not success and prec > desired_tol:
+                raise exception_types.FailedToMeetTolerances(
+                    "Step size too large, cannot solve system to the "
+                    "tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, desired_tol, num_iter))
+            self.solver_dict.update(dict(
+                tau0=self.solver_dict['tau1'], tau1=timestep,
+                niter0=self.solver_dict['niter0'], niter1=num_iter
+            ))
+
+            self.aux = D.reshape(aux_root, aux_shape)
+
+        if self.fsal and self.explicit:
+            self.dState = current_state - initial_state
         else:
-            nfun_jac = __nfun_jac
-
-        desired_tol = D.max(D.abs(self.atol + D.max(D.abs(D.to_float(self.rtol * initial_state)))))
-        aux_root, (success, num_iter, nfev, njev, prec) = utilities.optimizer.nonlinear_roots(nfun, initial_guess,
-                                                                                           jac=nfun_jac, verbose=False,
-                                                                                           tol=None, maxiter=30)
-        if not success and prec > desired_tol:
-            raise exception_types.FailedToMeetTolerances(
-                "Step size too large, cannot solve system to the "
-                "tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, desired_tol, num_iter))
-        self.solver_dict.update(dict(
-            tau0=self.solver_dict['tau1'], tau1=D.abs(timestep),
-            njev0=self.solver_dict['njev1'], njev1=njev+1,
-            nfev0=self.solver_dict['nfev1'], nfev1=nfev+1,
-            niter0=self.solver_dict['niter1'], niter1=num_iter+1
-        ))
-
-        self.aux = D.reshape(aux_root, aux_shape)
-        self.dState = timestep * D.sum(self.final_state[0][self.tableau_idx_expand] * self.aux, axis=0)
+            self.dState = timestep * D.sum(self.final_state[0][self.tableau_idx_expand] * self.aux, axis=0)
         self.dTime = D.copy(timestep)
+
+        return timestep, (self.dTime, self.dState)
+
+    def get_error_estimate(self):
+        if hasattr(self, "final_state") and self.adaptive:
+            p1 = D.sum(self.final_state[0][self.tableau_idx_expand] * self.aux, axis=0)
+            p2 = D.sum(self.final_state[1][self.tableau_idx_expand] * self.aux, axis=0)
+            return p1 - p2
+        else:
+            return D.zeros_like(self.dState)
+
+class ExplicitSymplecticIntegrator(TableauIntegrator):
+    """
+    A base class for all symplectic numerical integration methods.
+
+    A ExplicitSymplecticIntegrator derived object corresponds to a
+    numerical integrator tailored to a particular dynamical system 
+    with an integration scheme defined by the sequence of drift-kick
+    coefficients in tableau.
+    
+    An explicit symplectic integrator may be considered as a sequence of carefully
+    picked drift and kick stages that build off the previous stage which is
+    the implementation considered here. A masking array of indices indicates
+    the drift and kick variables that are updated at each stage.
+    
+    In a system defined by a Hamiltonian of q and p (generalised position and
+    generalised momentum respectively), the drift stages update q and the kick
+    stages update p. For a conservative Hamiltonian, a symplectic method will
+    minimise the drift in the Hamiltonian during the integration.
+    
+    Attributes
+    ----------
+    tableau : numpy array, shape (N, N+1)
+        A numpy array with N stages and 3 entries per stage where the first column
+        is the timestep fraction and the remaining columns are the drift/kick coefficients.
+        
+    symplectic : bool
+        True if the method is symplectic.
+    """
+
+    symplectic = True
+
+    # Class properties for accessing attributes of the class #
+    @classmethod
+    def is_adaptive(cls):
+        return False
+
+    @classmethod
+    def is_explicit(cls):
+        return True
+
+    @classmethod
+    def is_implicit(cls):
+        return False
+
+    @classmethod
+    def is_fsal(cls):
+        return False
+    # ---- #
+
+    # Instance properties that are cached #
+    @property
+    def adaptive(self):
+        return False
+
+    @adaptive.setter
+    def adaptive(self, other):
+        pass
+
+    @property
+    def fsal(self):
+        return False
+
+    @property
+    def explicit(self):
+        return True
+
+    @property
+    def implicit(self):
+        return False
+
+    @property
+    def explicit_stages(self):
+        return None
+
+    @property
+    def implicit_stages(self):
+        return None
+    # ---- #
+
+    def __init__(self, sys_dim, dtype=None, staggered_mask=None, rtol=None, atol=None, device=None):
+        super().__init__(sys_dim=sys_dim, dtype=dtype, rtol=rtol, atol=atol, device=device)
+        if staggered_mask is None:
+            staggered_mask = D.arange(sys_dim[0] // 2, sys_dim[0], dtype=D.int64)
+            self.staggered_mask = D.zeros(sys_dim, dtype=D.bool)
+            self.staggered_mask[staggered_mask] = 1
+        else:
+            self.staggered_mask = D.to_type(staggered_mask, D.bool)
+
+        self.msk = self.staggered_mask
+        self.nmsk = D.logical_not(self.staggered_mask)
+
+        if D.backend() == 'torch':
+            self.msk = self.msk.to(self.tableau)
+            self.nmsk = self.nmsk.to(self.tableau)
+
+    def __call__(self, rhs, initial_time, initial_state, constants, timestep):
+        self.initial_state = D.copy(initial_state)
+        self.initial_time = D.copy(initial_time)
+        self.initial_rhs = None
+
+        self.step(rhs=rhs, initial_time=initial_time, initial_state=initial_state,
+                  constants=constants, timestep=timestep)
+
+        if self.initial_rhs is None:
+            self.initial_rhs = rhs(initial_time, initial_state, **constants)
+
+        if self.final_rhs is None:
+            self.final_rhs = rhs(initial_time + self.dTime, initial_state + self.dState, **constants)
 
         return timestep, (self.dTime, self.dState)
 
@@ -431,6 +451,26 @@ class ImplicitRungeKuttaIntegrator(RungeKuttaIntegrator):
                     self.initial_rhs,
                     self.final_rhs
                 ))
+
+    def step(self, rhs, initial_time, initial_state, constants, timestep):
+        msk = self.msk
+        nmsk = self.nmsk
+
+        current_time = D.copy(initial_time)
+        self.dState *= 0.0
+
+        for stage in range(D.shape(self.tableau)[0]):
+            if stage == 0:
+                self.initial_rhs = rhs(current_time, initial_state + self.dState, **constants)
+                aux = timestep * self.initial_rhs
+            else:
+                aux = timestep * rhs(current_time, initial_state + self.dState, **constants)
+            current_time = current_time + timestep * self.tableau[stage, 0]
+            self.dState += aux * self.tableau[stage, 1] * msk + aux * self.tableau[stage, 2] * nmsk
+
+        self.dTime = D.copy(timestep)
+
+        return self.dTime, (self.dTime, self.dState)
 
 
 def generate_richardson_integrator(basis_integrator):
@@ -452,10 +492,26 @@ def generate_richardson_integrator(basis_integrator):
     class RichardsonExtrapolatedIntegrator(RichardsonIntegratorTemplate):
         __alt_names__ = ("Local Richardson Extrapolation of {}".format(basis_integrator.__name__),)
 
-        @property
-        def implicit(self):
-            return basis_integrator.implicit
+        # Class properties for accessing attributes of the class #
+        @classmethod
+        def is_adaptive(cls):
+            return True
 
+        @classmethod
+        def is_explicit(cls):
+            return basis_integrator.is_explicit()
+
+        @classmethod
+        def is_implicit(cls):
+            return basis_integrator.is_implicit()
+
+        @classmethod
+        def is_fsal(cls):
+            return False
+
+        # ---- #
+
+        # Instance properties that are cached #
         @property
         def adaptive(self):
             return True
@@ -463,6 +519,27 @@ def generate_richardson_integrator(basis_integrator):
         @adaptive.setter
         def adaptive(self, other):
             self.__adaptive = bool(other)
+
+        @property
+        def fsal(self):
+            return False
+
+        @property
+        def explicit(self):
+            return self.basis_integrators[0].explicit
+
+        @property
+        def implicit(self):
+            return self.basis_integrators[0].implicit
+
+        @property
+        def explicit_stages(self):
+            return None
+
+        @property
+        def implicit_stages(self):
+            return None
+        # ---- #
 
         symplectic = basis_integrator.symplectic
 
@@ -511,7 +588,6 @@ def generate_richardson_integrator(basis_integrator):
 
             self.__interpolants = None
             self.__interpolant_times = None
-            self.solver_dict = dict(safety_factor=0.5 if self.implicit else 0.9, atol=self.atol, rtol=self.rtol)
 
         def dense_output(self):
             return self.__interpolant_times, self.__interpolants
@@ -569,13 +645,8 @@ def generate_richardson_integrator(basis_integrator):
             self.dState = dy_z + 0.0
             self.dTime = D.copy(dt_z)
 
-            self.solver_dict['diff'] = diff
-            self.solver_dict['initial_state'] = initial_state
-            self.solver_dict['initial_time'] = initial_time
-            self.solver_dict['timestep'] = self.dTime
-            self.solver_dict['dState'] = self.dState
-            self.solver_dict['order'] = self.order
-            new_timestep, redo_step = self.update_timestep()
+            new_timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, dt_z,
+                                                           tol=0.5 if self.implicit else 0.9)
             if self.symplectic:
                 timestep = dt0
                 next_timestep = D.copy(dt0)
@@ -596,6 +667,20 @@ def generate_richardson_integrator(basis_integrator):
                 timestep = next_timestep
 
             return timestep, (self.dTime, self.dState)
+
+        def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.9):
+            err_estimate = D.max(D.abs(D.to_float(diff)))
+            relerr = D.max(
+                D.to_float(self.atol + self.rtol * D.abs(initial_state) + self.rtol * D.abs(dState / timestep)))
+            corr = 1.0
+            if err_estimate != 0:
+                corr = corr * tol * (relerr / err_estimate) ** (1.0 / self.order)
+            if corr != 0:
+                timestep = corr * timestep
+            if err_estimate > relerr:
+                return timestep, True
+            else:
+                return timestep, False
 
     RichardsonExtrapolatedIntegrator.__name__ = RichardsonExtrapolatedIntegrator.__qualname__ = "RichardsonExtrapolated_{}_Integrator".format(
         basis_integrator.__name__)
