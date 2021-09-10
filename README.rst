@@ -3,8 +3,8 @@ DESolver
 ========
 
 
-.. image:: https://travis-ci.com/Microno95/desolver.svg?branch=master
-   :target: https://travis-ci.com/Microno95/desolver
+.. image:: https://github.com/Microno95/desolver/.github/workflows/pytest-ubuntu.yml/badge.svg
+   :target: https://github.com/Microno95/desolver/.github/workflows/pytest-ubuntu.yml
    :alt: Build Status
 
 .. image:: https://readthedocs.org/projects/desolver/badge/?version=latest
