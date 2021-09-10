@@ -64,19 +64,6 @@ class TableauIntegrator(IntegratorTemplate, abc.ABC):
     def step(self, rhs, initial_time, initial_state, constants, timestep):
         pass
 
-    def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.8):
-        err_estimate = D.max(D.abs(D.to_float(diff)))
-        relerr = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state) + self.rtol * D.abs(dState / timestep)))
-        corr = 1.0
-        if err_estimate != 0:
-            corr = corr * tol * (relerr / err_estimate) ** (1.0 / self.order)
-        if corr != 0:
-            timestep = corr * timestep
-        if err_estimate > relerr:
-            return timestep, True
-        else:
-            return timestep, False
-
 
 class RungeKuttaIntegrator(TableauIntegrator):
     final_state = None
@@ -100,12 +87,11 @@ class RungeKuttaIntegrator(TableauIntegrator):
             self.aux = self.aux.to(self.device)
 
         self.tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (self.aux.ndim - 1))
+        self.solver_dict = dict(safety_factor=0.8, order=self.order, atol=self.atol, rtol=self.rtol)
         if self.implicit:
-            self.solver_dict = dict(
+            self.solver_dict.update(dict(
                 tau0=0, tau1=0, niter0=0, niter1=0
-            )
-        else:
-            self.solver_dict = dict()
+            ))
 
     # Class properties for accessing attributes of the class #
     @classmethod
@@ -168,14 +154,22 @@ class RungeKuttaIntegrator(TableauIntegrator):
                   constants=constants, timestep=timestep)
 
         if self.adaptive or self.implicit:
-            diff = timestep * self.get_error_estimate()
-            timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, timestep)
+            self.solver_dict['diff'] = timestep * self.get_error_estimate()
+            self.solver_dict['initial_state'] = initial_state
+            self.solver_dict['initial_time'] = initial_time
+            self.solver_dict['timestep'] = self.dTime
+            self.solver_dict['atol'] = self.atol
+            self.solver_dict['rtol'] = self.rtol
+            self.solver_dict['dState'] = self.dState
+            timestep, redo_step = self.update_timestep()
             if redo_step:
                 for _ in range(64):
                     timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants,
                                                                     timestep)
-                    diff = timestep * self.get_error_estimate()
-                    timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, timestep)
+                    self.solver_dict['diff'] = timestep * self.get_error_estimate()
+                    self.solver_dict['timestep'] = self.dTime
+                    self.solver_dict['dState'] = self.dState
+                    timestep, redo_step = self.update_timestep()
                     if not redo_step:
                         break
                 if redo_step:
@@ -203,15 +197,21 @@ class RungeKuttaIntegrator(TableauIntegrator):
                     self.final_rhs
                 ))
 
-    def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.8):
-        timestep_from_error, redo_step = super().update_timestep(initial_state, dState, diff, initial_time, timestep,
-                                                                 tol)
+    def update_timestep(self):
+        timestep = self.solver_dict['timestep']
+        safety_factor = self.solver_dict['safety_factor']
+        timestep_from_error, redo_step = super().update_timestep()
         if "niter0" in self.solver_dict.keys():
             if self.solver_dict['niter0'] != 0:
                 Tk0, CTk0 = D.log(self.solver_dict['tau0']), math.log(self.solver_dict['niter0'])
                 Tk1, CTk1 = D.log(self.solver_dict['tau1']), math.log(self.solver_dict['niter1'])
-                dCTk = (CTk1 - CTk0) / (Tk1 - Tk0)
-                tau2 = timestep * D.exp(-tol * dCTk)
+                dnCTk = D.array(CTk1 - CTk0)
+                ddCTk = D.array(Tk1 - Tk0)
+                if ddCTk > 0:
+                    dCTk = dnCTk / ddCTk
+                else:
+                    dCTk = D.array(0.0)
+                tau2 = timestep * D.exp(-safety_factor * dCTk)
             else:
                 tau2 = timestep
             if tau2 < timestep_from_error:
@@ -588,6 +588,7 @@ def generate_richardson_integrator(basis_integrator):
 
             self.__interpolants = None
             self.__interpolant_times = None
+            self.solver_dict = dict(safety_factor=0.5 if self.implicit else 0.9, atol=self.atol, rtol=self.rtol)
 
         def dense_output(self):
             return self.__interpolant_times, self.__interpolants
@@ -645,8 +646,13 @@ def generate_richardson_integrator(basis_integrator):
             self.dState = dy_z + 0.0
             self.dTime = D.copy(dt_z)
 
-            new_timestep, redo_step = self.update_timestep(initial_state, self.dState, diff, initial_time, dt_z,
-                                                           tol=0.5 if self.implicit else 0.9)
+            self.solver_dict['diff'] = diff
+            self.solver_dict['initial_state'] = initial_state
+            self.solver_dict['initial_time'] = initial_time
+            self.solver_dict['timestep'] = self.dTime
+            self.solver_dict['dState'] = self.dState
+            self.solver_dict['order'] = self.order
+            new_timestep, redo_step = self.update_timestep()
             if self.symplectic:
                 timestep = dt0
                 next_timestep = D.copy(dt0)
@@ -667,20 +673,6 @@ def generate_richardson_integrator(basis_integrator):
                 timestep = next_timestep
 
             return timestep, (self.dTime, self.dState)
-
-        def update_timestep(self, initial_state, dState, diff, initial_time, timestep, tol=0.9):
-            err_estimate = D.max(D.abs(D.to_float(diff)))
-            relerr = D.max(
-                D.to_float(self.atol + self.rtol * D.abs(initial_state) + self.rtol * D.abs(dState / timestep)))
-            corr = 1.0
-            if err_estimate != 0:
-                corr = corr * tol * (relerr / err_estimate) ** (1.0 / self.order)
-            if corr != 0:
-                timestep = corr * timestep
-            if err_estimate > relerr:
-                return timestep, True
-            else:
-                return timestep, False
 
     RichardsonExtrapolatedIntegrator.__name__ = RichardsonExtrapolatedIntegrator.__qualname__ = "RichardsonExtrapolated_{}_Integrator".format(
         basis_integrator.__name__)
