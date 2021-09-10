@@ -16,6 +16,7 @@ __all__ = [
 class TableauIntegrator(IntegratorTemplate, abc.ABC):
     tableau = None
     __order__ = None
+
     def __init__(self, sys_dim, dtype=None, rtol=None, atol=None, device=None):
         super().__init__()
         self.dim = sys_dim
@@ -48,6 +49,7 @@ class TableauIntegrator(IntegratorTemplate, abc.ABC):
     @classmethod
     def integrator_order(cls):
         return cls.__order__
+
     # ---- #
 
     # Instance properties that are cached #
@@ -58,6 +60,7 @@ class TableauIntegrator(IntegratorTemplate, abc.ABC):
     @property
     def stages(self):
         return self.tableau.shape[0]
+
     # ---- #
 
     @abc.abstractmethod
@@ -109,6 +112,7 @@ class RungeKuttaIntegrator(TableauIntegrator):
     @classmethod
     def is_fsal(cls):
         return bool((cls.tableau[-1, 1:] == cls.final_state[0][1:]).all())
+
     # ---- #
 
     # Instance properties that are cached #
@@ -139,6 +143,7 @@ class RungeKuttaIntegrator(TableauIntegrator):
     @property
     def implicit_stages(self):
         return self.__implicit_stages
+
     # ---- #
 
     def __call__(self, rhs, initial_time, initial_state, constants, timestep):
@@ -221,44 +226,40 @@ class RungeKuttaIntegrator(TableauIntegrator):
         else:
             return timestep_from_error, redo_step
 
+    def algebraic_system(self, next_state, rhs, initial_time, initial_state, timestep, constants):
+        __aux_states = D.reshape(next_state, self.aux.shape)
+        __rhs_states = D.stack([
+            rhs(initial_time + tbl[0] * timestep,
+                initial_state + timestep * D.sum(tbl[self.tableau_idx_expand] * __aux_states, axis=0), **constants)
+            for
+            tbl in self.tableau
+        ])
+        __states = D.reshape(__aux_states - __rhs_states, (-1,))
+        return __states
+
+    def algebraic_system_jacobian(self, next_state, rhs, initial_time, initial_state, timestep, constants):
+        __aux_states = D.reshape(next_state, self.aux.shape)
+        __step = self.numel
+        if D.backend() == 'torch':
+            __jac = D.eye(self.tableau.shape[0] * __step, device=__aux_states.device, dtype=__aux_states.dtype)
+        else:
+            __jac = D.eye(self.tableau.shape[0] * __step)
+        __prev_idx = -1
+        __rhs_jac = D.stack([
+            rhs.jac(initial_time + tbl[0] * timestep,
+                    initial_state + timestep * D.sum(tbl[self.tableau_idx_expand] * __aux_states, axis=0),
+                    **constants)
+            for tbl in self.tableau
+        ])
+        for idx in range(0, __jac.shape[0], __step):
+            for jdx in range(0, __jac.shape[1], __step):
+                __jac[idx:idx + __step, jdx:jdx + __step] -= timestep * self.tableau[
+                    idx // __step, 1 + jdx // __step] * __rhs_jac[idx // __step].reshape(__step, __step)
+        if __jac.shape[0] == 1 and __jac.shape[1] == 1:
+            __jac = D.reshape(__jac, tuple())
+        return __jac
+
     def step(self, rhs, initial_time, initial_state, constants, timestep):
-        aux_shape = self.aux.shape
-
-        def nfun(next_state):
-            nonlocal initial_time, initial_state, timestep, aux_shape
-            __aux_states = D.reshape(next_state, aux_shape)
-            __rhs_states = D.stack([
-                rhs(initial_time + tbl[0] * timestep,
-                    initial_state + timestep * D.sum(tbl[self.tableau_idx_expand] * __aux_states, axis=0), **constants)
-                for
-                tbl in self.tableau
-            ])
-            __states = D.reshape(__aux_states - __rhs_states, (-1,))
-            return __states
-
-        def __nfun_jac(next_state):
-            nonlocal self, initial_time, initial_state, timestep, aux_shape
-            __aux_states = D.reshape(next_state, aux_shape)
-            __step = self.numel
-            if D.backend() == 'torch':
-                __jac = D.eye(self.tableau.shape[0] * __step, device=__aux_states.device, dtype=__aux_states.dtype)
-            else:
-                __jac = D.eye(self.tableau.shape[0] * __step)
-            __prev_idx = -1
-            __rhs_jac = D.stack([
-                rhs.jac(initial_time + tbl[0] * timestep,
-                        initial_state + timestep * D.sum(tbl[self.tableau_idx_expand] * __aux_states, axis=0),
-                        **constants)
-                for tbl in self.tableau
-            ])
-            for idx in range(0, __jac.shape[0], __step):
-                for jdx in range(0, __jac.shape[1], __step):
-                    __jac[idx:idx + __step, jdx:jdx + __step] -= timestep * self.tableau[
-                        idx // __step, 1 + jdx // __step] * __rhs_jac[idx // __step].reshape(__step, __step)
-            if __jac.shape[0] == 1 and __jac.shape[1] == 1:
-                __jac = D.reshape(__jac, tuple())
-            return __jac
-
         # Initial guess using a conservative midpoint guess #
         # initial_guess = D.copy(self.aux)
         #
@@ -296,12 +297,15 @@ class RungeKuttaIntegrator(TableauIntegrator):
                 nfun_jac = None
                 initial_guess.requires_grad = True
             else:
-                nfun_jac = __nfun_jac
+                nfun_jac = self.algebraic_system_jacobian
 
             desired_tol = D.max(D.abs(self.atol * 1e-1 + D.max(D.abs(D.to_float(self.rtol * 1e-1 * initial_state)))))
-            aux_root, (success, num_iter, _, _, prec) = utilities.optimizer.nonlinear_roots(nfun, initial_guess,
-                                                                                            jac=nfun_jac, verbose=False,
-                                                                                            tol=desired_tol, maxiter=30)
+            aux_root, (success, num_iter, _, _, prec) = \
+                utilities.optimizer.nonlinear_roots(
+                    self.algebraic_system, initial_guess,
+                    jac=nfun_jac, verbose=False,
+                    tol=desired_tol, maxiter=30,
+                    additional_args=(rhs, initial_time, initial_state, timestep, constants))
 
             if not success and prec > desired_tol:
                 raise exception_types.FailedToMeetTolerances(
@@ -312,7 +316,7 @@ class RungeKuttaIntegrator(TableauIntegrator):
                 niter0=self.solver_dict['niter0'], niter1=num_iter
             ))
 
-            self.aux = D.reshape(aux_root, aux_shape)
+            self.aux = D.reshape(aux_root, self.aux.shape)
 
         if self.fsal and self.explicit:
             self.dState = current_state - initial_state
@@ -329,6 +333,7 @@ class RungeKuttaIntegrator(TableauIntegrator):
             return p1 - p2
         else:
             return D.zeros_like(self.dState)
+
 
 class ExplicitSymplecticIntegrator(TableauIntegrator):
     """
@@ -377,6 +382,7 @@ class ExplicitSymplecticIntegrator(TableauIntegrator):
     @classmethod
     def is_fsal(cls):
         return False
+
     # ---- #
 
     # Instance properties that are cached #
@@ -407,6 +413,7 @@ class ExplicitSymplecticIntegrator(TableauIntegrator):
     @property
     def implicit_stages(self):
         return None
+
     # ---- #
 
     def __init__(self, sys_dim, dtype=None, staggered_mask=None, rtol=None, atol=None, device=None):
@@ -539,6 +546,7 @@ def generate_richardson_integrator(basis_integrator):
         @property
         def implicit_stages(self):
             return None
+
         # ---- #
 
         symplectic = basis_integrator.symplectic
