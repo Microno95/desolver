@@ -79,11 +79,11 @@ class JacobianWrapper(object):
         D.set_float_fmt(cur_ffmt)
         return nodal_points, weights
 
-    def estimate(self, y, dy=None, **kwargs):
+    def estimate(self, y, *args, dy=None, **kwargs):
         if dy is None:
             dy = D.epsilon() ** 0.5
         unravelled_y = D.reshape(y, (-1,))
-        dy_val = self.rhs(y, **kwargs)
+        dy_val = self.rhs(y, *args, **kwargs)
         unravelled_dy = D.reshape(dy_val, (-1,))
         jacobian_y = D.zeros((*D.shape(unravelled_dy), *D.shape(unravelled_y)), dtype=unravelled_dy.dtype)
         y_msk = D.zeros_like(unravelled_y)
@@ -99,7 +99,7 @@ class JacobianWrapper(object):
             for A, w in zip(self.nodal_points, self.weights):
                 y_jac = unravelled_y + A * dy_cur * y_msk
                 jacobian_y[:, idx] = jacobian_y[:, idx] + w * D.reshape(
-                    self.rhs(D.reshape(y_jac, D.shape(y)), **kwargs), (-1,))
+                    self.rhs(D.reshape(y_jac, D.shape(y)), *args, **kwargs), (-1,))
 
             jacobian_y[:, idx] = jacobian_y[:, idx] / dy_cur
 
@@ -110,23 +110,23 @@ class JacobianWrapper(object):
         else:
             return jacobian_y.reshape((*D.shape(dy_val), *D.shape(y)))
 
-    def richardson(self, y, dy=0.5, factor=4.0, **kwargs):
-        A = [[self.estimate(y, dy=dy * (factor ** -m), **kwargs)] for m in range(self.richardson_iter)]
+    def richardson(self, y, *args, dy=0.5, factor=4.0, **kwargs):
+        A = [[self.estimate(y, dy=dy * (factor ** -m), *args, **kwargs)] for m in range(self.richardson_iter)]
         denom = factor ** self.base_order
         for m in range(1, self.richardson_iter):
             for n in range(1, m):
                 A[m].append(A[m][n - 1] + (A[m][n - 1] - A[m - 1][n - 1]) / (denom ** n - 1))
         return A[-1][-1]
 
-    def adaptive_richardson(self, y, dy=0.5, factor=4, **kwargs):
-        A = [[self.estimate(y, dy=dy, **kwargs)]]
+    def adaptive_richardson(self, y, *args, dy=0.5, factor=4, **kwargs):
+        A = [[self.estimate(y, *args, dy=dy, **kwargs)]]
         if self.richardson_iter == 1:
             return A[0][0]
         factor = 1.0 * factor
         denom = factor ** self.base_order
         prev_error = numpy.inf
         for m in range(1, self.richardson_iter):
-            A.append([self.estimate(y, dy=dy * (factor ** (-m)), **kwargs)])
+            A.append([self.estimate(y, *args, dy=dy * (factor ** (-m)), **kwargs)])
             for n in range(1, m + 1):
                 A[m].append(A[m][n - 1] + (A[m][n - 1] - A[m - 1][n - 1]) / (denom ** n - 1))
             if m >= 3:
@@ -144,14 +144,14 @@ class JacobianWrapper(object):
         else:
             return err_estimate, True
 
-    def __call__(self, y, **kwargs):
+    def __call__(self, y, *args, **kwargs):
         if self.richardson_iter > 0:
             if self.adaptive:
-                out = self.adaptive_richardson(y, **kwargs)
+                out = self.adaptive_richardson(y, *args, **kwargs)
             else:
-                out = self.richardson(y, **kwargs)
+                out = self.richardson(y, *args, **kwargs)
         else:
-            out = self.estimate(y, **kwargs)
+            out = self.estimate(y, *args, **kwargs)
         return out
 
 

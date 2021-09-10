@@ -593,7 +593,8 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200):
     return x, (success, dxn, iteration, F0)
 
 
-def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_scipy=True):
+def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_scipy=True,
+                    additional_args=tuple(), additional_kwargs=dict()):
     if tol is None:
         tol = 2 * D.epsilon()
     tol = float(tol)
@@ -603,7 +604,7 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
         xdim *= __d
     x = D.reshape(x0, (xdim, 1))
 
-    __f0 = f(x0)
+    __f0 = f(x0, *additional_args, **additional_kwargs)
     __f0n = D.norm(D.to_float(D.reshape(__f0, (-1,))))
     if __f0n <= tol:
         return x0, (True, 1, 1, 0, __f0n)
@@ -628,7 +629,7 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
         if D.backend() == 'torch' and not x.requires_grad:
             x.requires_grad = True
         nfev += 1
-        return D.reshape(f(D.reshape(x, xshape)), (fdim, 1))
+        return D.reshape(f(D.reshape(x, xshape), *additional_args, **additional_kwargs), (fdim, 1))
 
     if jac is None:
         if D.backend() == 'torch':
@@ -637,7 +638,7 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
                 if not x.requires_grad:
                     x.requires_grad = True
                 if __f is None:
-                    __f = fun(D.reshape(x, xshape))
+                    __f = fun(D.reshape(x, xshape), *additional_args, **additional_kwargs)
                 njev += 1
                 return D.reshape(D.jacobian(__f, x), (fdim, xdim))
         else:
@@ -646,13 +647,13 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
             def fun_jac(x, __f=None):
                 nonlocal njev, __fun_jac
                 njev += 1
-                return __fun_jac(x)
+                return __fun_jac(x, *additional_args, **additional_kwargs)
     else:
-        jac_shape = D.shape(jac(x0))
+        jac_shape = D.shape(jac(x0, *additional_args, **additional_kwargs))
         if is_gdual or jac_shape != (fdim, xdim):
             def fun_jac(x, __f=None):
                 nonlocal njev
-                __j = D.reshape(jac(D.reshape(x, xshape)), (fdim, xdim))
+                __j = D.reshape(jac(D.reshape(x, xshape), *additional_args, **additional_kwargs), (fdim, xdim))
                 if is_gdual and not is_vectorised:
                     __j = D.to_float(__j)
                 njev += 1
@@ -661,7 +662,7 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
             def fun_jac(x, __f=None):
                 nonlocal njev, jac
                 njev += 1
-                return jac(x)
+                return jac(x, *additional_args, **additional_kwargs)
 
     if use_scipy and D.backend() == 'numpy' and not is_vectorised and not is_gdual:
         res = scipy.optimize.root(lambda __x: fun(__x)[:, 0], x[:, 0], jac=fun_jac, tol=tol)
