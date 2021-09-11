@@ -42,11 +42,10 @@ jobs:
       run:  conda install "pytorch>=1.8.0" torchvision torchaudio -y
     - name: Test PyTorch backend
       continue-on-error: ${{ matrix.python-version == 3.8 || matrix.python-version == 3.9 }}
-      run: python -c "import torch;import torch.linalg;print(torch.linalg.inv(torch.tensor([[4.0]])))"
-#      env:
-#        DES_BACKEND: 'torch'
-#        OMP_NUM_THREADS: 1
-#      run: pytest --cov-append --cov-report=xml --cov=desolver -n 2 --run_implicit --run_explicit --run_torch_gradients
+      env:
+        DES_BACKEND: 'torch'
+        OMP_NUM_THREADS: 1
+      run: pytest --cov-append --cov-report=xml --cov=desolver -n 2 --run_implicit --run_explicit --run_torch_gradients
     - name: Test Numpy backend
       continue-on-error: ${{ matrix.python-version == 3.8 || matrix.python-version == 3.9 }}
       env: 
