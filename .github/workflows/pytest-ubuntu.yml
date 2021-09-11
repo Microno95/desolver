@@ -23,18 +23,20 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
+        channels: conda-forge
+        activate-environment: desolver
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
-      run:  conda install --file requirements.txt -c conda-forge -y
+      run:  conda install --file requirements.txt -y
     - name: Install pyaudi
       continue-on-error: ${{ matrix.python-version == 3.8 || matrix.python-version == 3.9 }}
-      run: conda install pyaudi>=1.6.5 -c conda-forge -y
+      run: conda install pyaudi>=1.6.5 -y
     - name: Install pytorch on Linux and Windows
       if: startsWith(matrix.os, 'windows') || startsWith(matrix.os, 'ubuntu')
-      run: conda install pytorch torchvision torchaudio cpuonly -c pytorch -c conda-forge -y
+      run: conda install pytorch torchvision torchaudio cpuonly -c pytorch -y
     - name: Install pytorch on Mac
       if: startsWith(matrix.os, 'macos')
-      run: conda install pytorch torchvision torchaudio -c pytorch -c conda-forge -y
+      run: conda install pytorch torchvision torchaudio -c pytorch -y
     - name: Test Numpy backend
       env: 
         DES_BACKEND: 'numpy'
