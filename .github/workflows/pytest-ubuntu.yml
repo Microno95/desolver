@@ -44,8 +44,7 @@ jobs:
       continue-on-error: ${{ matrix.python-version == 3.8 || matrix.python-version == 3.9 }}
       env:
         DES_BACKEND: 'torch'
-        OMP_NUM_THREADS: 1
-      run: pytest --cov-append --cov-report=xml --cov=desolver -n 2 --run_implicit --run_explicit --run_torch_gradients
+      run: pytest --cov-append --cov-report=xml --cov=desolver --run_implicit --run_explicit --run_torch_gradients
     - name: Test Numpy backend
       continue-on-error: ${{ matrix.python-version == 3.8 || matrix.python-version == 3.9 }}
       env: 
