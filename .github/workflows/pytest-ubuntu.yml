@@ -26,7 +26,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
-        channels: conda-forge
+        channels: conda-forge, pytorch
         activate-environment: desolver
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
@@ -36,10 +36,10 @@ jobs:
       run: conda install pyaudi>=1.6.5 -y
     - name: Install pytorch on Linux and Windows
       if: startsWith(matrix.os, 'windows') || startsWith(matrix.os, 'ubuntu')
-      run:  conda install pytorch>=1.8.0 torchvision torchaudio cpuonly -c pytorch -y
+      run:  conda install pytorch>=1.8.0 torchvision torchaudio cpuonly -y
     - name: Install pytorch on Mac
       if: startsWith(matrix.os, 'macos')
-      run:  conda install pytorch>=1.8.0 torchvision torchaudio -c pytorch -y
+      run:  conda install pytorch>=1.8.0 torchvision torchaudio -y
     - name: Test PyTorch backend
       continue-on-error: ${{ matrix.python-version == 3.8 || matrix.python-version == 3.9 }}
       run: python -c "import torch;import torch.linalg;print(torch.linalg.inv(torch.tensor([[4.0]])))"
