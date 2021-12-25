@@ -90,7 +90,7 @@ class RungeKuttaIntegrator(TableauIntegrator):
             self.aux = self.aux.to(self.device)
 
         self.tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (self.aux.ndim - 1))
-        self.solver_dict = dict(safety_factor=0.8, order=self.order, atol=self.atol, rtol=self.rtol)
+        self.solver_dict = dict(safety_factor=0.8, order=self.order, atol=self.atol, rtol=self.rtol, redo_count=0)
         if self.implicit:
             self.solver_dict.update(dict(
                 tau0=0, tau1=0, niter0=0, niter1=0
@@ -147,6 +147,7 @@ class RungeKuttaIntegrator(TableauIntegrator):
     # ---- #
 
     def __call__(self, rhs, initial_time, initial_state, constants, timestep):
+        self.solver_dict['redo_count'] = 0
         self.initial_state = D.copy(initial_state)
         self.initial_time = D.copy(initial_time)
         self.initial_rhs = None
@@ -169,6 +170,7 @@ class RungeKuttaIntegrator(TableauIntegrator):
             timestep, redo_step = self.update_timestep()
             if redo_step:
                 for _ in range(64):
+                    self.solver_dict['redo_count'] += 1
                     timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants,
                                                                     timestep)
                     self.solver_dict['diff'] = timestep * self.get_error_estimate()
@@ -274,10 +276,10 @@ class RungeKuttaIntegrator(TableauIntegrator):
         # initial_guess = initial_guess + (0.5 * midpoint_guess + 0.5 * self.dState[None])
 
         # Initial guess from assuming method is explicit #
-        current_state = None
+        intermediate_dstate = None
         for stage in range(self.stages):
-            current_state = initial_state + timestep * D.sum(self.tableau[stage][self.tableau_idx_expand] * self.aux,
-                                                             axis=0)
+            intermediate_dstate = timestep * D.sum(self.tableau[stage][self.tableau_idx_expand] * self.aux, axis=0)
+            current_state = initial_state + intermediate_dstate
 
             if stage > 0 or self.final_rhs is None:
                 self.aux[stage] = rhs(initial_time + self.tableau[stage, 0] * timestep, current_state, **constants)
@@ -319,7 +321,7 @@ class RungeKuttaIntegrator(TableauIntegrator):
             self.aux = D.reshape(aux_root, self.aux.shape)
 
         if self.fsal and self.explicit:
-            self.dState = current_state - initial_state
+            self.dState = intermediate_dstate
         else:
             self.dState = timestep * D.sum(self.final_state[0][self.tableau_idx_expand] * self.aux, axis=0)
         self.dTime = D.copy(timestep)

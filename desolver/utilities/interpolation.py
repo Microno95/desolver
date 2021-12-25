@@ -45,12 +45,41 @@ class CubicHermiteInterp(object):
         t_eval : float or array-type
            Point to evaluate interpolant at
         """
-        t        = self.__affine_transform(t_eval)
-        t2       = t**2
-        t3       = t2 * t
-        t3mt2    = t3 - t2
-        p2t3m3t2 = 2 * t3mt2 - t2
-        return (1 + p2t3m3t2) * self.p0 + (t3mt2 - t2 + t) * self.trange * self.m0 - p2t3m3t2 * self.p1 + t3mt2 * self.trange * self.m1
+        t = self.__affine_transform(t_eval)
+        if t == 0.0:
+            return self.p0
+        elif t == 1.0:
+            return self.p1
+        t2 = t**2
+        t3 = t2 * t
+
+        h00 = 2 * t3 - 3 * t2 + 1
+        h10 = t3 - 2 * t2 + t
+        h01 = -2 * t3 + 3 * t2
+        h11 = t3 - t2
+
+        return h00 * self.p0 + h10 * self.trange * self.m0 + h01 * self.p1 + h11 * self.trange * self.m1
+
+    def grad(self, t_eval):
+        t = t_eval
+        t_aff = (t - self.tshift)/self.trange
+        if t_aff == 0.0:
+            return self.m0
+        elif t_aff == 1.0:
+            return self.m1
+        t2 = 2 * (t - self.tshift)/self.trange * (1/self.trange)
+        t3 = 3 * (t - self.tshift)/self.trange * (t - self.tshift)/self.trange * (1/self.trange)
+
+        h00 = 2 * t3 - 3 * t2
+        h10 = t3 - 2 * t2 + (1/self.trange)
+        h01 = -2 * t3 + 3 * t2
+        h11 = t3 - t2
+
+        return h00 * self.p0 + h10 * self.trange * self.m0 + h01 * self.p1 + h11 * self.trange * self.m1
+
+    def __repr__(self):
+        return f"<CubicHermiteInterp(t0={self.t0}, t1={self.t1}, |p0|={D.norm(self.p0)}, |dp|={D.norm(self.p0 - self.p1)}, " \
+               f"|p1|={D.norm(self.p1)}, |m0|={D.norm(self.m0)}, |m1|={D.norm(self.m1)}, |dm|={D.norm(self.m0 - self.m1)})>"
     
 class FactorFunction:
     """Function Factoring Class

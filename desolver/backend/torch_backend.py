@@ -1,5 +1,6 @@
 from .common import *
 
+import builtins
 import torch
 
 # Datatypes
@@ -250,6 +251,7 @@ def min(x, axis=None, keepdims=False, out=None):
 any = torch.any
 all = torch.all
 
+
 @type_reg
 def array(x, dtype=None, device=None, requires_grad=False):
     if not torch.is_tensor(x):
@@ -258,9 +260,10 @@ def array(x, dtype=None, device=None, requires_grad=False):
     out.requires_grad = requires_grad
     return out
 
+
 # array = type_reg(torch.tensor)
 zeros = type_reg(torch.zeros)
-ones  = type_reg(torch.ones)
+ones = type_reg(torch.ones)
 empty = type_reg(torch.empty)
 full = type_reg(torch.full)
 zeros_like = type_reg(torch.zeros_like)
@@ -278,6 +281,8 @@ def asarray(x):
 def to_numpy(x):
     if isinstance(x, (list, tuple)):
         return stack(x).detach().cpu().numpy()
+    elif isinstance(x, (builtins.float, builtins.int, builtins.bool)):
+        return x
     return x.clone().detach().cpu().numpy()
 
 
@@ -354,12 +359,13 @@ def logical_xor(a, b, out=None, where=True):
 
 def nonzero(a):
     if len(shape(a)) == 0:
-        return (torch.nonzero(a.reshape(-1)),)
+        return torch.nonzero(a.reshape(-1)),
     else:
-        return (torch.nonzero(a),)
+        return torch.nonzero(a),
 
 
 argsort = axis_reg(torch.argsort)
+
 
 def gather(arr, indices, axis=0):
     return torch.gather(arr, dim=axis, index=indices)
@@ -426,7 +432,7 @@ def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True, r
         raise ValueError("nu cannot be less than zero! That's not a derivative...")
     if nu == 0:
         return out_tensor
-    if out_tensor.requires_grad == False:
+    if not out_tensor.requires_grad:
         if batch_mode:
             temp = torch.zeros(out_tensor.shape + in_tensor.shape[1:], dtype=in_tensor.dtype, device=out_tensor.device,
                                requires_grad=False)
@@ -448,7 +454,20 @@ def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True, r
                 )[0] for j in range(outputs_view.shape[1])]
             final_shape = out_tensor.shape + in_tensor.shape[1:]
         else:
-            outputs_view = out_tensor.view(-1)
+            outputs_view = out_tensor
+            if len(outputs_view.shape) > 1:
+                outputs_view = out_tensor.view(-1)
+            # outputs_view = outputs_view.view(1, -1)
+            # batch_one = torch.ones_like(outputs_view[:, 0])
+            # temp = [
+            #     torch.autograd.grad(
+            #         outputs_view[:, j],
+            #         [in_tensor] * in_tensor.nelement(),
+            #         grad_outputs=batch_one,
+            #         allow_unused=True,
+            #         retain_graph=True,
+            #         create_graph=create_graph if nu == 1 else True
+            #     )[0] for j in range(outputs_view.shape[1])]
             temp = [torch.autograd.grad(
                 outputs_view[i],
                 in_tensor,
@@ -462,7 +481,8 @@ def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True, r
         ])
         temp = temp.view(final_shape)
     if nu > 1:
-        temp2 = jacobian(temp, in_tensor, create_graph=create_graph, nu=nu - 1, batch_mode=batch_mode, return_intermediate=return_intermediate)
+        temp2 = jacobian(temp, in_tensor, create_graph=create_graph, nu=nu - 1, batch_mode=batch_mode,
+                         return_intermediate=return_intermediate)
         if return_intermediate:
             temp = (*temp2, (nu, temp))
         else:
@@ -472,8 +492,10 @@ def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True, r
             temp = ((nu, temp),)
     return temp
 
-def solve_linear_system(A,b,sparse=False):
-    return torch.solve(b,A).solution
+
+def solve_linear_system(A, b, sparse=False):
+    return torch.solve(b, A).solution
+
 
 matrix_inv = torch.linalg.inv
 eig = torch.eig

@@ -145,9 +145,9 @@ def brentsrootvec(f, bounds, tol=None, verbose=False, return_interval=False):
     """
     lower_bound, upper_bound = bounds
     if tol is None:
-        tol = D.epsilon()
-    if tol < D.epsilon():
-        tol = D.epsilon()
+        tol = 2*D.epsilon()
+    if tol < 2*D.epsilon():
+        tol = 2*D.epsilon()
     tol = D.to_float(tol)
     a, b = D.stack([lower_bound for _ in range(len(f))]), D.stack([upper_bound for _ in range(len(f))])
 
@@ -162,10 +162,9 @@ def brentsrootvec(f, bounds, tol=None, verbose=False, return_interval=False):
             out = [f[i](x[i]) for i in range(len(f))]
         else:
             out = [f[i](x[i]) if msk[i] else zero_elem for i in range(len(f))]
-        if verbose:
-            print(msk)
-            print(out)
-            print(f[0](x[0]), f[1](x[1]))
+        # if verbose:
+        #     print(msk)
+        #     print(out)
         return D.stack(out)
 
     if verbose:
@@ -250,7 +249,7 @@ def brentsrootvec(f, bounds, tol=None, verbose=False, return_interval=False):
         fa[mask], fb[mask] = fb[mask], fa[mask]
 
         conv = D.logical_not(D.logical_or(D.logical_or(fb == 0, fs == 0), D.abs(b - a) < tol))
-        conv = conv | (numiter >= 64)
+        conv = conv & (numiter <= 64)
         not_conv = D.logical_not(conv)
         true_conv = (D.abs(fb) <= tol)
 

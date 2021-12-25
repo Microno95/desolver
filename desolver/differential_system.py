@@ -30,25 +30,29 @@ def prepare_events(events):
         events = (events,)
 
     if events is not None:
-        is_terminal = D.zeros(len(events), dtype=bool)
+        is_terminal = D.zeros(len(events), dtype=D.bool)
         direction = D.zeros(len(events), dtype=D.int64)
-        last_occurence = D.zeros(len(events), dtype=D.int64) - 1
+        last_occurrence = D.zeros(len(events), dtype=D.int64) - 1
+        requires_dstate = D.zeros(len(events), dtype=D.bool)
         for i, event in enumerate(events):
             if hasattr(event, "is_terminal"):
                 is_terminal[i] = bool(event.is_terminal)
             if hasattr(event, "direction"):
                 direction[i] = event.direction
+            if hasattr(event, "requires_dstate"):
+                requires_dstate[i] = event.requires_dstate
     else:
         is_terminal = None
         direction = None
-        last_occurence = None
+        last_occurrence = None
+        requires_dstate = None
 
-    return events, is_terminal, direction, last_occurence
+    return events, is_terminal, direction, last_occurrence, requires_dstate
 
 
 #####
 
-def handle_events(sol_tuple, events, consts, direction, is_terminal):
+def handle_events(sol_tuple, events, consts, direction, is_terminal, attributes):
     """Helper function to handle events.
     Parameters
     ----------
@@ -75,7 +79,24 @@ def handle_events(sol_tuple, events, consts, direction, is_terminal):
         Whether a terminal event occurred.
     """
     sol, t_prev, t_next = sol_tuple
-    ev_f = [(lambda event: lambda t: event(t, sol(t), **consts))(ev) for ev in events]
+    requires_dstate, = attributes
+    t_diff = t_next - t_prev
+    # t_prev = t_prev - 0.01*t_diff
+    # t_next = t_next + 0.01*t_diff
+    ev_f = []
+
+    def __get_ev_f(__ev, __rds):
+        if __rds:
+            def __local_ev_f(t):
+                return __ev(t, sol(t), sol.grad(t), **consts)
+        else:
+            def __local_ev_f(t):
+                return __ev(t, sol(t), **consts)
+        return __local_ev_f
+
+    for ev, rds in zip(events, requires_dstate):
+        ev_f.append(__get_ev_f(ev, rds))
+    # ev_f = [(lambda event: lambda t: event(t, sol(t), **consts))(ev) for ev in events]
 
     roots, success = root_finder(
         ev_f,
@@ -116,6 +137,7 @@ def handle_events(sol_tuple, events, consts, direction, is_terminal):
     down = success & down
     either = up | down
 
+    # print(roots, success, up, down, either, g, g_cen, g_new)
     mask = (up & (direction > 0) |
             down & (direction < 0) |
             either & (direction == 0))
@@ -195,10 +217,26 @@ class DenseOutput(object):
             y_vals = D.stack([
                 self.y_interpolants[idx](_t) for idx, _t in zip(__indices, __flat_t)
             ], axis=0)
+            print(__indices)
             return D.reshape(y_vals, D.shape(t) + D.shape(y_vals)[1:])
         else:
             tidx = self.find_interval(t)
+            # print(tidx, self.y_interpolants[tidx])
             return self.y_interpolants[tidx](t)
+
+    def grad(self, t):
+        if len(D.shape(t)) > 0:
+            __flat_t = D.reshape(D.asarray(t), (-1,))
+            __indices = self.find_interval_vec(__flat_t)
+            y_vals = D.stack([
+                self.y_interpolants[idx].grad(_t) for idx, _t in zip(__indices, __flat_t)
+            ], axis=0)
+            print(__indices)
+            return D.reshape(y_vals, D.shape(t) + D.shape(y_vals)[1:])
+        else:
+            tidx = self.find_interval(t)
+            # print(tidx, self.y_interpolants[tidx])
+            return self.y_interpolants[tidx].grad(t)
 
     def add_interpolant(self, t, y_interp):
         if isinstance(t, list) and isinstance(y_interp, list):
@@ -236,6 +274,14 @@ class DenseOutput(object):
 
     def __len__(self):
         return len(self.t_eval) - 1
+
+    @property
+    def t_min(self):
+        return D.min(self.__t_eval_arr)
+
+    @property
+    def t_max(self):
+        return D.max(self.__t_eval_arr)
 
 
 class DiffRHS(object):
@@ -909,12 +955,16 @@ class OdeSystem(object):
             return
         steps = 0
 
-        events, is_terminal, direction, last_occurence = prepare_events(events)
+        events, is_terminal, direction, last_occurrence, requires_dstate = prepare_events(events)
 
-        if D.to_numpy(tf) == np.inf and not any(is_terminal):
-            deutil.warning(
-                "Specifying an indefinite integration time with no terminal events can lead to memory issues if no event terminates the integration.",
-                category=RuntimeWarning)
+        implicit_integration = False
+        if D.to_numpy(tf) == np.inf:
+            implicit_integration = True
+            if not any(is_terminal):
+                deutil.warning(
+                    "Specifying an indefinite integration time with no terminal events "
+                    "can lead to memory issues if no event terminates the integration.",
+                    category=RuntimeWarning)
 
         self.__fix_dt_dir(tf, self.__t[self.counter])
 
@@ -924,7 +974,10 @@ class OdeSystem(object):
         total_steps = self.__alloc_space_steps(tf)
 
         if eta:
-            tqdm_progress_bar = tqdm(total=int((tf - self.__t[self.counter]) / self.dt) + 1)
+            if tf == np.inf:
+                tqdm_progress_bar = tqdm(total=None)
+            else:
+                tqdm_progress_bar = tqdm(total=int((tf - self.__t[self.counter]) / self.dt) + 1)
         else:
             tqdm_progress_bar = None
 
@@ -941,8 +994,8 @@ class OdeSystem(object):
         cTime = D.zeros_like(self.__t[self.counter])
         self.__allocate_soln_space(total_steps)
         try:
-            while self.dt != 0 and D.abs(tf - self.__t[self.counter]) >= D.epsilon() and not end_int:
-                if D.abs(self.dt + self.__t[self.counter]) > D.abs(tf):
+            while (implicit_integration or self.dt != 0 and D.abs(tf - self.__t[self.counter]) >= D.epsilon()) and not end_int:
+                if not implicit_integration and D.abs(self.dt + self.__t[self.counter]) > D.abs(tf):
                     self.dt = (tf - self.__t[self.counter])
                 self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter],
                                                            self.constants, timestep=self.dt)
@@ -956,8 +1009,8 @@ class OdeSystem(object):
                 # https://reference.wolfram.com/language/tutorial/NDSolveSPRK.html
                 #
 
-                dState = dState + cState
-                dTime = dTime + cTime
+                # dState = dState + cState
+                # dTime = dTime + cTime
 
                 self.__y[self.counter + 1] = self.__y[self.counter] + dState
                 self.__t[self.counter + 1] = self.__t[self.counter] + dTime
@@ -980,8 +1033,7 @@ class OdeSystem(object):
                         self.counter -= 1
 
                         sol_tuple = (self.__sol, prev_time, next_time)
-                        active_events, roots, end_int, evs = handle_events(sol_tuple, events, self.constants, direction,
-                                                                           is_terminal)
+                        active_events, roots, end_int, evs = handle_events(sol_tuple, events, self.constants, direction, is_terminal, (requires_dstate,))
 
                         if self.counter + len(roots) + 1 >= len(self.__y):
                             total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
@@ -993,14 +1045,15 @@ class OdeSystem(object):
                             else:
                                 true_positive = (prev_time + dTime <= root) & (root <= self.__t[self.counter])
 
-                            #                             print(root, prev_time, prev_time + dTime, true_positive, ev(root, sol_tuple[0](root), **self.constants))
+                            # print(root, prev_time, prev_time + dTime, true_positive, ev(root, sol_tuple[0](root), **self.constants))
+
                             if true_positive:
                                 ev_state = StateTuple(t=root, y=self.__sol(root), event=ev)
-                                if not self.__events or last_occurence[ev_idx] == -1:
-                                    last_occurence[ev_idx] = len(self.__events)
+                                if not self.__events or last_occurrence[ev_idx] == -1:
+                                    last_occurrence[ev_idx] = len(self.__events)
                                     self.__events.append(ev_state)
-                                elif D.abs(ev_state.t - self.__events[last_occurence[ev_idx]].t) > D.epsilon() ** 0.7:
-                                    last_occurence[ev_idx] = len(self.__events)
+                                elif D.abs(ev_state.t - self.__events[last_occurrence[ev_idx]].t) > D.epsilon() ** 0.7:
+                                    last_occurrence[ev_idx] = len(self.__events)
                                     self.__events.append(ev_state)
 
                         if end_int:

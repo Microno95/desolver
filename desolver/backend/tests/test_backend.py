@@ -864,6 +864,7 @@ def test_gradients_batched():
 @pytest.mark.skipif(D.backend() != 'torch', reason="PyTorch Unavailable")
 def test_gradients_unbatched():
     a = D.array([1.0, 1.0], requires_grad=True)
+    print(D.jacobian(a, a, batch_mode=False))
     assert (D.all(D.jacobian(a, a, batch_mode=False) == D.array([[1.0, 0.0], [0.0, 1.0]])))
 
 
