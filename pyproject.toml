@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "desolver"
-version = "4.5.0"
+version = "5.0.0"
 dependencies = [
     'numpy>=1.18',
     'tqdm>=4.47.0',
