@@ -111,7 +111,7 @@ packages = ["desolver/"]
 parallel=true
 branch = true
 source = ["desolver"]
-data_file = "coverage/partial/.coverage"
+data_file = "coverage/.coverage"
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration
