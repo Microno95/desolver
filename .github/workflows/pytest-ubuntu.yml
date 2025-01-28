@@ -29,7 +29,6 @@ jobs:
         miniforge-version: latest
         auto-update-conda: true
         channels: conda-forge, pytorch
-        activate-environment: desolver
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
