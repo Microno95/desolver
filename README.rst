@@ -15,10 +15,6 @@ DESolver
    :target: https://codecov.io/gh/Microno95/desolver
    :alt: codecov
 
-.. image:: https://bettercodehub.com/edge/badge/Microno95/desolver?branch=master
-   :target: https://bettercodehub.com/
-   :alt: BCH compliance
-
 
 This is a python package for solving Initial Value Problems using various numerical integrators.
 Many integration routines are included ranging from fixed step to symplectic to adaptive integrators.
