@@ -10,13 +10,6 @@ if 'DES_BACKEND' in os.environ:
 
 if backend() == 'numpy':
     from .numpy_backend import *
-
-    try:
-        from .pyaudi_backend import *
-
-        print("PyAudi backend is available.", file=sys.stderr)
-    except:
-        pass
 elif backend() == 'torch':
     from .torch_backend import *
 
