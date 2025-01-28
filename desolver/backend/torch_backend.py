@@ -494,7 +494,7 @@ def jacobian(out_tensor, in_tensor, batch_mode=False, nu=1, create_graph=True, r
 
 
 def solve_linear_system(A, b, sparse=False):
-    return torch.solve(b, A).solution
+    return torch.linalg.solve(A, b)
 
 
 matrix_inv = torch.linalg.inv

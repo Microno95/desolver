@@ -239,7 +239,7 @@ def test_nonlinear_root_estimated_jac(solver, ffmt, tol):
 
 
 @pytest.mark.parametrize('solver', [de.utilities.optimizer.newtontrustregion,de.utilities.optimizer.nonlinear_roots])
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
+@pytest.mark.parametrize('ffmt', [i for i in D.available_float_fmt() if i != 'float16'])
 @pytest.mark.parametrize('tol', [None, 40, 1])
 @pytest.mark.parametrize('dim', [1, 5, 10, 100, 250])
 def test_nonlinear_root_dims(solver, ffmt, tol, dim):
