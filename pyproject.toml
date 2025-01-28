@@ -8,7 +8,8 @@ version = "4.5.0"
 dependencies = [
     'numpy>=1.18',
     'tqdm>=4.47.0',
-    'scipy>=1.4.1'
+    'scipy>=1.4.1',
+    'autoray>=0.7.0'
 ]
 requires-python = ">=3.9"
 authors = [
@@ -44,9 +45,6 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-pyaudi = [
-    "pyaudi>=1.6.5"
-]
 torch = [
     "torch>=2.5.0",
 ]
@@ -85,7 +83,6 @@ matrix.test-mode.env-vars = [
 matrix.test-mode.features = [
     "test",
   { value = "torch", if = ["torch"] },
-#   { value = "pyaudi", if = ["pyaudi"] },
 ]
 
 [project.urls]

@@ -5,9 +5,9 @@ Installing desolver
 
 `desolver` is a pure python module that builds upon the functionalities provided by numpy for a relatively efficient numerical integration library.
 
-Furthermore, desolver incoporates the use of `pyaudi <https://darioizzo.github.io/audi/>`_ and `pytorch <https://pytorch.org/>`_ for more advanced applications.
+Furthermore, as `desolver` relies on `autoray <https://github.com/jcmgray/autoray>` for the backend of array/tensors operations, `desolver` can easily extend to the use of other libraries such as pytorch, tensorflow, etc. in order to leverage accelerators and optimised gradient computation schemes for faster numerical integration.
 
-With these libraries, it is possible to incorporate gradient descent of parameters into the numerical integration of some system. :ref:`Differential Intelligence` example shows how to use pyaudi to tune the weights of a controller based on the outcome of a numerical integration.
+With the use of libraries equipped with automatic differentiation, it is possible to compute the gradients of the integrated system.
 
 To install `desolver` simply type:
 
@@ -15,14 +15,11 @@ To install `desolver` simply type:
 
    pip install desolver
    
-Refer to the following links for `pyaudi support <https://darioizzo.github.io/audi/install_c.html>`_ and `pytorch support <https://pytorch.org/get-started/>`_. desolver will automatically detect these modules if they are in the same environment and use them if possible.
+Refer to the following links for `pytorch support <https://pytorch.org/get-started/>`_. `desolver`` will automatically detect these modules and appropriately leverage their functionality.
 
-It is necessary to tell desolver if you'd like to use numpy (and pyaudi if available) or pytorch as the backend for the computations. To do this, you can set the environment variable `DES_BACKEND` to either `numpy` or `torch` as shown in the snippet below:
+Unlike versions prior to v5.0.0, `desolver` no longer requires specifying the backend manually and relies on `autoray` to automatically use the appropriate backend. Conversely, this puts the onus on the user to ensure that the functions remain pure `pytorch` or pure `numpy`, or to implement gradients of their function when necessary.
 
 .. code-block:: python
-
-   import os
-   os.environ['DES_BACKEND'] = 'torch' # or 'numpy'
    
    import desolver
 

@@ -142,7 +142,7 @@ def handle_events(sol_tuple, events, consts, direction, is_terminal, attributes)
             down & (direction < 0) |
             either & (direction == 0))
 
-    if D.backend() in ['numpy', 'pyaudi']:
+    if D.backend() in ['numpy']:
         active_events = D.nonzero(mask)[0]
     else:
         active_events = D.reshape(D.nonzero(mask)[0], (-1,))
@@ -748,7 +748,7 @@ class OdeSystem(object):
     def __allocate_soln_space(self, num_units):
         try:
             if num_units != 0:
-                if D.backend() in ['numpy', 'pyaudi']:
+                if D.backend() in ['numpy']:
                     self.__y = D.concatenate(
                         [self.__y, D.zeros((num_units,) + D.shape(self.__y[0]), dtype=self.__y[0].dtype)], axis=0)
                     self.__t = D.concatenate(

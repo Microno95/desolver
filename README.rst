@@ -22,24 +22,9 @@ Many integration routines are included ranging from fixed step to symplectic to 
 Documentation
 =============
 
-Documentation is now available at `desolver docs <https://desolver.readthedocs.io/>`_! This will be updated with new examples as they are written, currently the examples show the use of ``pyaudi``.
+Documentation is now available at `desolver docs <https://desolver.readthedocs.io/>`_! This will be updated with new examples as they are written.
 
-Latest Release
-==============
-
-**4.5.0** - Updated to `pyproject.toml` setup and removed `pyaudi` support.
-
-**4.2.0** - Improved performance of implicit methods, added embedded implicit methods following Kroulíková (2017) for fully implicit adaptive integration.
-
-**4.1.0** - Initial release of implicit integration schemes that use a basic newton-raphson algorithm to solve for the intermediate states.
-
-**3.0.0** - PyAudi support has been finalised. It is now possible to do numerical integrations using ``gdual`` variables such as ``gdual_double``\ , ``gdual_vdouble`` and ``gdual_real128`` (only on select platforms, refer to `pyaudi docs <https://darioizzo.github.io/audi/>`_ for more information). Install desolver with pyaudi support using ``pip install desolver[pyaudi]``. Documentation has also been added and is available at `desolver docs <https://desolver.readthedocs.io/>`_.
-
-**2.5.0** - Event detection has been added to the module. It is now possible to do numerical integration with terminal and non-terminal events.
-
-**2.2.0** - PyTorch backend is now implemented. It is now possible to numerically integrate a system of equations that use pytorch tensors and then compute gradients from these.
-
-Use of PyTorch backend requires installation of PyTorch from `here <https://pytorch.org/get-started/locally/>`_.
+.. include:: CHANGELOG.rst
 
 To Install:
 ===========
@@ -48,59 +33,9 @@ Just type
 
 ``pip install desolver``
 
-Implemented Integration Methods
--------------------------------
+Use of PyTorch backend requires installation of PyTorch from `here <https://pytorch.org/get-started/locally/>`_.
 
-Explicit Methods
-~~~~~~~~~~~~~~~~
-
-Adaptive Methods
-^^^^^^^^^^^^^^^^
-
-#. Runge-Kutta 14(12) (Feagin, 2009)
-#. Runge-Kutta 10(8) (Feagin, 2009)
-#. Runge-Kutta 8(7) (Dormand & Prince, 1980)
-#. Runge-Kutta 4(5) with Cash-Karp Coefficients
-#. Adaptive Heun-Euler Method
-
-Fixed Step Methods
-^^^^^^^^^^^^^^^^^^
-
-#. Symplectic BABs9o7H Method  (Mads & Nielsen, 2015, BAB's9o7H)
-#. Symplectic ABAs5o6HA Method (Mads & Nielsen, 2015, ABAs5o6H)
-#. Runge-Kutta 5 - The 5th order integrator from RK45 with Cash-Karp Coefficients.
-#. Runge-Kutta 4 - The classic RK4 integrator
-#. Midpoint Method
-#. Heun's Method
-#. Euler's Method
-#. Euler-Trapezoidal Method
-
-Implicit Methods [\ **NEW**\ ]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Adaptive Methods
-^^^^^^^^^^^^^^^^
-
-#. Lobatto IIIC 4(2) (Kroulíková, 2017)
-#. Radau IIA 5(2) (Kroulíková, 2017)
-
-
-Fixed Step Methods
-^^^^^^^^^^^^^^^^^^
-
-#. Backward Euler
-#. Implicit Midpoint
-#. Crank-Nicolson
-#. Lobatto IIIA 2
-#. Lobatto IIIB 2
-#. Lobatto IIIC 2
-#. Radau IA 3
-#. Radau IIA 3
-#. Lobatto IIIA 4
-#. Lobatto IIIB 4
-#. Gauss-Legendre 4
-#. Radau IA 5
-#. Radau IIA  6
+.. include:: AVAILABLE_METHODS.rst
 
 Minimal Working Example
 =======================
