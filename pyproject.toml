@@ -133,6 +133,3 @@ exclude_also = [
     ]
 
 ignore_errors = true
-
-[tool.coverage.html]
-directory = "coverage/reports/"

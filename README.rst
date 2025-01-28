@@ -27,6 +27,8 @@ Documentation is now available at `desolver docs <https://desolver.readthedocs.i
 Latest Release
 ==============
 
+**4.5.0** - Updated to `pyproject.toml` setup and removed `pyaudi` support.
+
 **4.2.0** - Improved performance of implicit methods, added embedded implicit methods following Kroulíková (2017) for fully implicit adaptive integration.
 
 **4.1.0** - Initial release of implicit integration schemes that use a basic newton-raphson algorithm to solve for the intermediate states.

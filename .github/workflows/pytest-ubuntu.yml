@@ -10,7 +10,7 @@ on:
     branches: [ master ]
 
 jobs:
-  test:
+  tests:
     name: Run tests/coverage
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -44,11 +44,59 @@ jobs:
         python -m pip install --requirement build-requirements.txt
     - name: Test All backend
       run: hatch test --all --cover -- -vx
-    - name: Upload Coverage report
-      run: codecov coverage
+    - name: Upload coverage data
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-data-${{ matrix.python-version }}-${{ matrix.os }}
+        path: .coverage
+        include-hidden-files: true
+        if-no-files-found: ignore
+  coverage:
+    name: Combine & check coverage
+    if: always()
+    needs: tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # Use latest Python, so it understands all syntax.
+          python-version: "3.12"
+      - name: Install a specific version of uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.4.4"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-data-*
+          merge-multiple: true
+      - name: Combine coverage
+        run: |
+          uv tool install 'coverage[toml]'
+
+          coverage combine
+
+          # Report and write to summary.
+          coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
+
+          coverage xml -o desolver-coverage.xml
+      - name: Upload XML report if check failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: xml-report
+          path: desolver-coverage.xml
+      - name: Upload coverage report to codecov
+        uses: codecov/codecov-action@13ce06bfc6bbe3ecf90edbbf1bc32fe5978ca1d3 # v5.3.1
+        with:
+          fail_ci_if_error: true # optional (default = false)
+          flags: pr-tests-${{ github.head_ref }} # optional
+          name: desolver-combined-reports # optional
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true # optional (default = false)
   publish:
     name: Build and publish Python 🐍 distributions 📦 to PyPI and TestPyPI
-    needs: test
+    needs: coverage
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags')
     steps:
@@ -70,3 +118,4 @@ jobs:
         with:
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
+      
