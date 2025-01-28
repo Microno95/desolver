@@ -75,7 +75,7 @@ cov-combine = "coverage combine"
 cov-report = "coverage report"
 
 [[tool.hatch.envs.hatch-test.matrix]]
-test-mode=["base", "torch"] #, "pyaudi"]
+test-mode=["base", "torch"]
 
 [tool.hatch.envs.hatch-test.overrides]
 matrix.test-mode.env-vars = [
@@ -108,8 +108,9 @@ exclude = [
 packages = ["desolver/"]
 
 [tool.coverage.run]
-parallel=true
+parallel = true
 branch = true
+relative_files = true
 source = ["desolver"]
 data_file = "coverage/.coverage"
 
