@@ -8,21 +8,22 @@ def pytest_addoption(parser):
         "--skip_backend", action="store_true", default=False, help="skip backend tests"
     )
     parser.addoption(
-        "--run_implicit", action="store_true", default=False, help="run implicit integrator tests"
+        "--skip_implicit", action="store_true", default=False, help="run implicit integrator tests"
     )
     parser.addoption(
-        "--run_explicit", action="store_true", default=False, help="run explicit integrator tests"
+        "--skip_explicit", action="store_true", default=False, help="run explicit integrator tests"
     )
     parser.addoption(
-        "--run_torch_gradients", action="store_true", default=False, help="run pytorch gradients integrator tests"
+        "--skip_torch_gradients", action="store_true", default=False, help="run pytorch gradients integrator tests"
     )
     parser.addoption(
         "--run_gpu", action="store_true", default=False, help="run pytorch gpu tests"
     )
     parser.addoption(
-        "--run_cpu", action="store_true", default=True, help="run pytorch cpu tests"
+        "--skip_cpu", action="store_true", default=False, help="run pytorch cpu tests"
     )
 
+    
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "backend: mark test as implicit integrator test")
@@ -41,7 +42,7 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(skip_backend)
     else:
         pass
-    if config.getoption("--run_implicit"):
+    if not config.getoption("--skip_implicit"):
         # --run_implicit given in cli: do not skip implicit integrator tests
         pass
     else:
@@ -49,7 +50,7 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if "implicit" in item.keywords:
                 item.add_marker(skip_implicit)
-    if config.getoption("--run_explicit"):
+    if not config.getoption("--skip_explicit"):
         # --run_explicit given in cli: do not skip explicit integrator tests
         pass
     else:
@@ -57,7 +58,7 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if "explicit" in item.keywords:
                 item.add_marker(skip_explicit)
-    if config.getoption("--run_torch_gradients"):
+    if not config.getoption("--skip_torch_gradients"):
         # --run_torch_gradients given in cli: do not skip tests for pytorch gradients
         pass
     else:
@@ -73,7 +74,7 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if "gpu" in item.keywords:
                 item.add_marker(gpu)
-    if config.getoption("--run_cpu"):
+    if not config.getoption("--skip_cpu"):
         # --run_cpu given in cli: do not skip cpu tests
         pass
     else:

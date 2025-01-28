@@ -1,0 +1,136 @@
+[build-system]
+requires = ["hatchling", "hatch-conda-build"]
+build-backend = "hatchling.build"
+
+[project]
+name = "desolver"
+version = "4.5.0"
+dependencies = [
+    'numpy>=1.18',
+    'tqdm>=4.47.0',
+    'scipy>=1.4.1'
+]
+requires-python = ">=3.9"
+authors = [
+  {name = "Ekin Ozturk'", email = "ekin.ozturk@alumni.utoronto.ca"},
+]
+maintainers = [
+  {name = "Ekin Ozturk'", email = "ekin.ozturk@alumni.utoronto.ca"},
+]
+description = "Differential Equation System Solver"
+readme = "README.rst"
+license = "MIT"
+license-files = ["LICEN[CS]E.*"]
+keywords = ['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode']
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: Console',
+    # Indicate who your project is intended for
+    'Intended Audience :: Developers',
+    'Intended Audience :: Science/Research',
+    'Intended Audience :: Education',
+    'Intended Audience :: End Users/Desktop',
+    'Topic :: Scientific/Engineering :: Mathematics',
+
+    # Pick your license as you wish (should match "license" above)
+    'License :: OSI Approved :: MIT License',
+
+    # Specify the Python versions you support here. In particular, ensure
+    # that you indicate whether you support Python 2, Python 3 or both.
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12'
+]
+
+[project.optional-dependencies]
+pyaudi = [
+    "pyaudi>=1.6.5"
+]
+torch = [
+    "torch>=2.5.0",
+]
+build = [
+    "hatch"
+]
+test = [
+    "coverage",
+    "pytest>=5.4.3",
+]
+
+
+
+[tool.hatch.envs.hatch-test]
+installer = "uv"
+parallel = true
+default-args = ["desolver"]
+features = [
+  "test"
+]
+
+[tool.hatch.envs.hatch-test.scripts]
+run = "pytest{env:HATCH_TEST_ARGS:} {args}"
+run-cov = "coverage run -m pytest{env:HATCH_TEST_ARGS:} {args}"
+cov-combine = "coverage combine"
+cov-report = "coverage report"
+
+[[tool.hatch.envs.hatch-test.matrix]]
+test-mode=["base", "torch"]
+
+[tool.hatch.envs.hatch-test.overrides]
+matrix.test-mode.env-vars = [
+  { key="DES_BACKEND", value = "numpy", if = ["base"] },
+  { key="DES_BACKEND", value = "torch", if = ["torch"] },
+]
+matrix.test-mode.features = [
+    "test",
+  { value = "torch", if = ["torch"] },
+#   { value = "pyaudi", if = ["pyaudi"] },
+]
+
+[project.urls]
+Homepage = "https://desolver.readthedocs.io/"
+Documentation = "https://desolver.readthedocs.io/"
+Repository = "https://github.com/Microno95/desolver"
+"Bug Tracker" = "https://github.com/Microno95/desolver/issues"
+Changelog = "https://github.com/Microno95/desolver/blob/master/CHANGELOG.md"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.github",
+  "/docs",
+  "/.coveragerc",
+  "/.readthedocs.yml",
+  "build-requirements.txt"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["desolver/"]
+
+[tool.coverage.run]
+parallel = true
+branch = true
+relative_files = true
+source = ["desolver"]
+data_file = "coverage/.coverage"
+
+[tool.coverage.report]
+# Regexes for lines to exclude from consideration
+exclude_also = [
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+    "if self\\.debug",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if __name__ == .__main__.:",
+
+    # Don't complain about abstract methods, they aren't run:
+    "@(abc\\.)?abstractmethod",
+    ]
+
+ignore_errors = true

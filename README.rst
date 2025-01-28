@@ -15,10 +15,6 @@ DESolver
    :target: https://codecov.io/gh/Microno95/desolver
    :alt: codecov
 
-.. image:: https://bettercodehub.com/edge/badge/Microno95/desolver?branch=master
-   :target: https://bettercodehub.com/
-   :alt: BCH compliance
-
 
 This is a python package for solving Initial Value Problems using various numerical integrators.
 Many integration routines are included ranging from fixed step to symplectic to adaptive integrators.
@@ -30,6 +26,8 @@ Documentation is now available at `desolver docs <https://desolver.readthedocs.i
 
 Latest Release
 ==============
+
+**4.5.0** - Updated to `pyproject.toml` setup and removed `pyaudi` support.
 
 **4.2.0** - Improved performance of implicit methods, added embedded implicit methods following Kroulíková (2017) for fully implicit adaptive integration.
 
