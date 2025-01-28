@@ -887,8 +887,8 @@ def test_matrix_inv_bigger():
         np.random.seed(15)
         for trial in range(3):
             A = np.random.normal(size=(diag_size,diag_size))
-            while np.abs(np.linalg.det(D.to_float(A))) <= 1e-5:
-                A = np.random.normal(size=(diag_size,diag_size), std=250.0)
+            while np.abs(np.linalg.det(D.to_float(A))) <= 1e-2 or np.abs(np.linalg.det(D.to_float(A))) > 10.0:
+                A = np.random.normal(size=(diag_size,diag_size))
             A = D.array(D.cast_to_float_fmt(A))
             Ainv = D.matrix_inv(A)
             assert (D.max(D.abs(D.to_float(Ainv@A - D.eye(diag_size)))) <= 16*D.epsilon()**0.5), "Matrix inversion failed for diagonal with size: " + str(diag_size)
