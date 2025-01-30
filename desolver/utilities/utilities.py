@@ -1,8 +1,8 @@
 import time
-import sys
+import functools
 import numpy
 import warnings
-from .. import backend as D
+from desolver import backend as D
 
 __all__ = [
     'JacobianWrapper',
@@ -13,6 +13,21 @@ __all__ = [
     'BlockTimer'
 ]
 
+
+@functools.lru_cache
+def get_finite_difference_weights(dtype, number_of_nodes, order=1):
+    inferred_backend = D.backend_like_dtype(dtype)
+    nodal_points = D.ar_numpy.linspace(-1, 1, number_of_nodes, dtype="float64")
+    weight_matrix = D.ar_numpy.stack(
+        [D.ar_numpy.pow(D.ar_numpy.astype(D.ar_numpy.asarray(nodal_points), "float64"), i) for i in range(len(nodal_points))])
+    b_vector = D.ar_numpy.zeros((len(nodal_points),), dtype="float64")
+    b_vector[order] = 1.0
+    if inferred_backend == 'torch':
+        b_vector = b_vector[:, None]
+    weights = D.ar_numpy.solve_linear_system(weight_matrix, b_vector)
+    if inferred_backend == 'torch':
+        weights = weights[:, 0]
+    return nodal_points, weights
 
 class JacobianWrapper(object):
     """
@@ -46,7 +61,7 @@ class JacobianWrapper(object):
     
     """
 
-    def __init__(self, rhs, base_order=2, richardson_iter=None, adaptive=True, flat=False, atol=None, rtol=None):
+    def __init__(self, rhs, base_order=2, richardson_iter=None, adaptive=True, flat=False, atol=None, rtol=None, sample_input=None):
         self.rhs = rhs
         self.base_order = base_order
         if richardson_iter is None:
@@ -55,60 +70,45 @@ class JacobianWrapper(object):
             self.richardson_iter = richardson_iter
         self.order = self.base_order + self.richardson_iter
         self.adaptive = adaptive
-        self.atol = 4 * D.epsilon() if atol is None else atol
-        self.rtol = 4 * D.epsilon() if rtol is None else rtol
+        eps_val = D.epsilon(sample_input.dtype if sample_input is not None else numpy.float64)
+        self.atol = 4 * eps_val if atol is None else atol
+        self.rtol = 4 * eps_val if rtol is None else rtol
         self.flat = flat
-        self.nodal_points, self.weights = self.finite_difference_weights(self.base_order, order=1)
-        self.nodal_points = self.nodal_points[D.abs(self.weights) > 16 * D.epsilon()]
-        self.weights = self.weights[D.abs(self.weights) > 16 * D.epsilon()]
-
-    @staticmethod
-    def finite_difference_weights(number_of_nodes, order=1):
-        cur_ffmt = D.float_fmt()
-        D.set_float_fmt('float64')
-        nodal_points = D.linspace(-1, 1, number_of_nodes)
-        weight_matrix = D.stack(
-            [D.pow(D.to_type(D.asarray(nodal_points), D.float64), i) for i in range(len(nodal_points))])
-        b_vector = D.zeros((len(nodal_points),), dtype=D.float64)
-        b_vector[order] = 1.0
-        if D.backend() == 'torch':
-            b_vector = b_vector[:, None]
-        weights = D.solve_linear_system(weight_matrix, b_vector)
-        if D.backend() == 'torch':
-            weights = weights[:, 0]
-        D.set_float_fmt(cur_ffmt)
-        return nodal_points, weights
+        self.nodal_points, self.weights = get_finite_difference_weights(numpy.float64 if sample_input is None else sample_input.dtype, self.base_order, order=1)
+        self.nodal_points = self.nodal_points[D.ar_numpy.abs(self.weights) > 16 * eps_val]
+        self.weights = self.weights[D.ar_numpy.abs(self.weights) > 16 * eps_val]
 
     def estimate(self, y, *args, dy=None, **kwargs):
         if dy is None:
-            dy = D.epsilon() ** 0.5
-        unravelled_y = D.reshape(y, (-1,))
+            dy = D.epsilon(y.dtype) ** 0.5
+        inferred_backend = D.backend_like_dtype(y.dtype)
+        unravelled_y = D.ar_numpy.reshape(y, (-1,))
         dy_val = self.rhs(y, *args, **kwargs)
-        unravelled_dy = D.reshape(dy_val, (-1,))
-        jacobian_y = D.zeros((*D.shape(unravelled_dy), *D.shape(unravelled_y)), dtype=unravelled_dy.dtype)
-        y_msk = D.zeros_like(unravelled_y)
-        if D.backend() == 'torch':
+        unravelled_dy = D.ar_numpy.reshape(dy_val, (-1,))
+        jacobian_y = D.ar_numpy.zeros((*D.ar_numpy.shape(unravelled_dy), *D.ar_numpy.shape(unravelled_y)), dtype=unravelled_dy.dtype)
+        y_msk = D.ar_numpy.zeros_like(unravelled_y)
+        if inferred_backend == 'torch':
             jacobian_y = jacobian_y.to(dy_val).to(y.device)
         for idx, val in enumerate(unravelled_y):
             y_msk[idx - 1] = 0.0
             y_msk[idx] = 1.0
             dy_cur = dy
-            if not self.adaptive and (D.abs(val) > 1.0 or dy_cur > D.abs(val) > 0.0):
+            if not self.adaptive and (D.ar_numpy.abs(val) > 1.0 or dy_cur > D.ar_numpy.abs(val) > 0.0):
                 dy_cur = dy_cur * val
 
             for A, w in zip(self.nodal_points, self.weights):
                 y_jac = unravelled_y + A * dy_cur * y_msk
-                jacobian_y[:, idx] = jacobian_y[:, idx] + w * D.reshape(
-                    self.rhs(D.reshape(y_jac, D.shape(y)), *args, **kwargs), (-1,))
+                jacobian_y[:, idx] = jacobian_y[:, idx] + w * D.ar_numpy.reshape(
+                    self.rhs(D.ar_numpy.reshape(y_jac, D.ar_numpy.shape(y)), *args, **kwargs), (-1,))
 
             jacobian_y[:, idx] = jacobian_y[:, idx] / dy_cur
 
         if self.flat:
-            if D.shape(jacobian_y) == (1, 1):
+            if D.ar_numpy.shape(jacobian_y) == (1, 1):
                 return jacobian_y[0, 0]
             return jacobian_y
         else:
-            return jacobian_y.reshape((*D.shape(dy_val), *D.shape(y)))
+            return jacobian_y.reshape((*D.ar_numpy.shape(dy_val), *D.ar_numpy.shape(y)))
 
     def richardson(self, y, *args, dy=0.5, factor=4.0, **kwargs):
         A = [[self.estimate(y, dy=dy * (factor ** -m), *args, **kwargs)] for m in range(self.richardson_iter)]
@@ -137,8 +137,8 @@ class JacobianWrapper(object):
         return A[-2][-1]
 
     def check_converged(self, initial_state, diff, prev_error):
-        err_estimate = D.max(D.abs(D.to_float(diff)))
-        relerr = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state)))
+        err_estimate = D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(diff)))
+        relerr = D.ar_numpy.max(D.ar_numpy.to_numpy(self.atol + self.rtol * D.ar_numpy.abs(initial_state)))
         if err_estimate > relerr and err_estimate < prev_error:
             return err_estimate, False
         else:
@@ -283,14 +283,14 @@ def search_bisection_vec(array, val):
     
     """
 
-    val = D.asarray(val)
-    array = D.asarray(array)
-    jlower = D.zeros_like(val, dtype=D.int64)
-    jupper = D.ones_like(val, dtype=D.int64) * (len(array) - 1)
+    val = D.ar_numpy.asarray(val)
+    array = D.ar_numpy.asarray(array)
+    jlower = D.ar_numpy.zeros_like(val, dtype=D.int64)
+    jupper = D.ar_numpy.ones_like(val, dtype=D.int64) * (len(array) - 1)
 
-    indices = D.zeros_like(val, dtype=D.int64)
-    msk1 = val <= D.gather(array, jlower)
-    msk2 = val >= D.gather(array, jupper)
+    indices = D.ar_numpy.zeros_like(val, dtype=D.int64)
+    msk1 = val <= D.ar_numpy.gather(array, jlower)
+    msk2 = val >= D.ar_numpy.gather(array, jupper)
     indices[msk1] = jlower[msk1]
     indices[msk2] = jupper[msk2]
 
@@ -298,7 +298,7 @@ def search_bisection_vec(array, val):
 
     while D.any(not_conv):
         jmid = (jupper + jlower) // 2
-        mid_vals = D.gather(array, jmid)
+        mid_vals = D.ar_numpy.gather(array, jmid)
         msk1 = val > mid_vals
         msk2 = val <= mid_vals
         jlower[msk1] = jmid[msk1]

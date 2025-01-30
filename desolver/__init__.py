@@ -1,14 +1,14 @@
-from . import backend
-from . import exception_types
+from desolver import backend
+from desolver import exception_types
+from desolver import utilities
+from desolver import integrators
 
-from .differential_system import DiffRHS, rhs_prettifier, OdeSystem
-from . import utilities
-from . import integrators
+from desolver.differential_system import *
 
-from .integrators import available_methods
-try:
-    from . import tests
-    from .utilities import tests
-    from .exception_types import tests
-except ImportError:
-    pass
+from desolver.integrators import available_methods
+# try:
+#     from . import tests
+#     from .utilities import tests
+#     from .exception_types import tests
+# except ImportError:
+#     pass

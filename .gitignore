@@ -5,3 +5,6 @@ coverage/
 coverage.xml
 .venv
 dist/
+**/.fileid.db
+**/.ipynb_checkpoints
+test-*.ipynb

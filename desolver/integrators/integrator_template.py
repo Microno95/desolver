@@ -1,11 +1,11 @@
 from .. import backend as D
 import abc
+import typing
 
 __all__ = [
     'IntegratorTemplate',
     'RichardsonIntegratorTemplate'
 ]
-
 
 class IntegratorTemplate(abc.ABC):
     symplectic = False
@@ -13,14 +13,27 @@ class IntegratorTemplate(abc.ABC):
 
     def __init__(self):
         self.solver_dict = None
+        self.__custom_adaptation_fn = None
 
     @property
-    def adaptive(self):
+    def is_adaptive(self):
         return False
 
-    @adaptive.setter
-    def adaptive(self, adaptive):
-        pass
+    @property
+    def adaptation_fn(self):
+        return self.__custom_adaptation_fn if self.__custom_adaptation_fn else self.update_timestep
+    
+    @adaptation_fn.setter
+    def adaptation_fn(self, update_step_fn: typing.Callable):
+        try:
+            adaptation_fn_outputs = update_step_fn(self)
+            assert isinstance(adaptation_fn_outputs, tuple)
+            assert len(adaptation_fn_outputs) == 2
+            assert isinstance(adaptation_fn_outputs[0], float)
+            assert isinstance(adaptation_fn_outputs[1], bool)
+        except AssertionError:
+            raise ValueError("Step adaptation function must be a function that takes `self` and returns a tuple of exactly two outputs of the form: (timestep[float], redo_step[bool])")
+        self.__custom_adaptation_fn = update_step_fn
 
     @abc.abstractmethod
     def __call__(self, rhs, initial_time, initial_state, constants, timestep):
@@ -30,7 +43,9 @@ class IntegratorTemplate(abc.ABC):
     def dense_output(self):
         pass
 
-    def update_timestep(self):
+    def update_timestep(self, ignore_custom_adaptation=False):
+        if self.adaptation_fn and not ignore_custom_adaptation:
+            return self.adaptation_fn(self)
         initial_state = self.solver_dict['initial_state']
         diff = self.solver_dict['diff']
         timestep = self.solver_dict['timestep']
@@ -39,9 +54,10 @@ class IntegratorTemplate(abc.ABC):
         rtol = self.solver_dict['rtol']
         dState = self.solver_dict['dState']
         order = self.solver_dict['order']
-        err_estimate = D.max(D.abs(D.to_float(diff)))
-        relerr = D.max(
-            D.to_float(atol + rtol * D.abs(initial_state) + rtol * D.abs(dState / timestep)))
+        err_estimate = D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(diff)))
+        relerr = D.ar_numpy.max(
+            D.ar_numpy.to_numpy(atol + rtol * D.ar_numpy.abs(initial_state) + rtol * D.ar_numpy.abs(dState / timestep))
+        )
         corr = 1.0
         if err_estimate != 0:
             corr = corr * safety_factor * (relerr / err_estimate) ** (1.0 / order)
@@ -60,7 +76,7 @@ class IntegratorTemplate(abc.ABC):
         return cls.__name__
 
     def __repr__(self):
-        if D.backend() == 'torch':
+        if self.device is not None:
             return "<{}({},{},{},{},{})>".format(self.__class__.__name__, self.dim, self.dtype, self.rtol, self.atol,
                                                  self.device)
         else:

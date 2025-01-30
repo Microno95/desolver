@@ -9,7 +9,8 @@ dependencies = [
     'numpy>=1.18',
     'tqdm>=4.47.0',
     'scipy>=1.4.1',
-    'autoray>=0.7.0'
+    'autoray>=0.7.0',
+    'einops>=0.8.0'
 ]
 requires-python = ">=3.9"
 authors = [
@@ -21,7 +22,7 @@ maintainers = [
 description = "Differential Equation System Solver"
 readme = "README.rst"
 license = "MIT"
-license-files = ["LICEN[CS]E.*"]
+license-files = ["LICENSE"]
 keywords = ['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode']
 classifiers = [
     'Development Status :: 5 - Production/Stable',
@@ -56,7 +57,23 @@ test = [
     "pytest>=5.4.3",
 ]
 
+[[tool.uv.index]]
+# Optional name for the index.
+name = "pytorch"
+# Required URL for the index.
+url = "https://download.pytorch.org/whl/cu126"
 
+[tool.hatch.envs.dev]
+installer = "uv"
+extra-dependencies = [
+  "jupyter",
+  "matplotlib",
+  "scipy",
+  "torch>=2.5.0",
+  "networkx",
+  "tqdm",
+  "ipywidgets"
+]
 
 [tool.hatch.envs.hatch-test]
 installer = "uv"
