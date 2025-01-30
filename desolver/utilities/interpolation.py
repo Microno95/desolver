@@ -23,9 +23,9 @@ class CubicHermiteInterp(object):
         self.t1 = D.ar_numpy.copy(t1)
         self.t0 = D.ar_numpy.copy(t0)
         self.p0 = D.ar_numpy.copy(p0)
-        self.p1 = D.ar_numpy.ar_numpy.copy(p1)
-        self.m0 = D.ar_numpy.ar_numpy.copy(m0)
-        self.m1 = D.ar_numpy.ar_numpy.copy(m1)
+        self.p1 = D.ar_numpy.copy(p1)
+        self.m0 = D.ar_numpy.copy(m0)
+        self.m1 = D.ar_numpy.copy(m1)
         
     @property
     def trange(self):

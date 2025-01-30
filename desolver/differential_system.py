@@ -9,7 +9,7 @@ from desolver import utilities as deutil
 
 import numpy as np
 
-# CubicHermiteInterp = deutil.interpolation.CubicHermiteInterp
+CubicHermiteInterp = deutil.interpolation.CubicHermiteInterp
 # root_finder = deutil.optimizer.brentsrootvec
 # root_polisher = deutil.optimizer.newtontrustregion
 
@@ -102,15 +102,15 @@ StateTuple = collections.namedtuple('StateTuple', ['t', 'y', 'event'])
 #         verbose=False
 #     )
 
-#     roots = D.asarray(roots)
+#     roots = D.ar_numpy.asarray(roots)
 
 #     g = [ev_f[idx](t_root - (t_next - t_prev) * D.epsilon() ** 0.5) for idx, t_root in enumerate(roots)]
 #     g_cen = [ev_f[idx](t_root) for idx, t_root in enumerate(roots)]
 #     g_new = [ev_f[idx](t_root + (t_next - t_prev) * D.epsilon() ** 0.5) for idx, t_root in enumerate(roots)]
 
-#     g = D.ar_numpy.to_numpy(D.stack(g))
-#     g_cen = D.ar_numpy.to_numpy(D.stack(g_cen))
-#     g_new = D.ar_numpy.to_numpy(D.stack(g_new))
+#     g = D.ar_numpy.to_numpy(D.ar_numpy.stack(g))
+#     g_cen = D.ar_numpy.to_numpy(D.ar_numpy.stack(g_cen))
+#     g_new = D.ar_numpy.to_numpy(D.ar_numpy.stack(g_new))
 
 #     if D.backend() == 'torch':
 #         direction = direction.to(g.device)
@@ -124,8 +124,8 @@ StateTuple = collections.namedtuple('StateTuple', ['t', 'y', 'event'])
 #         g_new = [ev_f[idx](t_root + receptive_field * (t_next - t_prev) * D.epsilon() ** 0.75) for idx, t_root in
 #                  enumerate(roots)]
 
-#         g = D.ar_numpy.to_numpy(D.stack(g))
-#         g_new = D.ar_numpy.to_numpy(D.stack(g_new))
+#         g = D.ar_numpy.to_numpy(D.ar_numpy.stack(g))
+#         g_new = D.ar_numpy.to_numpy(D.ar_numpy.stack(g_new))
 
 #         up = up | (((g <= 0) & (g_new >= 0)) | ((g <= 0) & (g_cen >= 0)) | ((g_cen <= 0) & (g_new >= 0)))
 #         down = down | ((g >= 0) & (g_new <= 0)) | ((g >= 0) & (g_cen <= 0)) | ((g_cen >= 0) & (g_new <= 0))
@@ -142,7 +142,7 @@ StateTuple = collections.namedtuple('StateTuple', ['t', 'y', 'event'])
 #     if D.backend() in ['numpy']:
 #         active_events = D.nonzero(mask)[0]
 #     else:
-#         active_events = D.reshape(D.nonzero(mask)[0], (-1,))
+#         active_events = D.ar_numpy.reshape(D.nonzero(mask)[0], (-1,))
 
 #     roots = roots[active_events]
 #     evs = [events[idx] for idx in active_events]
@@ -164,121 +164,127 @@ StateTuple = collections.namedtuple('StateTuple', ['t', 'y', 'event'])
 #     return active_events, roots, terminate, evs
 
 
-# class DenseOutput(object):
-#     """Dense Output class for storing the dense output from a numerical integration.
+class DenseOutput(object):
+    """Dense Output class for storing the dense output from a numerical integration.
     
-#     Attributes
-#     ----------
-#     t_eval : list or array-type
-#         time of evaluation of differential equations
-#     y_interpolants : list of interpolants
-#         interpolants of each timestep in a numerical integration
-#     """
+    Attributes
+    ----------
+    t_eval : list or array-type
+        time of evaluation of differential equations
+    y_interpolants : list of interpolants
+        interpolants of each timestep in a numerical integration
+    """
 
-#     def __init__(self, t_eval, y_interpolants):
-#         if t_eval is None and y_interpolants is None:
-#             self.t_eval = [D.array(0.0)]
-#             self.__t_eval_arr = D.stack(self.t_eval)
-#             self.__t_eval_arr_stale = False
-#             self.y_interpolants = []
-#         else:
-#             if t_eval is None or y_interpolants is None:
-#                 raise ValueError("Both t_eval and y_interpolants must not be NoneTypes")
-#             elif len(t_eval) != len(y_interpolants) + 1:
-#                 raise ValueError("The number of evaluation times and interpolants must be equal!")
-#             else:
-#                 self.t_eval = [D.asarray(t) for t in t_eval]
-#                 self.__t_eval_arr = D.stack(self.t_eval)
-#                 self.__t_eval_arr_stale = False
-#                 self.y_interpolants = y_interpolants
+    def __init__(self, t_eval, y_interpolants):
+        if t_eval is None and y_interpolants is None:
+            self.t_eval = None
+            self.__t_eval_arr = None
+            self.__t_eval_arr_stale = False
+            self.y_interpolants = []
+        else:
+            if t_eval is None or y_interpolants is None:
+                raise ValueError("Both t_eval and y_interpolants must not be NoneTypes")
+            elif len(t_eval) != len(y_interpolants) + 1:
+                raise ValueError("The number of evaluation times and interpolants must be equal!")
+            else:
+                self.t_eval = [D.ar_numpy.asarray(t) for t in t_eval]
+                self.__t_eval_arr = D.ar_numpy.stack(self.t_eval)
+                self.__t_eval_arr_stale = False
+                self.y_interpolants = y_interpolants
 
-#     @property
-#     def t_eval_arr(self):
-#         if self.__t_eval_arr_stale:
-#             self.__t_eval_arr = D.stack(self.t_eval)
-#             self.__t_eval_arr_stale = False
-#         return self.__t_eval_arr
+    @property
+    def t_eval_arr(self):
+        if self.__t_eval_arr_stale:
+            self.__t_eval_arr = D.ar_numpy.stack(self.t_eval)
+            self.__t_eval_arr_stale = False
+        return self.__t_eval_arr
 
-#     def find_interval(self, t):
-#         return min(deutil.search_bisection(self.t_eval, t), len(self.y_interpolants) - 1)
+    def find_interval(self, t):
+        if self.t_eval is None:
+            raise ValueError("No interpolant has been added and time interval is not defined!")
+        return min(deutil.search_bisection(self.t_eval, t), len(self.y_interpolants) - 1)
 
-#     def find_interval_vec(self, t):
-#         out = deutil.search_bisection_vec(self.t_eval_arr, t)
-#         out[out > len(self.y_interpolants) - 1] = len(self.y_interpolants) - 1
-#         return out
+    def find_interval_vec(self, t):
+        if self.t_eval is None:
+            raise ValueError("No interpolant has been added and time interval is not defined!")
+        out = deutil.search_bisection_vec(self.t_eval_arr, t)
+        out[out > len(self.y_interpolants) - 1] = len(self.y_interpolants) - 1
+        return out
 
-#     def __call__(self, t):
-#         if len(D.shape(t)) > 0:
-#             __flat_t = D.reshape(D.asarray(t), (-1,))
-#             __indices = self.find_interval_vec(__flat_t)
-#             y_vals = D.stack([
-#                 self.y_interpolants[idx](_t) for idx, _t in zip(__indices, __flat_t)
-#             ], axis=0)
-#             print(__indices)
-#             return D.reshape(y_vals, D.shape(t) + D.shape(y_vals)[1:])
-#         else:
-#             tidx = self.find_interval(t)
-#             # print(tidx, self.y_interpolants[tidx])
-#             return self.y_interpolants[tidx](t)
+    def __call__(self, t):
+        if len(D.ar_numpy.shape(t)) > 0:
+            __flat_t = D.ar_numpy.reshape(D.ar_numpy.asarray(t), (-1,))
+            __indices = self.find_interval_vec(__flat_t)
+            y_vals = D.ar_numpy.stack([
+                self.y_interpolants[idx](_t) for idx, _t in zip(__indices, __flat_t)
+            ], axis=0)
+            return D.ar_numpy.reshape(y_vals, D.ar_numpy.shape(t) + D.ar_numpy.shape(y_vals)[1:])
+        else:
+            tidx = self.find_interval(t)
+            return self.y_interpolants[tidx](t)
 
-#     def grad(self, t):
-#         if len(D.shape(t)) > 0:
-#             __flat_t = D.reshape(D.asarray(t), (-1,))
-#             __indices = self.find_interval_vec(__flat_t)
-#             y_vals = D.stack([
-#                 self.y_interpolants[idx].grad(_t) for idx, _t in zip(__indices, __flat_t)
-#             ], axis=0)
-#             print(__indices)
-#             return D.reshape(y_vals, D.shape(t) + D.shape(y_vals)[1:])
-#         else:
-#             tidx = self.find_interval(t)
-#             # print(tidx, self.y_interpolants[tidx])
-#             return self.y_interpolants[tidx].grad(t)
+    def grad(self, t):
+        if len(D.ar_numpy.shape(t)) > 0:
+            __flat_t = D.ar_numpy.reshape(D.ar_numpy.asarray(t), (-1,))
+            __indices = self.find_interval_vec(__flat_t)
+            y_vals = D.ar_numpy.stack([
+                self.y_interpolants[idx].grad(_t) for idx, _t in zip(__indices, __flat_t)
+            ], axis=0)
+            print(__indices)
+            return D.ar_numpy.reshape(y_vals, D.ar_numpy.shape(t) + D.ar_numpy.shape(y_vals)[1:])
+        else:
+            tidx = self.find_interval(t)
+            # print(tidx, self.y_interpolants[tidx])
+            return self.y_interpolants[tidx].grad(t)
 
-#     def add_interpolant(self, t, y_interp):
-#         if isinstance(t, list) and isinstance(y_interp, list):
-#             assert (len(t) == len(y_interp))
-#             for idx in range(len(t)):
-#                 self.add_interpolant(t[idx], y_interp[idx])
-#         elif (isinstance(t, list) and not isinstance(y_interp, list)) or (
-#                 not isinstance(t, list) and isinstance(y_interp, list)):
-#             raise TypeError(
-#                 "Expected both t and y_interp to be lists, but got type(t)={}, type(y_interp)={}".format(type(t), type(
-#                     y_interp)))
-#         else:
-#             try:
-#                 y_interp(self.t_eval[-1])
-#             except:
-#                 raise
-#             try:
-#                 y_interp(t)
-#             except:
-#                 raise
-#             if (t - self.t_eval[-1]) < 0:
-#                 self.t_eval.insert(0, D.asarray(t))
-#                 self.y_interpolants.insert(0, y_interp)
-#             else:
-#                 self.t_eval.append(D.asarray(t))
-#                 self.y_interpolants.append(y_interp)
-#             if D.backend() == 'torch':
-#                 self.t_eval = [i.to(D.asarray(t)) for i in self.t_eval]
-#             self.__t_eval_arr_stale = True
+    def add_interpolant(self, t, y_interp):
+        if isinstance(t, list) and isinstance(y_interp, list):
+            assert (len(t) == len(y_interp))
+            for idx in range(len(t)):
+                self.add_interpolant(t[idx], y_interp[idx])
+        elif (isinstance(t, list) and not isinstance(y_interp, list)) or (
+                not isinstance(t, list) and isinstance(y_interp, list)):
+            raise TypeError(
+                "Expected both t and y_interp to be lists, but got type(t)={}, type(y_interp)={}".format(type(t), type(
+                    y_interp)))
+        else:
+            try:
+                y_interp(self.t_eval[-1])
+            except:
+                raise
+            try:
+                y_interp(t)
+            except:
+                raise
+            if self.t_eval is None or len(self.t_eval) == 0:
+                self.t_eval = [D.ar_numpy.asarray(t)]
+                self.y_interpolants = [y_interp]
+            else:
+                if (t - self.t_eval[-1]) < 0:
+                    self.t_eval.insert(0, D.ar_numpy.asarray(t))
+                    self.y_interpolants.insert(0, y_interp)
+                else:
+                    self.t_eval.append(D.ar_numpy.asarray(t))
+                    self.y_interpolants.append(y_interp)
+            if D.autoray.infer_backend(t) == 'torch':
+                self.t_eval = [i.to(D.ar_numpy.asarray(t)) for i in self.t_eval]
+            self.__t_eval_arr_stale = True
 
-#     def remove_interpolant(self, idx):
-#         out = self.t_eval.pop(idx), self.y_interpolants.pop(idx)
-#         self.__t_eval_arr = D.stack(self.t_eval)
-#         return out
+    def remove_interpolant(self, idx):
+        out = self.t_eval.pop(idx), self.y_interpolants.pop(idx)
+        self.__t_eval_arr = D.ar_numpy.stack(self.t_eval)
+        return out
 
-#     def __len__(self):
-#         return len(self.t_eval) - 1
+    def __len__(self):
+        return len(self.t_eval) - 1
 
-#     @property
-#     def t_min(self):
-#         return D.min(self.__t_eval_arr)
+    @property
+    def t_min(self):
+        return D.ar_numpy.min(self.__t_eval_arr)
 
-#     @property
-#     def t_max(self):
-#         return D.max(self.__t_eval_arr)
+    @property
+    def t_max(self):
+        return D.ar_numpy.max(self.__t_eval_arr)
 
 
 class DiffRHS(object):
@@ -512,7 +518,7 @@ class OdeSystem(object):
         self.staggered_mask = None
         self.__dense_output = dense_output
         self.__int_status = 0
-        # self.__sol = DenseOutput([self.t0], [])
+        self.__sol = DenseOutput([self.t0], [])
 
         self.__move_to_device()
         self.__allocate_soln_space(self.__alloc_space_steps(self.tf))
@@ -1060,9 +1066,9 @@ class OdeSystem(object):
                         self.__y[self.counter + 1] = prev_state + dState
                         self.counter += 1
 
-                    # if not self.__dense_output:
-                    #     for _ in range(__pre_length - 1):
-                    #         self.__sol.remove_interpolant(0)
+                    if not self.__dense_output:
+                        for _ in range(__pre_length - 1):
+                            self.__sol.remove_interpolant(0)
 
                 steps += 1
 
