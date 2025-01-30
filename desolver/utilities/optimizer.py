@@ -162,9 +162,10 @@ def brentsrootvec(f, bounds, tol=None, verbose=False, return_interval=False, acc
     
     if isinstance(f, list):
         def _f(x, mask=None):
-            print(x, mask)
             out = [f[i](x[i]) if mask is None or (mask is not None and mask[i]) else D.ar_numpy.zeros_like(x[i]) for i in range(x.shape[0])]
-            return D.ar_numpy.stack(out)
+            return D.ar_numpy.concatenate(out)
+        if len(a.shape) == 0:
+            a, b = a[None], b[None]
         if a.shape[0] == 1:
             a, b = D.ar_numpy.tile(a, (len(f),)), D.ar_numpy.tile(b, (len(f),))
     elif accepts_mask:

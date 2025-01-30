@@ -10,8 +10,8 @@ from desolver import utilities as deutil
 import numpy as np
 
 CubicHermiteInterp = deutil.interpolation.CubicHermiteInterp
-# root_finder = deutil.optimizer.brentsrootvec
-# root_polisher = deutil.optimizer.newtontrustregion
+root_finder = deutil.optimizer.brentsrootvec
+root_polisher = deutil.optimizer.newtontrustregion
 
 __all__ = [
     'DiffRHS',
@@ -22,146 +22,146 @@ __all__ = [
 StateTuple = collections.namedtuple('StateTuple', ['t', 'y', 'event'])
 
 
-# ##### Code adapted from https://github.com/scipy/scipy/blob/v1.3.2/scipy/integrate/_ivp/ivp.py#L28 #####
-# def prepare_events(events):
-#     """Standardize event functions and extract is_terminal and direction."""
-#     if callable(events):
-#         events = (events,)
+##### Code adapted from https://github.com/scipy/scipy/blob/v1.3.2/scipy/integrate/_ivp/ivp.py#L28 #####
+def prepare_events(events, backend_like):
+    """Standardize event functions and extract is_terminal and direction."""
+    if callable(events):
+        events = (events,)
 
-#     if events is not None:
-#         is_terminal = D.ar_numpy.zeros(len(events), dtype=D.bool)
-#         direction = D.ar_numpy.zeros(len(events), dtype=D.int64)
-#         last_occurrence = D.ar_numpy.zeros(len(events), dtype=D.int64) - 1
-#         requires_dstate = D.ar_numpy.zeros(len(events), dtype=D.bool)
-#         for i, event in enumerate(events):
-#             if hasattr(event, "is_terminal"):
-#                 is_terminal[i] = bool(event.is_terminal)
-#             if hasattr(event, "direction"):
-#                 direction[i] = event.direction
-#             if hasattr(event, "requires_dstate"):
-#                 requires_dstate[i] = event.requires_dstate
-#     else:
-#         is_terminal = None
-#         direction = None
-#         last_occurrence = None
-#         requires_dstate = None
+    if events is not None:
+        is_terminal = D.ar_numpy.zeros(len(events), dtype=D.autoray.to_backend_dtype("bool", like=backend_like), like=backend_like)
+        direction = D.ar_numpy.zeros(len(events), dtype=D.autoray.to_backend_dtype("int64", like=backend_like), like=backend_like)
+        last_occurrence = D.ar_numpy.zeros(len(events), dtype=D.autoray.to_backend_dtype("int64", like=backend_like), like=backend_like) - 1
+        requires_dstate = D.ar_numpy.zeros(len(events), dtype=D.autoray.to_backend_dtype("bool", like=backend_like), like=backend_like)
+        if D.autoray.infer_backend(backend_like) == 'torch':
+            is_terminal = is_terminal.to(backend_like.device)
+            direction = direction.to(backend_like.device)
+            last_occurrence = last_occurrence.to(backend_like.device)
+            requires_dstate = requires_dstate.to(backend_like.device)
+        for i, event in enumerate(events):
+            if hasattr(event, "is_terminal"):
+                is_terminal[i] = bool(event.is_terminal)
+            if hasattr(event, "direction"):
+                direction[i] = event.direction
+            if hasattr(event, "requires_dstate"):
+                requires_dstate[i] = event.requires_dstate
+    else:
+        is_terminal = None
+        direction = None
+        last_occurrence = None
+        requires_dstate = None
 
-#     return events, is_terminal, direction, last_occurrence, requires_dstate
-# ##### #####
+    return events, is_terminal, direction, last_occurrence, requires_dstate
+##### ---- #####
 
-# def handle_events(sol_tuple, events, consts, direction, is_terminal, attributes):
-#     """Helper function to handle events.
-#     Parameters
-#     ----------
-#     sol : DenseOutput
-#         Function ``sol(t)`` which evaluates an ODE solution between `t_old`
-#         and  `t`.
-#     events : list of callables
-#         List of Event functions
-#     consts : dict
-#         Dictionary of system constants
-#     direction : array-type, shape (n_events,)
-#         Direction of event to be detected
-#     is_terminal : array-type, shape (n_events,)
-#         Which events are terminal.
-#     Returns
-#     -------
-#     active_events : array-type
-#         Indices of events which take zero between `t_prev` and `t_next` and before
-#         a possible termination.
-#     roots : array-type
-#         Values of t at which events occurred sorted in time according to the direction
-#         of `t_prev` to `t_next`.
-#     terminate : bool
-#         Whether a terminal event occurred.
-#     """
-#     sol, t_prev, t_next = sol_tuple
-#     requires_dstate, = attributes
-#     t_diff = t_next - t_prev
-#     # t_prev = t_prev - 0.01*t_diff
-#     # t_next = t_next + 0.01*t_diff
-#     ev_f = []
+def handle_events(sol_tuple, events, consts, direction, is_terminal, attributes):
+    """Helper function to handle events.
+    Parameters
+    ----------
+    sol : DenseOutput
+        Function ``sol(t)`` which evaluates an ODE solution between `t_old`
+        and  `t`.
+    events : list of callables
+        List of Event functions
+    consts : dict
+        Dictionary of system constants
+    direction : array-type, shape (n_events,)
+        Direction of event to be detected
+    is_terminal : array-type, shape (n_events,)
+        Which events are terminal.
+    Returns
+    -------
+    active_events : array-type
+        Indices of events which take zero between `t_prev` and `t_next` and before
+        a possible termination.
+    roots : array-type
+        Values of t at which events occurred sorted in time according to the direction
+        of `t_prev` to `t_next`.
+    terminate : bool
+        Whether a terminal event occurred.
+    """
+    sol, t_prev, t_next = sol_tuple
+    requires_dstate, = attributes
+    # t_diff = t_next - t_prev
+    # t_prev = t_prev - 0.001*t_diff
+    # t_next = t_next + 0.001*t_diff
+    ev_f = []
 
-#     def __get_ev_f(__ev, __rds):
-#         if __rds:
-#             def __local_ev_f(t):
-#                 return __ev(t, sol(t), sol.grad(t), **consts)
-#         else:
-#             def __local_ev_f(t):
-#                 return __ev(t, sol(t), **consts)
-#         return __local_ev_f
+    def __get_ev_f(__ev, __rds):
+        if __rds:
+            def __local_ev_f(t):
+                return __ev(t, sol(t), sol.grad(t), **consts)
+        else:
+            def __local_ev_f(t):
+                return __ev(t, sol(t), **consts)
+        return __local_ev_f
 
-#     for ev, rds in zip(events, requires_dstate):
-#         ev_f.append(__get_ev_f(ev, rds))
-#     # ev_f = [(lambda event: lambda t: event(t, sol(t), **consts))(ev) for ev in events]
+    for ev, rds in zip(events, requires_dstate):
+        ev_f.append(__get_ev_f(ev, rds))
+    # ev_f = [(lambda event: lambda t: event(t, sol(t), **consts))(ev) for ev in events]
 
-#     roots, success = root_finder(
-#         ev_f,
-#         [t_prev, t_next],
-#         tol=None,
-#         verbose=False
-#     )
+    roots, success = root_finder(
+        ev_f,
+        [t_prev, t_next],
+        tol=None,
+        verbose=False
+    )
 
-#     roots = D.ar_numpy.asarray(roots)
+    g = [ev_f[idx](t_root - (t_next - t_prev) * D.epsilon(roots[0].dtype) ** 0.5) for idx, t_root in enumerate(roots)]
+    g_cen = [ev_f[idx](t_root) for idx, t_root in enumerate(roots)]
+    g_new = [ev_f[idx](t_root + (t_next - t_prev) * D.epsilon(roots[0].dtype) ** 0.5) for idx, t_root in enumerate(roots)]
 
-#     g = [ev_f[idx](t_root - (t_next - t_prev) * D.epsilon() ** 0.5) for idx, t_root in enumerate(roots)]
-#     g_cen = [ev_f[idx](t_root) for idx, t_root in enumerate(roots)]
-#     g_new = [ev_f[idx](t_root + (t_next - t_prev) * D.epsilon() ** 0.5) for idx, t_root in enumerate(roots)]
+    g = D.ar_numpy.stack(g)
+    g_cen = D.ar_numpy.stack(g_cen)
+    g_new = D.ar_numpy.stack(g_new)
 
-#     g = D.ar_numpy.to_numpy(D.ar_numpy.stack(g))
-#     g_cen = D.ar_numpy.to_numpy(D.ar_numpy.stack(g_cen))
-#     g_new = D.ar_numpy.to_numpy(D.ar_numpy.stack(g_new))
+    if D.autoray.infer_backend(roots[0]) == 'torch':
+        direction = direction.to(g.device)
 
-#     if D.backend() == 'torch':
-#         direction = direction.to(g.device)
+    up = ((g <= 0) & (g_new >= 0)) | ((g <= 0) & (g_cen >= 0)) | ((g_cen <= 0) & (g_new >= 0))
+    down = ((g >= 0) & (g_new <= 0)) | ((g >= 0) & (g_cen <= 0)) | ((g_cen >= 0) & (g_new <= 0))
 
-#     up = ((g <= 0) & (g_new >= 0)) | ((g <= 0) & (g_cen >= 0)) | ((g_cen <= 0) & (g_new >= 0))
-#     down = ((g >= 0) & (g_new <= 0)) | ((g >= 0) & (g_cen <= 0)) | ((g_cen >= 0) & (g_new <= 0))
+    for receptive_field in [1.0, 2.0, 3.0]:
+        g = [ev_f[idx](t_root - receptive_field * (t_next - t_prev) * D.epsilon(roots[0].dtype) ** 0.75) for idx, t_root in
+             enumerate(roots)]
+        g_new = [ev_f[idx](t_root + receptive_field * (t_next - t_prev) * D.epsilon(roots[0].dtype) ** 0.75) for idx, t_root in
+                 enumerate(roots)]
 
-#     for receptive_field in [1.0, 2.0, 3.0]:
-#         g = [ev_f[idx](t_root - receptive_field * (t_next - t_prev) * D.epsilon() ** 0.75) for idx, t_root in
-#              enumerate(roots)]
-#         g_new = [ev_f[idx](t_root + receptive_field * (t_next - t_prev) * D.epsilon() ** 0.75) for idx, t_root in
-#                  enumerate(roots)]
+        g = D.ar_numpy.stack(g)
+        g_new = D.ar_numpy.stack(g_new)
 
-#         g = D.ar_numpy.to_numpy(D.ar_numpy.stack(g))
-#         g_new = D.ar_numpy.to_numpy(D.ar_numpy.stack(g_new))
+        up = up | (((g <= 0) & (g_new >= 0)) | ((g <= 0) & (g_cen >= 0)) | ((g_cen <= 0) & (g_new >= 0)))
+        down = down | ((g >= 0) & (g_new <= 0)) | ((g >= 0) & (g_cen <= 0)) | ((g_cen >= 0) & (g_new <= 0))
 
-#         up = up | (((g <= 0) & (g_new >= 0)) | ((g <= 0) & (g_cen >= 0)) | ((g_cen <= 0) & (g_new >= 0)))
-#         down = down | ((g >= 0) & (g_new <= 0)) | ((g >= 0) & (g_cen <= 0)) | ((g_cen >= 0) & (g_new <= 0))
+    up = success & up
+    down = success & down
+    either = up | down
 
-#     up = success & up
-#     down = success & down
-#     either = up | down
+    # print(roots, success, up, down, either, g, g_cen, g_new)
+    mask = (up & (direction > 0) |
+            down & (direction < 0) |
+            either & (direction == 0))
+    
+    active_events = D.ar_numpy.reshape(D.ar_numpy.nonzero(mask)[0], (-1,))
 
-#     # print(roots, success, up, down, either, g, g_cen, g_new)
-#     mask = (up & (direction > 0) |
-#             down & (direction < 0) |
-#             either & (direction == 0))
+    roots = roots[active_events]
+    evs = [events[idx] for idx in active_events]
+    terminate = False
 
-#     if D.backend() in ['numpy']:
-#         active_events = D.nonzero(mask)[0]
-#     else:
-#         active_events = D.ar_numpy.reshape(D.nonzero(mask)[0], (-1,))
+    if len(active_events) > 0:
+        order = D.ar_numpy.argsort(D.ar_numpy.sign(t_next - t_prev) * roots)
+        active_events = active_events[order]
+        roots = roots[order]
+        evs = [evs[idx] for idx in order]
 
-#     roots = roots[active_events]
-#     evs = [events[idx] for idx in active_events]
-#     terminate = False
+        if D.ar_numpy.any(is_terminal[active_events]):
+            t = D.ar_numpy.nonzero(is_terminal[active_events])[0][0]
+            active_events = active_events[:t + 1]
+            roots = roots[:t + 1]
+            evs = evs[:t + 1]
+            terminate = True
 
-#     if len(active_events) > 0:
-#         order = D.argsort(D.ar_numpy.sign(t_next - t_prev) * roots)
-#         active_events = active_events[order]
-#         roots = roots[order]
-#         evs = [evs[idx] for idx in order]
-
-#         if D.any(is_terminal[active_events]):
-#             t = D.nonzero(is_terminal[active_events])[0][0]
-#             active_events = active_events[:t + 1]
-#             roots = roots[:t + 1]
-#             evs = evs[:t + 1]
-#             terminate = True
-
-#     return active_events, roots, terminate, evs
+    return active_events, roots, terminate, evs
 
 
 class DenseOutput(object):
@@ -543,7 +543,8 @@ class OdeSystem(object):
 
     @property
     def events(self):
-        """A tuple of (time, state) tuples at which each event occurs.
+        """A tuple of (time, state, event) tuples containing the times and states
+        for each event that triggered
         
         Examples
         --------
@@ -551,10 +552,14 @@ class OdeSystem(object):
         >>> ode_system = desolver.OdeSystem(...)
         >>> ode_system.integrate(events=[...])
         >>> ode_system.events
-        (StateTuple(t=..., y=...), StateTuple(t=..., y=...), StateTuple(t=..., y=...), ...)
-        
+        (StateTuple(t=..., y=..., event=event_1), StateTuple(t=..., y=..., event=event_2), etc.)        
         """
-        return tuple(self.__events)
+        event_fn = set([i.event for i in self.__events])
+        return tuple([StateTuple(
+            t=D.ar_numpy.stack([i.t for i in self.__events if i.event == ev]),
+            y=D.ar_numpy.stack([i.y for i in self.__events if i.event == ev]),
+            event=ev
+        ) for ev in event_fn])
 
     @property
     def y(self):
@@ -958,16 +963,16 @@ class OdeSystem(object):
             return
         steps = 0
 
-        # events, is_terminal, direction, last_occurrence, requires_dstate = prepare_events(events)
+        events, is_terminal, direction, last_occurrence, requires_dstate = prepare_events(events, self.__y[0])
 
         implicit_integration = False
         if D.ar_numpy.to_numpy(tf) == np.inf:
             implicit_integration = True
-            # if not any(is_terminal):
-            #     deutil.warning(
-            #         "Specifying an indefinite integration time with no terminal events "
-            #         "can lead to memory issues if no event terminates the integration.",
-            #         category=RuntimeWarning)
+            if not any(is_terminal):
+                deutil.warning(
+                    "Specifying an indefinite integration time with no terminal events "
+                    "can lead to memory issues if no event terminates the integration.",
+                    category=RuntimeWarning)
 
         self.__fix_dt_dir(tf, self.__t[self.counter])
 
@@ -1012,8 +1017,8 @@ class OdeSystem(object):
                 # https://reference.wolfram.com/language/tutorial/NDSolveSPRK.html
                 #
 
-                # dState = dState + cState
-                # dTime = dTime + cTime
+                dState = dState + cState
+                dTime = dTime + cTime
 
                 self.__y[self.counter + 1] = self.__y[self.counter] + dState
                 self.__t[self.counter + 1] = self.__t[self.counter] + dTime
@@ -1036,38 +1041,38 @@ class OdeSystem(object):
                         self.counter -= 1
 
                         sol_tuple = (self.__sol, prev_time, next_time)
-                        # active_events, roots, end_int, evs = handle_events(sol_tuple, events, self.constants, direction, is_terminal, (requires_dstate,))
+                        active_events, roots, end_int, evs = handle_events(sol_tuple, events, self.constants, direction, is_terminal, (requires_dstate,))
 
-                        # if self.counter + len(roots) + 1 >= len(self.__y):
-                        #     total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
-                        #     self.__allocate_soln_space(total_steps)
+                        if self.counter + len(roots) + 1 >= len(self.__y):
+                            total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
+                            self.__allocate_soln_space(total_steps)
 
-                        # for ev_idx, (root, ev) in enumerate(zip(roots, evs)):
-                        #     if dTime >= 0:
-                        #         true_positive = (self.__t[self.counter] <= root) & (root <= prev_time + dTime)
-                        #     else:
-                        #         true_positive = (prev_time + dTime <= root) & (root <= self.__t[self.counter])
+                        for ev_idx, (root, ev) in enumerate(zip(roots, evs)):
+                            if dTime >= 0:
+                                true_positive = (self.__t[self.counter] <= root) & (root <= prev_time + dTime)
+                            else:
+                                true_positive = (prev_time + dTime <= root) & (root <= self.__t[self.counter])
 
-                        #     # print(root, prev_time, prev_time + dTime, true_positive, ev(root, sol_tuple[0](root), **self.constants))
+                            # print(root, prev_time, prev_time + dTime, true_positive, ev(root, sol_tuple[0](root), **self.constants))
 
-                        #     if true_positive:
-                        #         ev_state = StateTuple(t=root, y=self.__sol(root), event=ev)
-                        #         if not self.__events or last_occurrence[ev_idx] == -1:
-                        #             last_occurrence[ev_idx] = len(self.__events)
-                        #             self.__events.append(ev_state)
-                        #         elif D.ar_numpy.abs(ev_state.t - self.__events[last_occurrence[ev_idx]].t) > D.epsilon() ** 0.7:
-                        #             last_occurrence[ev_idx] = len(self.__events)
-                        #             self.__events.append(ev_state)
+                            if true_positive:
+                                ev_state = StateTuple(t=root, y=self.__sol(root), event=ev)
+                                if not self.__events or last_occurrence[ev_idx] == -1:
+                                    last_occurrence[ev_idx] = len(self.__events)
+                                    self.__events.append(ev_state)
+                                elif D.ar_numpy.abs(ev_state.t - self.__events[last_occurrence[ev_idx]].t) > D.epsilon(self.__y[0].dtype) ** 0.7:
+                                    last_occurrence[ev_idx] = len(self.__events)
+                                    self.__events.append(ev_state)
 
-                        # if end_int:
-                        #     self.integrate(roots[-1])
-                        #     self.__int_status = 2
-                        # else:
-                            # if self.counter + len(roots) + 1 >= len(self.__y):
-                            #     total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
-                            #     self.__allocate_soln_space(total_steps)
-                        self.__t[self.counter + 1] = prev_time + dTime
-                        self.__y[self.counter + 1] = prev_state + dState
+                        if end_int:
+                            self.integrate(roots[-1])
+                            self.__int_status = 2
+                        else:
+                            if self.counter + len(roots) + 1 >= len(self.__y):
+                                total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
+                                self.__allocate_soln_space(total_steps)
+                            self.__t[self.counter + 1] = prev_time + dTime
+                            self.__y[self.counter + 1] = prev_state + dState
                         self.counter += 1
 
                     if not self.__dense_output:
