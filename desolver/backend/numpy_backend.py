@@ -8,14 +8,14 @@ import scipy.sparse.linalg
 import autoray
 
 
-def solve_linear_system(A,b,overwrite_a=False,overwrite_b=False,check_finite=False,sparse=False):
+def __solve_linear_system(A,b,overwrite_a=False,overwrite_b=False,check_finite=False,sparse=False):
     if sparse:
         return scipy.sparse.linalg.spsolve(scipy.sparse.csc_matrix(A),b)
     else:
         return scipy.linalg.solve(A,b,overwrite_a=overwrite_a,overwrite_b=overwrite_b,check_finite=check_finite)
 
 
-autoray.register_function("numpy", "solve_linear_system", solve_linear_system)
+autoray.register_function("numpy", "solve_linear_system", __solve_linear_system)
 
 # def asarray(x):
 #     if hasattr(x, 'dtype'):

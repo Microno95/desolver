@@ -1,7 +1,6 @@
 import numpy
 
-from .integrator_types import RungeKuttaIntegrator, ExplicitSymplecticIntegrator
-from .. import backend as D
+from desolver.integrators.integrator_types import RungeKuttaIntegrator, ExplicitSymplecticIntegrator
 
 __all__ = [
     'RK1412Solver',

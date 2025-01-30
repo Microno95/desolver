@@ -325,11 +325,15 @@ class DiffRHS(object):
                     self.md_repr = str(self.rhs)
             self.equ_repr = str(self.rhs)
         self.__jac_wrapped_rhs_order = None
+        if sample_input is None:
+            inferred_backend = D.autoray.get_backend()
+        else:
+            inferred_backend = D.autoray.infer_backend(sample_input)
         if hasattr(self.rhs, 'jac'):
             self.__jac = self.rhs.jac
             self.__jac_time = None
             self.__jac_is_wrapped_rhs = False
-        elif D.autoray.infer_backend(sample_input) == 'numpy':
+        elif inferred_backend == 'numpy':
             self.__jac_wrapped_rhs_order = 5
             self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(0.0, y, **kwargs),
                                                 base_order=self.__jac_wrapped_rhs_order, flat=False)
@@ -337,7 +341,7 @@ class DiffRHS(object):
             self.__jac_is_wrapped_rhs = True
         else:
             import torch
-            self.__jac = torch.func.jacrev(self.rhs, argnums=(0, 1))
+            self.__jac = torch.func.jacrev(self.rhs, argnums=1)
             self.__jac_time = None
             self.__jac_is_wrapped_rhs = False
         self.nfev = 0
@@ -491,9 +495,9 @@ class OdeSystem(object):
             self.equ_rhs = copy.copy(equ_rhs)
         else:
             if hasattr(equ_rhs, "equ_repr"):
-                self.equ_rhs = DiffRHS(equ_rhs.rhs, equ_rhs.equ_repr, equ_rhs.md_repr)
+                self.equ_rhs = DiffRHS(equ_rhs.rhs, y0, equ_rhs.equ_repr, equ_rhs.md_repr)
             else:
-                self.equ_rhs = DiffRHS(equ_rhs)
+                self.equ_rhs = DiffRHS(equ_rhs, y0)
 
         self.__rtol = rtol
         self.__atol = atol

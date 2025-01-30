@@ -1,7 +1,7 @@
 import numpy
 
-from .integrator_types import RungeKuttaIntegrator
-from .. import backend as D
+from desolver.integrators.integrator_types import RungeKuttaIntegrator, ExplicitSymplecticIntegrator
+from desolver import backend as D
 
 
 class GaussLegendre4(RungeKuttaIntegrator):
@@ -14,12 +14,12 @@ class GaussLegendre4(RungeKuttaIntegrator):
 
     s = numpy.sqrt(3)
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.5 - s / 6, 0.25, 0.25 - s / 6],
          [0.5 + s / 6, 0.25 + s / 6, 0.25]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 0.5, 0.5]], dtype=numpy.float64
     )
 
@@ -36,13 +36,13 @@ class GaussLegendre6(RungeKuttaIntegrator):
 
     s = numpy.sqrt(15)
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.5 - s / 10, 5 / 36, 2 / 9 - s / 15, 5 / 36 - s / 30],
          [0.5, 5 / 36 + s / 24, 2 / 9, 5 / 36 - s / 24],
          [0.5 + s / 10, 5 / 36 + s / 30, 2 / 9 + s / 15, 5 / 36]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 5 / 18, 4 / 9, 5 / 18]], dtype=numpy.float64
     )
 
@@ -57,12 +57,12 @@ class LobattoIIIA2(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0, 0, 0],
          [1.0, 0.5, 0.5]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 0.5, 0.5]], dtype=numpy.float64
     )
 
@@ -75,13 +75,13 @@ class LobattoIIIA4(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.0, 0.0, 0.0, 0.0],
          [0.5, 5 / 24, 1 / 3, -1 / 24],
          [1.0, 1 / 6, 2 / 3, 1 / 6]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 1 / 6, 2 / 3, 1 / 6]], dtype=numpy.float64
     )
 
@@ -94,12 +94,12 @@ class LobattoIIIB2(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.5, 0.5, 0.0],
          [0.5, 0.5, 0.0]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 0.5, 0.5]], dtype=numpy.float64
     )
 
@@ -112,13 +112,13 @@ class LobattoIIIB4(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.0, 1 / 6, -1 / 6, 0.0],
          [0.5, 1 / 6, 1 / 3, 0.0],
          [1.0, 1 / 6, 5 / 6, 0.0]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 1 / 6, 2 / 3, 1 / 6]], dtype=numpy.float64
     )
 
@@ -131,12 +131,12 @@ class LobattoIIIC2(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.0, 0.5, -0.5],
          [1.0, 0.5, 0.5]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 0.5, 0.5]], dtype=numpy.float64
     )
 
@@ -149,13 +149,13 @@ class LobattoIIIC4(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.0, 1 / 6, -1 / 3, 1 / 6],
          [0.5, 1 / 6, 5 / 12, -1 / 12],
          [1.0, 1 / 6, 2 / 3, 1 / 6]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 1 / 6, 2 / 3, 1 / 6],
          [0, -0.5, 2.0, -0.5]], dtype=numpy.float64
     )
@@ -169,11 +169,11 @@ class BackwardEuler(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[1.0, 1.0]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 1.0]], dtype=numpy.float64
     )
 
@@ -186,11 +186,11 @@ class ImplicitMidpoint(RungeKuttaIntegrator):
 
     symplectic = True
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.5, 0.5]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 1.0]], dtype=numpy.float64
     )
 
@@ -203,12 +203,12 @@ class CrankNicolson(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.0, 0.0, 0.0],
          [1.0, 0.5, 0.5]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 0.5, 0.5]], dtype=numpy.float64
     )
 
@@ -221,14 +221,14 @@ class DIRK3LStable(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.5, 0.5, 0.0, 0.0, 0.0],
          [2.0 / 3.0, 1.0 / 6.0, 0.5, 0.0, 0.0],
          [0.5, -0.5, 0.5, 0.5, 0.0],
          [1.0, 1.5, -1.5, 0.5, 0.5]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 1.5, -1.5, 0.5, 0.5]], dtype=numpy.float64
     )
 
@@ -241,12 +241,12 @@ class RadauIA3(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.0, 1 / 4, -1 / 4],
          [2 / 3, 1 / 4, 5 / 12]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 1 / 4, 3 / 4]], dtype=numpy.float64
     )
 
@@ -261,13 +261,13 @@ class RadauIA5(RungeKuttaIntegrator):
 
     s = numpy.sqrt(6)
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.0, 1 / 9, (-1 - s) / 18, (-1 + s) / 18],
          [3 / 5 - s / 10, 1 / 9, 11 / 45 + 7 * s / 360, 11 / 45 - 43 * s / 360],
          [3 / 5 + s / 10, 1 / 9, 11 / 45 + 43 * s / 360, 11 / 45 - 7 * s / 360]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 1 / 9, 4 / 9 + s / 36, 4 / 9 - s / 36]], dtype=numpy.float64
     )
 
@@ -282,12 +282,12 @@ class RadauIIA3(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[1 / 3, 5 / 12, -1 / 12],
          [1, 3 / 4, 1 / 3]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, 3 / 4, 1 / 4]], dtype=numpy.float64
     )
 
@@ -302,13 +302,13 @@ class RadauIIA5(RungeKuttaIntegrator):
 
     s = numpy.sqrt(6)
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[(4 - s) / 10, (88 - 7 * s) / 360, (296 - 169 * s) / 1800, (-2 + 3 * s) / 225],
          [(4 + s) / 10, (296 + 169 * s) / 1800, (88 + 7 * s) / 360, (-2 - 3 * s) / 225],
          [1, (16 - s) / 36, (16 + s) / 36, 1 / 9]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0, (16 - s) / 36, (16 + s) / 36, 1 / 9],
          [0, 1 - 7 * s / 12, 1 + 7 * s / 12, -1]], dtype=numpy.float64
     )
@@ -324,7 +324,7 @@ class RadauIIA19(RungeKuttaIntegrator):
 
     symplectic = False
 
-    tableau = numpy.array([
+    tableau_intermediate = numpy.array([
         [
             0.014412409648876548632826740810813239411744731056578086070750679128,
             0.01847631341993400747592695722381535245022576145583384485927431185,
@@ -447,7 +447,7 @@ class RadauIIA19(RungeKuttaIntegrator):
             0.010000000000000000000000000000000000000000000000000000000000000000]
     ], dtype=numpy.float64)
 
-    final_state = numpy.array([
+    tableau_final = numpy.array([
         [1.0,
          0.03680850274337924946552564703952257250633407560110190885784111690,
          0.08218800636846073785084083445387855020451656194507156599834064799,
@@ -474,10 +474,10 @@ class RadauIIA19(RungeKuttaIntegrator):
     ], dtype=numpy.float64)
 
     def get_error_estimate(self):
-        if self.adaptive:
-            return D.sum(self.final_state[1][self.tableau_idx_expand] * self.aux, axis=0)
+        if self.is_adaptive:
+            return D.ar_numpy.sum(self.aux * self.tableau_final[1], axis=-1)
         else:
-            return D.zeros_like(self.dState)
+            return D.ar_numpy.zeros_like(self.dState)
 
     def update_timestep(self):
         self.solver_dict['order'] = 10.0

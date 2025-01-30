@@ -54,10 +54,8 @@ class IntegratorTemplate(abc.ABC):
         rtol = self.solver_dict['rtol']
         dState = self.solver_dict['dState']
         order = self.solver_dict['order']
-        err_estimate = D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(diff)))
-        relerr = D.ar_numpy.max(
-            D.ar_numpy.to_numpy(atol + rtol * D.ar_numpy.abs(initial_state) + rtol * D.ar_numpy.abs(dState / timestep))
-        )
+        err_estimate = D.ar_numpy.max(D.ar_numpy.abs(diff))
+        relerr = D.ar_numpy.max(atol + rtol * D.ar_numpy.abs(initial_state) + rtol * D.ar_numpy.abs(dState / timestep))
         corr = 1.0
         if err_estimate != 0:
             corr = corr * safety_factor * (relerr / err_estimate) ** (1.0 / order)

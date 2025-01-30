@@ -4,10 +4,10 @@ import torch
 import autoray
 
 
-def solve_linear_system(A, b, sparse=False):
+def __solve_linear_system(A, b, sparse=False):
     return torch.linalg.solve(A, b)
 
-autoray.register_function("torch", "solve_linear_system", solve_linear_system)
+autoray.register_function("torch", "solve_linear_system", __solve_linear_system)
 
 def to_cpu_wrapper(fn):
     def new_fn(x:torch.Tensor):

@@ -29,10 +29,11 @@ class TableauIntegrator(IntegratorTemplate, abc.ABC):
         self.dtype = dtype
         self.device = device
         self.array_constructor_kwargs = dict(dtype=self.dtype)
+        self.array_constructor_kwargs['like'] = D.backend_like_dtype(self.dtype)
         # THIS IS WHERE WE SPECIALISE TO DIFFERENT BACKENDS
-        if D.backend_like_dtype(self.dtype) == 'torch':
+        if self.array_constructor_kwargs['like'] == 'torch':
             self.array_constructor_kwargs['device'] = self.device
-        
+        # ---- #
         self.dState = D.ar_numpy.zeros(self.dim, **self.array_constructor_kwargs)
         self.dTime = D.ar_numpy.zeros(tuple(), **self.array_constructor_kwargs)
         self.tableau_intermediate = D.ar_numpy.asarray(self.__class__.tableau_intermediate, **self.array_constructor_kwargs)
@@ -133,29 +134,31 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
         self._explicit_stages = [col for col in range(self.stages) if D.ar_numpy.all(self.tableau_intermediate[col, col + 1:] == 0.0)]
         self._implicit_stages = [col for col in range(self.stages) if D.ar_numpy.any(self.tableau_intermediate[col, col + 1:] != 0.0)]
 
-        self.solver_dict_preserved = dict(safety_factor=0.8, order=self.order, atol=self.atol, rtol=self.rtol, redo_count=0)
+        solver_dict_preserved = dict(safety_factor=0.8, order=self.order, atol=self.atol, rtol=self.rtol, redo_count=0)
         self.solver_dict = dict()
-        self.solver_dict.update(self.solver_dict_preserved)
+        self.solver_dict.update(solver_dict_preserved)
         self.solver_dict.update(dict(
             initial_state=self.stage_values[...,0],
-            diff=0.0,
+            diff=D.ar_numpy.zeros(sys_dim, **self.array_constructor_kwargs),
             timestep=1.0,
             dState=self.stage_values[...,0]
         ))
-        if self.is_implicit:
-            self.solver_dict.update(dict(
+        if not self._explicit:
+            solver_dict_preserved.update(dict(
                 tau0=0, tau1=0, niter0=0, niter1=0
             ))
+            self.solver_dict.update(solver_dict_preserved)
             self.adaptation_fn = integrator_utilities.implicit_aware_update_timestep
+        self.solver_dict_keep_keys = set(solver_dict_preserved.keys())
 
     def __call__(self, rhs, initial_time, initial_state, constants, timestep):
-        self.solver_dict = self.solver_dict_preserved
+        self.solver_dict = {k:v for k,v in self.solver_dict.items() if k in self.solver_dict_keep_keys}
         self.initial_state = D.ar_numpy.copy(initial_state)
         self.initial_time = D.ar_numpy.copy(initial_time)
         self.initial_rhs = None
         
         if self.is_fsal and self.final_rhs is not None:
-            self.aux[0] = self.final_rhs
+            self.stage_values[...,0] = self.final_rhs
             self.initial_rhs = self.final_rhs
         self.final_rhs = None
 
@@ -199,19 +202,19 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
         
 
     def algebraic_system(self, next_state, rhs, initial_time, initial_state, timestep, constants):
-        __aux_states = D.ar_numpy.reshape(next_state, self.aux.shape)
+        __aux_states = D.ar_numpy.reshape(next_state, self.stage_values.shape)
         __rhs_states = D.ar_numpy.stack([
             rhs(initial_time + tbl[0] * timestep,
                 initial_state + timestep * D.ar_numpy.sum(tbl[1:] * __aux_states, axis=-1), **constants)
             for tbl in self.tableau_intermediate
-        ])
+        ], axis=-1)
         __states = D.ar_numpy.reshape(__aux_states - __rhs_states, (-1,))
         return __states
 
     def algebraic_system_jacobian(self, next_state, rhs, initial_time, initial_state, timestep, constants):
-        __aux_states = D.ar_numpy.reshape(next_state, (self.dim, self.stages))
+        __aux_states = D.ar_numpy.reshape(next_state, self.stage_values.shape)
         __step = self.numel
-        __jac = D.ar_numpy.eye(self.tableau.shape[0] * __step, **self.array_constructor_kwargs)
+        __jac = D.ar_numpy.eye(self.tableau_intermediate.shape[0] * __step, **self.array_constructor_kwargs)
         __rhs_jac = D.ar_numpy.stack([
             rhs.jac(initial_time + tbl[0] * timestep,
                     initial_state + timestep * D.ar_numpy.sum(tbl[1:] * __aux_states, axis=-1),
@@ -220,7 +223,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
         ])
         for idx in range(0, __jac.shape[0], __step):
             for jdx in range(0, __jac.shape[1], __step):
-                __jac[idx:idx + __step, jdx:jdx + __step] -= timestep * self.tableau[
+                __jac[idx:idx + __step, jdx:jdx + __step] -= timestep * self.tableau_intermediate[
                     idx // __step, 1 + jdx // __step] * __rhs_jac[idx // __step].reshape(__step, __step)
         if __jac.shape[0] == 1 and __jac.shape[1] == 1:
             __jac = D.ar_numpy.reshape(__jac, tuple())
@@ -245,18 +248,13 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
             self.initial_rhs = None
 
         if self.is_implicit:
-            raise TypeError("Implicit integrators are currently unsupported!")
             initial_guess = self.stage_values
-            
-            nfun_jac = None
-            if D.autoray.backend_like(self.stage_values) == 'torch':
-                nfun_jac = self.algebraic_system_jacobian
 
-            desired_tol = D.ar_numpy.max(D.ar_numpy.abs(self.atol * 1e-1 + D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(self.rtol * 1e-1 * initial_state)))))
+            desired_tol = D.ar_numpy.max(D.ar_numpy.abs(self.atol * 1e-1 + D.ar_numpy.max(D.ar_numpy.abs(self.rtol * 1e-1 * initial_state))))
             aux_root, (success, num_iter, _, _, prec) = \
                 utilities.optimizer.nonlinear_roots(
                     self.algebraic_system, initial_guess,
-                    jac=nfun_jac, verbose=False,
+                    jac=self.algebraic_system_jacobian, verbose=False,
                     tol=desired_tol, maxiter=30,
                     additional_args=(rhs, initial_time, initial_state, timestep, constants))
 
@@ -269,7 +267,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
                 niter0=self.solver_dict['niter0'], niter1=num_iter
             ))
 
-            self.aux = D.ar_numpy.reshape(aux_root, self.aux.shape)
+            self.stage_values = D.ar_numpy.reshape(aux_root, self.stage_values.shape)
 
         if self.is_fsal and self.is_explicit:
             self.dState = intermediate_dstate
@@ -415,14 +413,14 @@ def generate_richardson_integrator(basis_integrator):
             self.array_constructor_args = dict(dtype=self.dtype)
             if self.device is not None:
                 self.array_constructor_args['device'] = self.device
-            self.aux = D.ar_numpy.zeros((richardson_iter, richardson_iter, *self.dim), **self.array_constructor_args)
+            self.stage_values = D.ar_numpy.zeros((richardson_iter, richardson_iter, *self.dim), **self.array_constructor_args)
             self.dState = D.ar_numpy.zeros(self.dim, **self.array_constructor_args)
             self.dTime = D.ar_numpy.zeros(tuple(), **self.array_constructor_args)
             self.initial_state = None
             self.initial_rhs = None
             self.initial_time = None
             self.final_rhs = None
-            self.tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (self.aux.ndim - 1))
+            self.tableau_idx_expand = tuple([slice(1, None, None)] + [None] * (self.stage_values.ndim - 1))
             self.richardson_iter = richardson_iter
             self.basis_integrators = [basis_integrator(sys_dim, **kwargs) for _ in range(self.richardson_iter)]
             for integrator in self.basis_integrators:
@@ -439,12 +437,12 @@ def generate_richardson_integrator(basis_integrator):
 
             if self.dtype is not None:
                 if D.backend() == 'torch':
-                    self.aux = self.aux.to(self.dtype)
+                    self.stage_values = self.stage_values.to(self.dtype)
                 else:
-                    self.aux = self.aux.astype(self.dtype)
+                    self.stage_values = self.stage_values.astype(self.dtype)
 
             if D.backend() == 'torch':
-                self.aux = self.aux.to(self.device)
+                self.stage_values = self.stage_values.to(self.device)
             
             self._adaptive = True
             self._fsal = False
@@ -485,23 +483,23 @@ def generate_richardson_integrator(basis_integrator):
             dt0, (dt_z, dy_z) = self.subdiv_step(0, rhs, t, y, timestep, constants, 1)
             if dt_z < timestep:
                 timestep = dt_z
-            self.aux[0, 0] = dy_z
+            self.stage_values[0, 0] = dy_z
             prev_error = None
             m, n = 0, 0
             for m in range(1, self.richardson_iter):
-                self.aux[m, 0] = self.subdiv_step(m, rhs, t, y, timestep, constants, 1 << m)[1][1]
+                self.stage_values[m, 0] = self.subdiv_step(m, rhs, t, y, timestep, constants, 1 << m)[1][1]
                 for n in range(1, m + 1):
-                    self.aux[m, n] = self.aux[m, n - 1] + (self.aux[m, n - 1] - self.aux[m - 1, n - 1]) / (
+                    self.stage_values[m, n] = self.stage_values[m, n - 1] + (self.stage_values[m, n - 1] - self.stage_values[m - 1, n - 1]) / (
                             (1 << n) - 1)
                 self.order = self.basis_order + m + 1
                 if m >= 3:
-                    prev_error, t_conv = self.check_converged(self.aux[m, n],
-                                                              self.aux[m - 1, m - 1] - self.aux[m, m],
+                    prev_error, t_conv = self.check_converged(self.stage_values[m, n],
+                                                              self.stage_values[m - 1, m - 1] - self.stage_values[m, m],
                                                               prev_error)
                     if t_conv:
                         break
 
-            return timestep, (timestep, self.aux[m - 1, n - 1]), self.aux[m - 1, m - 1] - self.aux[m, m]
+            return timestep, (timestep, self.stage_values[m - 1, n - 1]), self.stage_values[m - 1, m - 1] - self.stage_values[m, m]
 
         def __call__(self, rhs, initial_time, initial_state, constants, timestep):
             dt0, (dt_z, dy_z), diff = self.adaptive_richardson(rhs, initial_time, initial_state, constants,
