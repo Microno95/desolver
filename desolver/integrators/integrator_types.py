@@ -264,7 +264,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
                     "tolerances required: achieved = {}, desired = {}, iter = {}".format(prec, desired_tol, num_iter))
             self.solver_dict.update(dict(
                 tau0=self.solver_dict['tau1'], tau1=timestep,
-                niter0=self.solver_dict['niter0'], niter1=num_iter
+                niter0=self.solver_dict['niter1'], niter1=num_iter
             ))
 
             self.stage_values = D.ar_numpy.reshape(aux_root, self.stage_values.shape)
@@ -394,11 +394,10 @@ def generate_richardson_integrator(basis_integrator):
     RichardsonExtrapolatedIntegrator
         returns the Richardson Extrapolated specialisation of basis_integrator
     """
-    raise TypeError("Richardson Extrapolated Integrators are currently unsupported!")
     class RichardsonExtrapolatedIntegrator(RichardsonIntegratorTemplate):
         __alt_names__ = ("Local Richardson Extrapolation of {}".format(basis_integrator.__name__),)
 
-        symplectic = basis_integrator.is_symplectic
+        symplectic = basis_integrator.symplectic
 
         def __init__(self, sys_dim, richardson_iter=8, **kwargs):
             super().__init__()
@@ -410,12 +409,15 @@ def generate_richardson_integrator(basis_integrator):
             self.atol = kwargs.get("atol") if kwargs.get("atol", None) is not None else 32 * D.epsilon()
             self.dtype = kwargs.get("dtype")
             self.device = kwargs.get("device", None)
-            self.array_constructor_args = dict(dtype=self.dtype)
-            if self.device is not None:
-                self.array_constructor_args['device'] = self.device
-            self.stage_values = D.ar_numpy.zeros((richardson_iter, richardson_iter, *self.dim), **self.array_constructor_args)
-            self.dState = D.ar_numpy.zeros(self.dim, **self.array_constructor_args)
-            self.dTime = D.ar_numpy.zeros(tuple(), **self.array_constructor_args)
+            self.array_constructor_kwargs = dict(dtype=self.dtype)
+            self.array_constructor_kwargs['like'] = D.backend_like_dtype(self.dtype)
+            # THIS IS WHERE WE SPECIALISE TO DIFFERENT BACKENDS
+            if self.array_constructor_kwargs['like'] == 'torch':
+                self.array_constructor_kwargs['device'] = self.device
+            # ---- #
+            self.stage_values = D.ar_numpy.zeros((richardson_iter, richardson_iter, *self.dim), **self.array_constructor_kwargs)
+            self.dState = D.ar_numpy.zeros(self.dim, **self.array_constructor_kwargs)
+            self.dTime = D.ar_numpy.zeros(tuple(), **self.array_constructor_kwargs)
             self.initial_state = None
             self.initial_rhs = None
             self.initial_time = None
@@ -426,7 +428,6 @@ def generate_richardson_integrator(basis_integrator):
             for integrator in self.basis_integrators:
                 integrator.is_adaptive = False
             self.basis_order = self.basis_integrators[0].order
-            self.order = self.basis_order + richardson_iter // 2
             if 'staggered_mask' in kwargs:
                 if kwargs['staggered_mask'] is None:
                     staggered_mask = D.arange(sys_dim[0] // 2, sys_dim[0], dtype=D.int64)
@@ -436,29 +437,27 @@ def generate_richardson_integrator(basis_integrator):
                     self.staggered_mask = D.to_type(kwargs['staggered_mask'], D.bool)
 
             if self.dtype is not None:
-                if D.backend() == 'torch':
+                if D.backend_like_dtype(self.dtype) == 'torch':
                     self.stage_values = self.stage_values.to(self.dtype)
                 else:
                     self.stage_values = self.stage_values.astype(self.dtype)
 
-            if D.backend() == 'torch':
+            if D.backend_like_dtype(self.dtype) == 'torch':
                 self.stage_values = self.stage_values.to(self.device)
             
             self._adaptive = True
-            self._fsal = False
-            self._explicit = self.basis_integrators[0].is_explicit
 
             self.__interpolants = None
             self.__interpolant_times = None
-            self.solver_dict = dict(safety_factor=0.5 if self.implicit else 0.9, atol=self.atol, rtol=self.rtol)
+            self.solver_dict = dict(safety_factor=0.5 if self.basis_integrators[0].is_implicit else 0.9, atol=self.atol, rtol=self.rtol, order=self.basis_integrators[0].order + richardson_iter // 2)
 
         def dense_output(self):
             return self.__interpolant_times, self.__interpolants
 
         def check_converged(self, initial_state, diff, prev_error):
-            err_estimate = D.max(D.abs(D.to_float(diff)))
-            relerr = D.max(D.to_float(self.atol + self.rtol * D.abs(initial_state)))
-            if prev_error is None or (err_estimate > relerr and err_estimate <= D.max(D.abs(D.to_float(prev_error)))):
+            err_estimate = D.ar_numpy.max(D.ar_numpy.abs(diff))
+            relerr = D.ar_numpy.max(self.atol + self.rtol * D.ar_numpy.abs(initial_state))
+            if prev_error is None or (err_estimate > relerr and err_estimate <= D.ar_numpy.max(D.ar_numpy.abs(prev_error))):
                 return diff, False
             else:
                 return diff, True
@@ -491,7 +490,7 @@ def generate_richardson_integrator(basis_integrator):
                 for n in range(1, m + 1):
                     self.stage_values[m, n] = self.stage_values[m, n - 1] + (self.stage_values[m, n - 1] - self.stage_values[m - 1, n - 1]) / (
                             (1 << n) - 1)
-                self.order = self.basis_order + m + 1
+                self.solver_dict['order'] = self.basis_order + m + 1
                 if m >= 3:
                     prev_error, t_conv = self.check_converged(self.stage_values[m, n],
                                                               self.stage_values[m - 1, m - 1] - self.stage_values[m, m],
@@ -502,22 +501,20 @@ def generate_richardson_integrator(basis_integrator):
             return timestep, (timestep, self.stage_values[m - 1, n - 1]), self.stage_values[m - 1, m - 1] - self.stage_values[m, m]
 
         def __call__(self, rhs, initial_time, initial_state, constants, timestep):
-            dt0, (dt_z, dy_z), diff = self.adaptive_richardson(rhs, initial_time, initial_state, constants,
-                                                               timestep)
+            dt0, (dt_z, dy_z), diff = self.adaptive_richardson(rhs, initial_time, initial_state, constants, timestep)
 
             self.dState = dy_z + 0.0
-            self.dTime = D.copy(dt_z)
+            self.dTime = D.ar_numpy.copy(dt_z)
 
             self.solver_dict['diff'] = diff
             self.solver_dict['initial_state'] = initial_state
             self.solver_dict['initial_time'] = initial_time
             self.solver_dict['timestep'] = self.dTime
             self.solver_dict['dState'] = self.dState
-            self.solver_dict['order'] = self.order
             new_timestep, redo_step = self.update_timestep()
             if self.symplectic:
                 timestep = dt0
-                next_timestep = D.copy(dt0)
+                next_timestep = D.ar_numpy.copy(dt0)
                 if (0.8 * new_timestep + 0.2 * timestep) < next_timestep:
                     while new_timestep < next_timestep:
                         next_timestep /= 2.0
@@ -535,6 +532,40 @@ def generate_richardson_integrator(basis_integrator):
                 timestep = next_timestep
 
             return timestep, (self.dTime, self.dState)
+
+        # Instance properties that are cached #
+        @property
+        def order(self):
+            return self.basis_integrators[0] + self.richardson_iter // 2
+        
+        @property
+        def is_implicit(self):
+            return self.basis_integrators[0].is_implicit
+        
+        @property
+        def is_explicit(self):
+            return self.basis_integrators[0].is_explicit
+        
+        @property
+        def is_adaptive(self):
+            return self._adaptive and not self._adaptivity_enabled
+        
+        @is_adaptive.setter
+        def is_adaptive(self, adaptivity):
+            self._adaptivity_enabled = adaptivity
+
+        @property
+        def stages(self):
+            return self.basis_integrators[0].stages * self.richardson_iter
+
+        @property
+        def explicit_stages(self):
+            return self.basis_integrators[0].explicit_stages * self.richardson_iter
+
+        @property
+        def implicit_stages(self):
+            return self.basis_integrators[0].implicit_stages * self.richardson_iter
+        # ---- #
 
     RichardsonExtrapolatedIntegrator.__name__ = RichardsonExtrapolatedIntegrator.__qualname__ = "RichardsonExtrapolated_{}_Integrator".format(
         basis_integrator.__name__)

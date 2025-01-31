@@ -15,8 +15,8 @@ def implicit_aware_update_timestep(integrator: TableauIntegrator):
             if ddCTk > 0:
                 dCTk = dnCTk / ddCTk
             else:
-                dCTk = D.array(0.0)
-            tau2 = timestep * D.exp(-safety_factor * dCTk)
+                dCTk = D.ar_numpy.zeros_like(integrator.solver_dict['timestep'])
+            tau2 = timestep * D.ar_numpy.exp(-safety_factor * dCTk)
         else:
             tau2 = timestep
         if tau2 < timestep_from_error:
