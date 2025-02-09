@@ -3,80 +3,63 @@ import desolver.backend as D
 import numpy as np
 import pytest
 from copy import deepcopy
-# from .common import ffmt_set, integrator_param, richardson_param, device_param, dt_param, dense_output_param
-
-# ffmt_set_copy = deepcopy(ffmt_set)
-
-# if 'float16' in ffmt_set_copy:
-#     ffmt_set_copy.remove('float16')
-#     ffmt_set_copy.insert(0, pytest.param('float16', marks=pytest.mark.skip(
-#         reason="Event detection with float16 types is too imprecise for consistent results")))
-
-# ffmt_param = pytest.mark.parametrize('ffmt', ffmt_set_copy)
+from desolver.tests import common
 
 
-# @ffmt_param
-# @integrator_param
-# @richardson_param
-# @device_param
-# @dt_param
-# # @dense_output_param
-# def test_event_detection_single(ffmt, integrator, use_richardson_extrapolation, device, dt, dense_output=False):
-#     if use_richardson_extrapolation and integrator.is_implicit():
-#         pytest.skip("Richardson Extrapolation is too slow with implicit methods")
-#     if ffmt == 'gdual_vdouble':
-#         pytest.skip("gdual_vdouble type does not support event detection")
-#     D.set_float_fmt(ffmt)
+@common.richardson_param
+@common.integrator_param
+@common.dt_param
+@common.dense_output_param
+def test_event_detection_single(dtype_var, backend_var, device_var, integrator, use_richardson_extrapolation, dt, dense_output):
+    if use_richardson_extrapolation and integrator.is_implicit:
+        pytest.skip("Richardson Extrapolation is too slow with implicit methods")
+    if "float16" in dtype_var:
+        pytest.skip("Event detection with 'float16' types are unreliable due to imprecision")
+    
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+        device = torch.device(device_var)
 
-#     if D.backend() == 'torch':
-#         import torch
+    de_mat, rhs, analytic_soln, y_init, _, _ = common.set_up_basic_system(dtype_var, backend_var, integrator, hook_jacobian=True)
 
-#         torch.set_printoptions(precision=17)
+    if backend_var == 'torch':
+        y_init = y_init.to(device)
 
-#         torch.autograd.set_detect_anomaly(False)  # Enable if a test fails
+    def time_event(t, y, **kwargs):
+        out = D.ar_numpy.asarray(t - D.pi / 8, dtype=dtype_var, like=y_init)
+        if backend_var == 'torch':
+            out = out.to(y_init)
+        return out
 
-#         device = torch.device(device)
+    time_event.is_terminal = True
+    time_event.direction = 0
 
-#     print("Testing event detection for float format {}".format(D.float_fmt()))
-#     from .common import set_up_basic_system
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi / 4), dt=dt, rtol=D.epsilon(dtype_var) ** 0.5,
+                     atol=D.epsilon(dtype_var) ** 0.75)
+    
+    a.set_kick_vars([0, 1])
 
-#     de_mat, rhs, analytic_soln, y_init, _, _ = set_up_basic_system(integrator, hook_jacobian=True)
+    method = integrator
+    if use_richardson_extrapolation:
+        method = de.integrators.generate_richardson_integrator(method)
 
-#     if D.backend() == 'torch':
-#         y_init = y_init.to(device)
+    with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
+        a.set_method(method)
 
-#     def time_event(t, y, **kwargs):
-#         out = D.array(t - D.pi / 8)
-#         if D.backend() == 'torch':
-#             out = out.to(device)
-#         return out
+        a.integrate(eta=False, events=time_event)
 
-#     time_event.is_terminal = True
-#     time_event.direction = 0
+        assert (a.integration_status == "Integration terminated upon finding a triggered event.")
 
-#     a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi / 4), dt=dt, rtol=D.epsilon() ** 0.5,
-#                      atol=D.epsilon() ** 0.75)
-#     a.set_kick_vars(D.array([0, 1], dtype=bool))
-
-#     method = integrator
-#     if use_richardson_extrapolation:
-#         method = de.integrators.generate_richardson_integrator(method)
-
-#     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
-#         a.set_method(method)
-#         print("Testing {} with dt = {:.4e}".format(a.integrator, a.dt))
-
-#         a.integrate(eta=True, events=time_event)
-
-#         assert (a.integration_status == "Integration terminated upon finding a triggered event.")
-
-#         print(a)
-#         print(a.events)
-#         assert (D.abs(a.t[-1] - D.pi / 8) <= D.epsilon() ** 0.5)
-#         assert (len(a.events) == 1)
-#         assert (a.events[0].event == time_event)
-#         print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
-#                                                                                                a.t[-1] - D.pi / 8))
+        print(a)
+        print(a.events)
+        assert (D.ar_numpy.abs(a.t[-1] - D.pi / 8) <= D.epsilon(dtype_var) ** 0.5)
+        assert (len(a.events) == 1)
+        assert (a.events[0].event == time_event)
+        print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
+                                                                                               a.t[-1] - D.pi / 8))
 
 
 # @ffmt_param

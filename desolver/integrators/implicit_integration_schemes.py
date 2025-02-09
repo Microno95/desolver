@@ -475,7 +475,7 @@ class RadauIIA19(RungeKuttaIntegrator):
 
     def get_error_estimate(self):
         if self.is_adaptive:
-            return D.ar_numpy.sum(self.aux * self.tableau_final[1], axis=-1)
+            return D.ar_numpy.sum(self.stage_values * self.tableau_final[1][1:], axis=-1)
         else:
             return D.ar_numpy.zeros_like(self.dState)
 

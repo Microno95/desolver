@@ -2,385 +2,349 @@ import desolver as de
 import desolver.backend as D
 import numpy as np
 import pytest
-# from .common import ffmt_param
+from desolver.tests import common
 
 
-# @ffmt_param
-# def test_getter_setters(ffmt):
-#     D.set_float_fmt(ffmt)
+def test_getter_setters(dtype_var, backend_var, device_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
 
-#     if D.backend() == 'torch':
-#         import torch
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        arr_con_kwargs['device'] = device_var
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
 
-#         torch.set_printoptions(precision=17)
+    @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
 
-#         torch.autograd.set_detect_anomaly(True)
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
 
-#     print("Testing {} float format".format(D.float_fmt()))
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon(dtype_var) ** 0.5,
+                     atol=D.epsilon(dtype_var) ** 0.5)
 
-#     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
+    assert (a.t0 == 0)
+    assert (a.tf == 2 * D.pi)
+    assert (a.dt == 0.01)
+    assert (a.get_current_time() == a.t0)
+    assert (a.rtol == D.epsilon(dtype_var) ** 0.5)
+    assert (a.atol == D.epsilon(dtype_var) ** 0.5)
+    assert (D.ar_numpy.linalg.norm(a.y[0] - y_init) <= 2 * D.epsilon(dtype_var))
+    assert (D.ar_numpy.linalg.norm(a.y[-1] - y_init) <= 2 * D.epsilon(dtype_var))
 
-#     @de.rhs_prettifier("""[vx, -x+t]""")
-#     def rhs(t, state, **kwargs):
-#         return de_mat @ state + D.array([0.0, t])
+    a.set_kick_vars([True, False])
 
-#     y_init = D.array([1., 0.])
+    assert (a.staggered_mask == [True, False])
+    pval = 3 * D.pi
 
-#     a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-#                      atol=D.epsilon() ** 0.5)
+    a.tf = pval
 
-#     assert (a.t0 == 0)
-#     assert (a.tf == 2 * D.pi)
-#     assert (a.dt == 0.01)
-#     assert (a.get_current_time() == a.t0)
-#     assert (a.rtol == D.epsilon() ** 0.5)
-#     assert (a.atol == D.epsilon() ** 0.5)
-#     assert (D.norm(a.y[0] - y_init) <= 2 * D.epsilon())
-#     assert (D.norm(a.y[-1] - y_init) <= 2 * D.epsilon())
+    assert (a.tf == pval)
+    pval = -1.0
 
-#     a.set_kick_vars([True, False])
+    a.t0 = pval
 
-#     assert (a.staggered_mask == [True, False])
-#     pval = 3 * D.pi
+    assert (a.t0 == pval)
+    assert (a.dt == 0.01)
 
-#     a.tf = pval
+    a.rtol = 1e-3
 
-#     assert (a.tf == pval)
-#     pval = -1.0
+    assert (a.rtol == 1e-3)
 
-#     a.t0 = pval
+    a.atol = 1e-3
 
-#     assert (a.t0 == pval)
-#     assert (a.dt == 0.01)
+    assert (a.atol == 1e-3)
 
-#     a.rtol = 1e-3
+    for method in de.available_methods():
+        a.set_method(method)
+        assert (isinstance(a.integrator, de.available_methods(False)[method]))
 
-#     assert (a.rtol == 1e-3)
+    for method in de.available_methods():
+        a.method = method
+        assert (isinstance(a.integrator, de.available_methods(False)[method]))
 
-#     a.atol = 1e-3
+    a.constants['k'] = 5.0
 
-#     assert (a.atol == 1e-3)
+    assert (a.constants['k'] == 5.0)
 
-#     for method in de.available_methods():
-#         a.set_method(method)
-#         assert (isinstance(a.integrator, de.available_methods(False)[method]))
+    a.constants.pop('k')
 
-#     for method in de.available_methods():
-#         a.method = method
-#         assert (isinstance(a.integrator, de.available_methods(False)[method]))
+    assert ('k' not in a.constants.keys())
 
-#     a.constants['k'] = 5.0
+    new_constants = dict(k=10.0)
 
-#     assert (a.constants['k'] == 5.0)
+    a.constants = new_constants
 
-#     a.constants.pop('k')
+    assert (a.constants['k'] == 10.0)
 
-#     assert ('k' not in a.constants.keys())
+    del a.constants
 
-#     new_constants = dict(k=10.0)
-
-#     a.constants = new_constants
-
-#     assert (a.constants['k'] == 10.0)
-
-#     del a.constants
-
-#     assert (not bool(a.constants))
+    assert (not bool(a.constants))
 
 
-# @ffmt_param
-# def test_integration_and_representation(ffmt):
-#     D.set_float_fmt(ffmt)
-
-#     if D.backend() == 'torch':
-#         import torch
-
-#         torch.set_printoptions(precision=17)
-
-#         torch.autograd.set_detect_anomaly(True)
-
-#     print("Testing {} float format".format(D.float_fmt()))
-
-#     from . import common
-
-#     (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system()
-
-#     assert (a.integration_status == "Integration has not been run.")
-
-#     a.integrate()
-
-#     assert (a.integration_status == "Integration completed successfully.")
-
-#     print(str(a))
-#     print(repr(a))
-#     assert (D.max(D.abs(D.to_float(a.sol(a.t[0])) - D.to_float(y_init))) <= 8 * D.epsilon() ** 0.5)
-#     assert (D.max(D.abs(D.to_float(a.sol(a.t[-1])) - D.to_float(analytic_soln(a.t[-1], y_init)))) <= 8 * D.epsilon() ** 0.5)
-#     assert (D.max(D.abs(D.to_float(a.sol(a.t).T) - D.to_float(analytic_soln(a.t, y_init)))) <= 8 * D.epsilon() ** 0.5)
-
-#     for i in a:
-#         assert (D.max(D.abs(D.to_float(i.y) - D.to_float(analytic_soln(i.t, y_init)))) <= 8 * D.epsilon() ** 0.5)
-
-#     assert (len(a.y) == len(a))
-#     assert (len(a.t) == len(a))
-
-
-# @ffmt_param
-# def test_integration_and_nearest_float_no_dense_output(ffmt):
-#     D.set_float_fmt(ffmt)
-
-#     if D.backend() == 'torch':
-#         import torch
-
-#         torch.set_printoptions(precision=17)
-
-#         torch.autograd.set_detect_anomaly(True)
-
-#     print("Testing {} float format".format(D.float_fmt()))
-
-#     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
-
-#     @de.rhs_prettifier("""[vx, -x+t]""")
-#     def rhs(t, state, k, **kwargs):
-#         return de_mat @ state + D.array([0.0, t])
-
-#     y_init = D.array([1., 0.])
-
-#     a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-#                      atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
-
-#     assert (a.integration_status == "Integration has not been run.")
-
-#     a.integrate()
+def test_integration_and_representation(dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
     
-#     assert (a.sol is None)
+    (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var)
 
-#     assert (a.integration_status == "Integration completed successfully.")
+    assert (a.integration_status == "Integration has not been run.")
 
-#     assert (D.abs(a.t[-2] - a[2 * D.pi].t) <= D.abs(a.dt))
+    a.integrate()
 
+    assert (a.integration_status == "Integration completed successfully.")
 
-# @ffmt_param
-# def test_no_events(ffmt):
-#     D.set_float_fmt(ffmt)
+    print(str(a))
+    print(repr(a))
+    assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= D.tol_epsilon(dtype_var) ** 0.5)
+    assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+    assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
 
-#     if D.backend() == 'torch':
-#         import torch
+    for i in a:
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
 
-#         torch.set_printoptions(precision=17)
+    assert (len(a.y) == len(a))
+    assert (len(a.t) == len(a))
 
-#         torch.autograd.set_detect_anomaly(True)
 
-#     print("Testing {} float format".format(D.float_fmt()))
+def test_integration_and_nearest_float_no_dense_output(dtype_var, backend_var, device_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+        
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        arr_con_kwargs['device'] = device_var
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
 
-#     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
+    @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
 
-#     @de.rhs_prettifier("""[vx, -x+t]""")
-#     def rhs(t, state, k, **kwargs):
-#         return de_mat @ state + D.array([0.0, t])
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
 
-#     y_init = D.array([1., 0.])
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon(dtype_var) ** 0.5,
+                     atol=D.epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
 
-#     a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-#                      atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
+    assert (a.integration_status == "Integration has not been run.")
 
-#     a.integrate()
-
-#     assert (len(a.events) == 0)
-
-
-# @ffmt_param
-# def test_wrong_t0(ffmt):
-#     with pytest.raises(ValueError):
-#         D.set_float_fmt(ffmt)
-
-#         if D.backend() == 'torch':
-#             import torch
-
-#             torch.set_printoptions(precision=17)
-
-#             torch.autograd.set_detect_anomaly(True)
-
-#         print("Testing {} float format".format(D.float_fmt()))
-
-#         de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
-
-#         @de.rhs_prettifier("""[vx, -x+t]""")
-#         def rhs(t, state, k, **kwargs):
-#             return de_mat @ state + D.array([0.0, t])
-
-#         y_init = D.array([1., 0.])
-
-#         a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-#                          atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
-
-#         a.t0 = 2 * D.pi
-
-
-# @ffmt_param
-# def test_wrong_tf(ffmt):
-#     with pytest.raises(ValueError):
-#         D.set_float_fmt(ffmt)
-
-#         if D.backend() == 'torch':
-#             import torch
-
-#             torch.set_printoptions(precision=17)
-
-#             torch.autograd.set_detect_anomaly(True)
-
-#         print("Testing {} float format".format(D.float_fmt()))
-
-#         from . import common
-
-#         (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system()
-
-#         a.tf = 0.0
-
-
-# @ffmt_param
-# def test_not_enough_time_values(ffmt):
-#     with pytest.raises(ValueError):
-#         D.set_float_fmt(ffmt)
-
-#         if D.backend() == 'torch':
-#             import torch
-
-#             torch.set_printoptions(precision=17)
-
-#             torch.autograd.set_detect_anomaly(True)
-
-#         print("Testing {} float format".format(D.float_fmt()))
-
-#         de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
-
-#         @de.rhs_prettifier("""[vx, -x+t]""")
-#         def rhs(t, state, k, **kwargs):
-#             return de_mat @ state + D.array([0.0, t])
-
-#         y_init = D.array([1., 0.])
-
-#         a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0,), dt=0.01, rtol=D.epsilon() ** 0.5,
-#                          atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
-
-#         a.tf = 0.0
-
-
-# @ffmt_param
-# def test_dt_dir_fix(ffmt):
-#     D.set_float_fmt(ffmt)
-
-#     if D.backend() == 'torch':
-#         import torch
-
-#         torch.set_printoptions(precision=17)
-
-#         torch.autograd.set_detect_anomaly(True)
-
-#     print("Testing {} float format".format(D.float_fmt()))
-
-#     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
-
-#     @de.rhs_prettifier("""[vx, -x+t]""")
-#     def rhs(t, state, k, **kwargs):
-#         return de_mat @ state + D.array([0.0, t])
-
-#     y_init = D.array([1., 0.])
-
-#     a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=-0.01, rtol=D.epsilon() ** 0.5,
-#                      atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
-
-
-# @ffmt_param
-# def test_non_callable_rhs(ffmt):
-#     with pytest.raises(TypeError):
-#         D.set_float_fmt(ffmt)
-
-#         if D.backend() == 'torch':
-#             import torch
-
-#             torch.set_printoptions(precision=17)
-
-#             torch.autograd.set_detect_anomaly(True)
-
-#         print("Testing {} float format".format(D.float_fmt()))
-
-#         from . import common
-
-#         (de_mat, rhs, analytic_soln, y_init, dt, _) = common.set_up_basic_system()
-
-#         a = de.OdeSystem(de_mat, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=dt, rtol=D.epsilon() ** 0.5,
-#                          atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
-
-#         a.tf = 0.0
-
-
-# def test_callback_called():
-#     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
-
-#     @de.rhs_prettifier("""[vx, -x+t]""")
-#     def rhs(t, state, **kwargs):
-#         return de_mat @ state + D.array([0.0, t])
-
-#     y_init = D.array([1., 0.])
+    a.integrate()
     
-#     callback_called = False
-    
-#     def callback(ode_sys):
-#         nonlocal callback_called
-#         if not callback_called and ode_sys.t[-1] > D.pi:
-#             callback_called = True
+    assert (a.sol is None)
 
-#     a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-#                      atol=D.epsilon() ** 0.5)
+    assert (a.integration_status == "Integration completed successfully.")
 
-#     a.integrate(callback=callback)
+    assert (D.ar_numpy.abs(a.t[-2] - a[2 * D.pi].t) <= D.ar_numpy.abs(a.dt))
+
+    assert (len(a.events) == 0)
+
+def test_wrong_t0(dtype_var, backend_var):
+    with pytest.raises(ValueError):
+        dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+        if backend_var == 'torch':
+            import torch
+            torch.set_printoptions(precision=17)
+            torch.autograd.set_detect_anomaly(True)
+
+        arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+        de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+            
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            t = D.ar_numpy.atleast_1d(t)
+            return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+
+        y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                         atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+
+        a.t0 = 2 * D.pi
+
+
+def test_wrong_tf(dtype_var, backend_var):
+    with pytest.raises(ValueError):
+        dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+        if backend_var == 'torch':
+            import torch
+            torch.set_printoptions(precision=17)
+            torch.autograd.set_detect_anomaly(True)
+
+        arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+        de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+            
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            t = D.ar_numpy.atleast_1d(t)
+            return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+
+        y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                         atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+
+        a.tf = 0.0
+
+
+def test_not_enough_time_values(dtype_var, backend_var):
+    with pytest.raises(ValueError):
+        dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+        if backend_var == 'torch':
+            import torch
+            torch.set_printoptions(precision=17)
+            torch.autograd.set_detect_anomaly(True)
+
+        arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+        de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+            
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            t = D.ar_numpy.atleast_1d(t)
+            return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+
+        y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0,), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                         atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+
+
+def test_dt_dir_fix(dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+        
+    @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                        atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
     
-#     assert(callback_called)
+    assert a.dt == 0.5
+
+
+def test_non_callable_rhs(dtype_var, backend_var):
+    with pytest.raises(ValueError):
+        dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+        if backend_var == 'torch':
+            import torch
+            torch.set_printoptions(precision=17)
+            torch.autograd.set_detect_anomaly(True)
+
+        arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+        de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+            
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            t = D.ar_numpy.atleast_1d(t)
+            return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+
+        y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+        a = de.OdeSystem(de_mat, y0=y_init, dense_output=False, t=(0,), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                         atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+
+
+def test_callback_called(dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+        
+    @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+    
+    callback_called = False
+    
+    def callback(ode_sys):
+        nonlocal callback_called
+        if not callback_called and ode_sys.t[-1] > D.pi:
+            callback_called = True
+
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                        atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+    
+    a.integrate(callback=callback)
+    
+    assert(callback_called)
+
+
+def test_keyboard_interrupt_caught(dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+        
+    @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+    
+    def kb_callback(ode_sys):
+        if ode_sys.t[-1] > D.pi:
+            raise KeyboardInterrupt()
+
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                        atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+
+    with pytest.raises(KeyboardInterrupt):
+        a.integrate(callback=kb_callback)
+    
+    assert(a.integration_status == "A KeyboardInterrupt exception was raised during integration.")
     
 
-# def test_keyboard_interrupt_caught():
-#     de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
+def test_DiffRHS():
+    def rhs(t, state, k, **kwargs):
+        return None
 
-#     @de.rhs_prettifier("""[vx, -x+t]""")
-#     def rhs(t, state, **kwargs):
-#         return de_mat @ state + D.array([0.0, t])
+    wrapped_rhs_no_repr = de.DiffRHS(rhs)
 
-#     y_init = D.array([1., 0.])
-    
-#     def kb_callback(ode_sys):
-#         if ode_sys.t[-1] > D.pi:
-#             raise KeyboardInterrupt()
+    assert (str(wrapped_rhs_no_repr) == str(rhs))
+    assert (wrapped_rhs_no_repr._repr_markdown_() == str(rhs))
 
-#     a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-#                      atol=D.epsilon() ** 0.5)
+    wrapped_rhs_no_equ_repr = de.DiffRHS(rhs, equ_repr=None, md_repr="1")
 
-#     with pytest.raises(KeyboardInterrupt):
-#         a.integrate(callback=kb_callback)
-    
-#     assert(a.integration_status == "A KeyboardInterrupt exception was raised during integration.")
-    
-    
+    assert (str(wrapped_rhs_no_equ_repr) == str(rhs))
+    assert (wrapped_rhs_no_equ_repr._repr_markdown_() == "1")
 
-# def test_DiffRHS():
-#     def rhs(t, state, k, **kwargs):
-#         return None
+    wrapped_rhs_no_md_repr = de.DiffRHS(rhs, equ_repr="1", md_repr=None)
 
-#     wrapped_rhs_no_repr = de.DiffRHS(rhs)
+    assert (str(wrapped_rhs_no_md_repr) == "1")
+    assert (wrapped_rhs_no_md_repr._repr_markdown_() == "1")
 
-#     assert (str(wrapped_rhs_no_repr) == str(rhs))
-#     assert (wrapped_rhs_no_repr._repr_markdown_() == str(rhs))
+    wrapped_rhs_both_repr = de.DiffRHS(rhs, equ_repr="1", md_repr="2")
 
-#     wrapped_rhs_no_equ_repr = de.DiffRHS(rhs, equ_repr=None, md_repr="1")
-
-#     assert (str(wrapped_rhs_no_equ_repr) == str(rhs))
-#     assert (wrapped_rhs_no_equ_repr._repr_markdown_() == "1")
-
-#     wrapped_rhs_no_md_repr = de.DiffRHS(rhs, equ_repr="1", md_repr=None)
-
-#     assert (str(wrapped_rhs_no_md_repr) == "1")
-#     assert (wrapped_rhs_no_md_repr._repr_markdown_() == "1")
-
-#     wrapped_rhs_both_repr = de.DiffRHS(rhs, equ_repr="1", md_repr="2")
-
-#     assert (str(wrapped_rhs_both_repr) == "1")
-#     assert (wrapped_rhs_both_repr._repr_markdown_() == "2")
+    assert (str(wrapped_rhs_both_repr) == "1")
+    assert (wrapped_rhs_both_repr._repr_markdown_() == "2")

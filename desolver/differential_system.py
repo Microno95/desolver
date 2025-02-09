@@ -504,26 +504,31 @@ class OdeSystem(object):
                 self.equ_rhs = DiffRHS(equ_rhs.rhs, y0, equ_rhs.equ_repr, equ_rhs.md_repr)
             else:
                 self.equ_rhs = DiffRHS(equ_rhs, y0)
-
-        self.__rtol = D.ar_numpy.maximum(rtol, D.tol_epsilon(y0.dtype))
-        self.__atol = D.ar_numpy.maximum(atol, D.tol_epsilon(y0.dtype))
-        self.__consts = constants if constants is not None else dict()
-        self.__y = D.ar_numpy.copy(y0)[None]
-        self.__t = D.ar_numpy.asarray(t[0], like=y0)[None]
-        self.dim = D.ar_numpy.shape(self.__y[0])
-        self.counter = 0
-        self.__t0 = D.ar_numpy.asarray(t[0], like=y0)
-        self.__tf = D.ar_numpy.asarray(t[1], like=y0)
-        self.__method = integrators.RK45CKSolver
-        self.integrator = None
-        self.__dt = D.ar_numpy.asarray(dt, like=y0)
-        self.__dt0 = self.dt
+                
+        
         self.__inferred_backend = D.autoray.infer_backend(y0)
-
         if self.__inferred_backend == 'torch':
             self.device = y0.device
         else:
             self.device = None
+            
+        self.__array_con_kwargs = dict(dtype=y0.dtype, like=self.__inferred_backend)
+        if self.__inferred_backend == 'torch':
+            self.__array_con_kwargs['device'] = self.device
+
+        self.__rtol = rtol
+        self.__atol = atol
+        self.__consts = constants if constants is not None else dict()
+        self.__y = D.ar_numpy.copy(y0)[None]
+        self.__t = D.ar_numpy.asarray(t[0], **self.__array_con_kwargs)[None]
+        self.dim = D.ar_numpy.shape(self.__y[0])
+        self.counter = 0
+        self.__t0 = D.ar_numpy.asarray(t[0], **self.__array_con_kwargs)
+        self.__tf = D.ar_numpy.asarray(t[1], **self.__array_con_kwargs)
+        self.__method = integrators.RK45CKSolver
+        self.integrator = None
+        self.__dt = D.ar_numpy.asarray(dt, **self.__array_con_kwargs)
+        self.__dt0 = self.dt
 
         self.staggered_mask = None
         self.__dense_output = dense_output
@@ -618,7 +623,7 @@ class OdeSystem(object):
         """Sets the target relative error used by the timestep autocalculator and the adaptive integration methods.
         Has no effect when the integration method is non-adaptive.
         """
-        self.__rtol = D.ar_numpy.maximum(new_rtol, D.tol_epsilon(self.__y[0].dtype))
+        self.__rtol = D.ar_numpy.asarray(new_rtol, **self.__array_con_kwargs)
         self.initialise_integrator()
 
     @property
@@ -632,7 +637,7 @@ class OdeSystem(object):
         """Sets the target absolute error used by the timestep autocalculator and the adaptive integration methods.
         Has no effect when the integration method is non-adaptive.
         """
-        self.__atol = D.ar_numpy.maximum(new_atol, D.tol_epsilon(self.__y[0].dtype))
+        self.__atol = D.ar_numpy.asarray(new_atol, **self.__array_con_kwargs)
         self.initialise_integrator()
 
     @property
@@ -643,7 +648,7 @@ class OdeSystem(object):
 
     @dt.setter
     def dt(self, new_dt):
-        self.__dt = D.ar_numpy.asarray(new_dt, like=self.__y[0])
+        self.__dt = D.ar_numpy.asarray(new_dt, **self.__array_con_kwargs)
         self.__move_to_device()
         self.__fix_dt_dir(self.tf, self.t0)
         return self.__dt
@@ -669,7 +674,7 @@ class OdeSystem(object):
             If the initial integration time is greater than the final time and the integration 
             has been run (successfully or unsuccessfully).
         """
-        new_t0 = D.ar_numpy.to_numpy(new_t0)
+        new_t0 = D.ar_numpy.asarray(new_t0, **self.__array_con_kwargs)
         if D.ar_numpy.abs(self.tf - new_t0) <= D.epsilon(self.__y[self.counter].dtype):
             raise ValueError("The start time of the integration cannot be greater than or equal to {}!".format(self.tf))
         self.__t0 = new_t0
@@ -697,7 +702,7 @@ class OdeSystem(object):
             If the initial integration time is greater than the final time and the integration 
             has been run (successfully or unsuccessfully).
         """
-        new_tf = D.ar_numpy.to_numpy(new_tf)
+        new_tf = D.ar_numpy.asarray(new_tf, **self.__array_con_kwargs)
         if D.ar_numpy.abs(self.t0 - new_tf) <= D.epsilon(self.__y[self.counter].dtype):
             raise ValueError("The end time of the integration cannot be equal to the start time: {}!".format(self.t0))
         self.__tf = new_tf
@@ -755,15 +760,11 @@ class OdeSystem(object):
         try:
             if num_units != 0:
                 if self.__inferred_backend in ['numpy', 'torch']:
-                    __new_allocs = D.ar_numpy.zeros((num_units,) + D.ar_numpy.shape(self.__y[0]), dtype=self.__y[0].dtype, like=self.__y[0])
-                    if self.__inferred_backend == 'torch':
-                        __new_allocs = __new_allocs.to(self.__y[0])
+                    __new_allocs = D.ar_numpy.zeros((num_units,) + D.ar_numpy.shape(self.__y[0]), **self.__array_con_kwargs)
                     self.__y = D.ar_numpy.concatenate(
                         [self.__y, __new_allocs], axis=0)
                     
-                    __new_allocs = D.ar_numpy.zeros((num_units,) + D.ar_numpy.shape(self.__t[0]), dtype=self.__y[0].dtype, like=self.__y[0])
-                    if self.__inferred_backend == 'torch':
-                        __new_allocs = __new_allocs.to(self.__y[0])
+                    __new_allocs = D.ar_numpy.zeros((num_units,) + D.ar_numpy.shape(self.__t[0]), **self.__array_con_kwargs)
                     self.__t = D.ar_numpy.concatenate(
                         [self.__t, __new_allocs], axis=0)
                 else:
@@ -1059,8 +1060,6 @@ class OdeSystem(object):
                             else:
                                 true_positive = (prev_time + dTime <= root) & (root <= self.__t[self.counter])
 
-                            # print(root, prev_time, prev_time + dTime, true_positive, ev(root, sol_tuple[0](root), **self.constants))
-
                             if true_positive:
                                 ev_state = StateTuple(t=root, y=self.__sol(root), event=ev)
                                 if not self.__events or last_occurrence[ev_idx] == -1:
@@ -1079,7 +1078,7 @@ class OdeSystem(object):
                                 self.__allocate_soln_space(total_steps)
                             self.__t[self.counter + 1] = prev_time + dTime
                             self.__y[self.counter + 1] = prev_state + dState
-                        self.counter += 1
+                            self.counter += 1
 
                     if not self.__dense_output:
                         for _ in range(__pre_length - 1):

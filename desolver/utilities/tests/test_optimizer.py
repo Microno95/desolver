@@ -13,9 +13,9 @@ def set_torch_printoptions():
 def convert_tolerance(tolerance, dtype):
     if tolerance is not None:
         tolerance = tolerance * D.tol_epsilon(dtype)
-        tol = 256 * tolerance
+        tol = 32 * tolerance
     else:
-        tol = 256 * D.tol_epsilon(dtype)
+        tol = 32 * D.tol_epsilon(dtype)
     return tolerance, tol
 
 

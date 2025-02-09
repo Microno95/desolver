@@ -4,7 +4,7 @@ from desolver.utilities.interpolation import CubicHermiteInterp
 import desolver.backend as D
 import numpy as np
 import pytest
-from desolver.tests.common import *
+from desolver.tests import common
 
 
 def test_dense_init_and_call():
@@ -104,15 +104,13 @@ def test_dense_right_interval_vec(dtype_var, backend_var):
     assert (D.ar_numpy.all(denseoutput.find_interval_vec(test_t) == D.ar_numpy.asarray([0, 0, 1, 1], dtype=D.autoray.to_backend_dtype("int64", like=backend_var), like=backend_var)))
 
 
-@richardson_param
+@common.richardson_param
 def test_dense_output(dtype_var, backend_var, use_richardson_extrapolation):
     dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
     if backend_var == 'torch':
         import torch
         torch.set_printoptions(precision=17)
         torch.autograd.set_detect_anomaly(True)
-
-    from . import common
 
     (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var)
 

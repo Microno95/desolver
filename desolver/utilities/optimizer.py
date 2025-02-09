@@ -313,12 +313,12 @@ def brentsrootvec(f, bounds, tol=None, verbose=False, return_interval=False, acc
 def iterative_inverse_7th(A, Ainv0, maxiter=10):
     I = D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(A)))
     Vn = Ainv0
-    initial_norm = D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(Vn @ A - I))
+    initial_norm = D.ar_numpy.linalg.norm(Vn @ A - I)
     for i in range(maxiter):
         Vn1 = (1 / 16) * Vn @ (120 * I + A @ Vn @ (-393 * I + A @ Vn @ (-861 * I + A @ Vn @ (
                     651 * I + A @ Vn @ (-315 * I + A @ Vn @ (931 * I + A @ Vn @ (-15 * I + A @ Vn)))))))
-        new_norm = D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(Vn1 @ A - I))
-        if new_norm < 2 * D.epsilon(A.dtype) or new_norm > initial_norm:
+        new_norm = D.ar_numpy.linalg.norm(Vn1 @ A - I)
+        if new_norm < D.tol_epsilon(A.dtype) or new_norm > initial_norm:
             break
         else:
             Vn = Vn1
@@ -329,11 +329,11 @@ def iterative_inverse_7th(A, Ainv0, maxiter=10):
 def iterative_inverse_1st(A, Ainv0, maxiter=10):
     I = D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(A)))
     Vn = Ainv0
-    initial_norm = D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(Vn @ A - I))
+    initial_norm = D.ar_numpy.linalg.norm(Vn @ A - I)
     for i in range(maxiter):
         Vn1 = Vn @ (2 * I - A @ Vn)
-        new_norm = D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(Vn1 @ A - I))
-        if new_norm < 2 * D.epsilon(A.dtype) or new_norm > initial_norm:
+        new_norm = D.ar_numpy.linalg.norm(Vn1 @ A - I)
+        if new_norm < D.tol_epsilon(A.dtype) or new_norm > initial_norm:
             break
         else:
             Vn = Vn1
@@ -344,12 +344,12 @@ def iterative_inverse_1st(A, Ainv0, maxiter=10):
 def iterative_inverse_3rd(A, Ainv0, maxiter=10):
     I = D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(A)))
     Vn = Ainv0
-    initial_norm = D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(Vn @ A - I))
+    initial_norm = D.ar_numpy.linalg.norm(Vn @ A - I)
     for i in range(maxiter):
         Vn1 = Vn @ (2 * I - A @ Vn)
         Vn1 = Vn1 @ (3 * I - A @ Vn1 @ (3 * I - A @ Vn1))
-        new_norm = D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(Vn1 @ A - I))
-        if new_norm < 2 * D.epsilon(A.dtype) or new_norm > initial_norm:
+        new_norm = D.ar_numpy.linalg.norm(Vn1 @ A - I)
+        if new_norm < D.tol_epsilon(A.dtype) or new_norm > initial_norm:
             break
         else:
             Vn = Vn1
@@ -364,7 +364,8 @@ def broyden_update_jac(B, dx, df, Binv=None):
     B_new = D.ar_numpy.reshape((1 + kI * B * dx) * B, (df.shape[0], dx.shape[0]))
     if Binv is not None:
         Binv_new = Binv + ((dx - Binv @ y_is) / (y_is.mT @ y_is)) @ y_is.mT
-        if D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(Binv_new @ B_new - D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(B))))) < 0.5:
+        norm_val = D.ar_numpy.linalg.norm(Binv_new @ B_new - D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(B))))
+        if norm_val < 0.5:
             Binv_new = iterative_inverse_7th(B_new, Binv_new, maxiter=3)
         return B_new, Binv_new
     else:
@@ -466,7 +467,7 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
             df = (df.mT @ df).item() ** 0.5
             dJ = D.ar_numpy.sum(dJ ** 2) ** 0.5
             print(f"[ntr-{iteration}]: x = {D.ar_numpy.to_numpy(x)}, f = {D.ar_numpy.to_numpy(F1)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn1)}, ||dF|| = {D.ar_numpy.to_numpy(df)}, ||dJ|| = {D.ar_numpy.to_numpy(dJ)}")
-        sparse = (1.0 - D.ar_numpy.sum(D.ar_numpy.abs(D.ar_numpy.to_numpy(Jf1)) > 0) / (xdim * fdim)) <= 0.7
+        sparse = (1.0 - D.ar_numpy.sum(D.ar_numpy.abs(Jf1) > 0) / (xdim * fdim)) <= 0.7
         P = Jf1
         diagP = D.ar_numpy.diag(trust_region * D.ar_numpy.diag(P))
         dx = D.ar_numpy.reshape(D.ar_numpy.solve_linear_system(Jinv @ (P + diagP), -Jinv @ F1, sparse=sparse), (xdim, 1))

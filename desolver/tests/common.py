@@ -55,12 +55,12 @@ def set_up_basic_system(dtype_var, backend_var, integrator=None, hook_jacobian=F
 
     y_init = D.ar_numpy.array([1., 0.], dtype=dtype_var, like=backend_var)
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0.0, 2 * D.pi), dt=0.01, rtol=D.tol_epsilon(dtype_var)**0.5,
-                     atol=D.tol_epsilon(dtype_var)**0.5)
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0.0, 2 * D.pi), dt=0.01, rtol=D.epsilon(dtype_var)**0.75,
+                     atol=D.epsilon(dtype_var)**0.75)
     a.set_kick_vars(D.ar_numpy.array([0,1], dtype=D.autoray.to_backend_dtype('bool', like=backend_var), like=backend_var))
     if integrator is None:
         integrator = a.method
-    dt = (D.epsilon(dtype_var) ** 0.5)**(1.0/(2+a.integrator.order))/(2*D.pi)
+    dt = (D.epsilon(dtype_var) ** 0.75)**(1.0/(2+a.integrator.order))/(2*D.pi)
     a.dt = dt
 
     return de_mat, rhs, analytic_soln, y_init, dt, a
