@@ -319,11 +319,11 @@ class ExplicitSymplecticIntegrator(TableauIntegrator):
     def __init__(self, sys_dim, dtype=None, staggered_mask=None, rtol=None, atol=None, device=None):
         super().__init__(sys_dim=sys_dim, dtype=dtype, rtol=rtol, atol=atol, device=device)
         if staggered_mask is None:
-            staggered_mask = D.ar_numpy.arange(sys_dim[0] // 2, sys_dim[0], dtype=D.autoray.to_backend_dtype('int64', like=self.tableau_intermediate))
-            self.staggered_mask = D.ar_numpy.zeros(sys_dim, dtype=D.autoray.to_backend_dtype('bool', like=self.tableau_intermediate))
+            staggered_mask = D.ar_numpy.arange(sys_dim[0] // 2, sys_dim[0], dtype=D.autoray.to_backend_dtype('int64', like=self.tableau_intermediate), like=self.tableau_intermediate)
+            self.staggered_mask = D.ar_numpy.zeros(sys_dim, dtype=D.autoray.to_backend_dtype('bool', like=self.tableau_intermediate), like=self.tableau_intermediate)
             self.staggered_mask[staggered_mask] = 1
         else:
-            self.staggered_mask = D.astype(staggered_mask, D.autoray.to_backend_dtype('bool', like=self.tableau_intermediate))
+            self.staggered_mask = D.astype(staggered_mask, D.autoray.to_backend_dtype('bool', like=self.tableau_intermediate), like=self.tableau_intermediate)
 
         self.kick_mask = D.ar_numpy.asarray(self.staggered_mask, **self.array_constructor_kwargs)
         self.drift_mask = 1.0 - self.kick_mask
@@ -379,7 +379,7 @@ class ExplicitSymplecticIntegrator(TableauIntegrator):
         return self.dTime, (self.dTime, self.dState)
 
 
-def generate_richardson_integrator(basis_integrator):
+def generate_richardson_integrator(basis_integrator, richardson_iter=2):
     """
     A function for generating an integrator that uses local Richardson Extrapolation to find the change in state ΔY over a timestep h by estimating lim ΔY as h->0.
     
@@ -399,7 +399,7 @@ def generate_richardson_integrator(basis_integrator):
 
         symplectic = basis_integrator.symplectic
 
-        def __init__(self, sys_dim, richardson_iter=8, **kwargs):
+        def __init__(self, sys_dim, **kwargs):
             super().__init__()
             self.dim = sys_dim
             self.numel = 1
@@ -497,6 +497,8 @@ def generate_richardson_integrator(basis_integrator):
                                                               prev_error)
                     if t_conv:
                         break
+            
+            self.solver_dict['num_richardson_iterations'] = m
 
             return timestep, (timestep, self.stage_values[m - 1, n - 1]), self.stage_values[m - 1, m - 1] - self.stage_values[m, m]
 

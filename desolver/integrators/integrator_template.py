@@ -20,7 +20,7 @@ class IntegratorTemplate(abc.ABC):
         return False
 
     @property
-    def adaptation_fn(self):
+    def adaptation_fn(self):# -> Callable[..., Any] | Callable[..., Any | tuple[Any, Liter...:
         return self.__custom_adaptation_fn if self.__custom_adaptation_fn else self.update_timestep
     
     @adaptation_fn.setter

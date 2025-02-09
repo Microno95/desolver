@@ -499,8 +499,8 @@ class OdeSystem(object):
             else:
                 self.equ_rhs = DiffRHS(equ_rhs, y0)
 
-        self.__rtol = rtol
-        self.__atol = atol
+        self.__rtol = D.ar_numpy.maximum(rtol, D.tol_epsilon(y0.dtype))
+        self.__atol = D.ar_numpy.maximum(atol, D.tol_epsilon(y0.dtype))
         self.__consts = constants if constants is not None else dict()
         self.__y = D.ar_numpy.copy(y0)[None]
         self.__t = D.ar_numpy.asarray(t[0], like=y0)[None]
@@ -612,7 +612,7 @@ class OdeSystem(object):
         """Sets the target relative error used by the timestep autocalculator and the adaptive integration methods.
         Has no effect when the integration method is non-adaptive.
         """
-        self.__rtol = new_rtol
+        self.__rtol = D.ar_numpy.maximum(new_rtol, D.tol_epsilon(self.__y[0].dtype))
         self.initialise_integrator()
 
     @property
@@ -626,7 +626,7 @@ class OdeSystem(object):
         """Sets the target absolute error used by the timestep autocalculator and the adaptive integration methods.
         Has no effect when the integration method is non-adaptive.
         """
-        self.__atol = new_atol
+        self.__atol = D.ar_numpy.maximum(new_atol, D.tol_epsilon(self.__y[0].dtype))
         self.initialise_integrator()
 
     @property

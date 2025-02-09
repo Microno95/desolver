@@ -10,7 +10,6 @@ def test_convert_suffix():
 
 def test_bisection_search():
     l1 = [0.0, 1.0, 2.0, 3.0, 5.0, 10.0]
-
     for idx, i in enumerate(l1):
         assert (de.utilities.search_bisection(l1, i) == idx)
 
@@ -24,55 +23,45 @@ def test_bisection_search_vec():
     l4 = [0.2, 9.9, 2.3, 5.5]
     expected_l4 = [0, 4, 2, 4]
     
-    assert (D.all(de.utilities.search_bisection_vec(l1, l2) == D.asarray(expected_l2)))
-    assert (D.all(de.utilities.search_bisection_vec(l1, l3) == D.asarray(expected_l3)))
-    assert (D.all(de.utilities.search_bisection_vec(l1, l4) == D.asarray(expected_l4)))
+    assert (D.ar_numpy.all(de.utilities.search_bisection_vec(l1, l2) == D.ar_numpy.asarray(expected_l2)))
+    assert (D.ar_numpy.all(de.utilities.search_bisection_vec(l1, l3) == D.ar_numpy.asarray(expected_l3)))
+    assert (D.ar_numpy.all(de.utilities.search_bisection_vec(l1, l4) == D.ar_numpy.asarray(expected_l4)))
         
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())        
-def test_jacobian_wrapper_non_callable(ffmt):
-    D.set_float_fmt(ffmt)
-    rhs = 5.0
+def test_jacobian_wrapper_non_callable(dtype_var, backend_var, device_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    rhs = D.ar_numpy.asarray(5.0, dtype=dtype_var, like=backend_var)
     
     jac_rhs = de.utilities.JacobianWrapper(rhs)
+
+    x = D.ar_numpy.asarray(0.1, dtype=dtype_var, like=backend_var)
+    if backend_var == "torch":
+        x = x.to(device_var)
     
     with pytest.raises(TypeError):
-        print(jac_rhs(0.1))
+        print(jac_rhs(x))
         
 
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
-def test_jacobian_wrapper_exact(ffmt):
-    D.set_float_fmt(ffmt)
-    rhs     = lambda x: D.exp(-x)
-    drhs_exact = lambda x: -D.exp(-x)
-    jac_rhs = de.utilities.JacobianWrapper(rhs, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
+def test_jacobian_wrapper_exact(dtype_var, backend_var, device_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    rhs     = lambda x: D.ar_numpy.exp(-x)
+    drhs_exact = lambda x: -D.ar_numpy.exp(-x)
     
-    x = D.array(0.0)
+    x = D.ar_numpy.asarray(0.0, dtype=dtype_var, like=backend_var)
+    if backend_var == "torch":
+        x = x.to(device_var)
     
-    assert (D.allclose(D.to_float(drhs_exact(x)), D.to_float(jac_rhs(x)), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
-        
-
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
-def test_jacobian_wrapper_no_adaptive(ffmt):
-    D.set_float_fmt(ffmt)
-    rhs     = lambda x: D.exp(-x)
-    drhs_exact = lambda x: -D.exp(-x)
-    jac_rhs = de.utilities.JacobianWrapper(rhs, richardson_iter=4, adaptive=False, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
+    # Adaptive estimate
+    jac_rhs = de.utilities.JacobianWrapper(rhs, rtol=D.epsilon(dtype_var) ** 0.5, atol=D.epsilon(dtype_var) ** 0.5)
+    assert (D.ar_numpy.allclose(D.ar_numpy.to_numpy(drhs_exact(x)), D.ar_numpy.to_numpy(jac_rhs(x)), rtol=D.tol_epsilon(dtype_var) ** 0.5, atol=D.tol_epsilon(dtype_var) ** 0.5))
     
-    x = D.array(0.0)
+    # Non-adaptive estimate
+    jac_rhs = de.utilities.JacobianWrapper(rhs, richardson_iter=4, adaptive=False, rtol=D.epsilon(dtype_var) ** 0.5, atol=D.epsilon(dtype_var) ** 0.5)
+    assert (D.ar_numpy.allclose(D.ar_numpy.to_numpy(drhs_exact(x)), D.ar_numpy.to_numpy(jac_rhs(x)), rtol=D.tol_epsilon(dtype_var) ** 0.5, atol=D.tol_epsilon(dtype_var) ** 0.5))
     
-    assert (D.allclose(D.to_float(drhs_exact(x)), D.to_float(jac_rhs(x)), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
-        
-
-@pytest.mark.parametrize('ffmt', D.available_float_fmt())
-def test_jacobian_wrapper_calls_estimate(ffmt):
-    D.set_float_fmt(ffmt)
-    rhs     = lambda x: D.exp(-x)
-    jac_rhs = de.utilities.JacobianWrapper(rhs, richardson_iter=0, adaptive=False, rtol=D.epsilon() ** 0.5, atol=D.epsilon() ** 0.5)
-    
-    x = D.array(0.0)
-    
-    assert (D.allclose(D.to_float(jac_rhs.estimate(x)), D.to_float(jac_rhs(x)), rtol=4 * D.epsilon() ** 0.5, atol=4 * D.epsilon() ** 0.5))
+    # Non-adaptive estimate
+    jac_rhs = de.utilities.JacobianWrapper(rhs, richardson_iter=0, adaptive=False, rtol=D.epsilon(dtype_var) ** 0.5, atol=D.epsilon(dtype_var) ** 0.5)
+    assert (D.ar_numpy.allclose(D.ar_numpy.to_numpy(jac_rhs.estimate(x)), D.ar_numpy.to_numpy(jac_rhs(x)), rtol=D.tol_epsilon(dtype_var) ** 0.5, atol=D.tol_epsilon(dtype_var) ** 0.5))
 
     
 def test_blocktimer():

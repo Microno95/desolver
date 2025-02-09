@@ -163,6 +163,7 @@ def brentsrootvec(f, bounds, tol=None, verbose=False, return_interval=False, acc
     if isinstance(f, list):
         def _f(x, mask=None):
             out = [f[i](x[i]) if mask is None or (mask is not None and mask[i]) else D.ar_numpy.zeros_like(x[i]) for i in range(x.shape[0])]
+            out = list(map(D.ar_numpy.atleast_1d, out))
             return D.ar_numpy.concatenate(out)
         if len(a.shape) == 0:
             a, b = a[None], b[None]
@@ -359,10 +360,10 @@ def iterative_inverse_3rd(A, Ainv0, maxiter=10):
 def broyden_update_jac(B, dx, df, Binv=None):
     y_ex = B @ dx
     y_is = df
-    kI = (y_is - y_ex) / D.ar_numpy.sum(y_ex.T @ y_ex)
+    kI = (y_is - y_ex) / D.ar_numpy.sum(y_ex.mT @ y_ex)
     B_new = D.ar_numpy.reshape((1 + kI * B * dx) * B, (df.shape[0], dx.shape[0]))
     if Binv is not None:
-        Binv_new = Binv + ((dx - Binv @ y_is) / (y_is.T @ y_is)) @ y_is.T
+        Binv_new = Binv + ((dx - Binv @ y_is) / (y_is.mT @ y_is)) @ y_is.mT
         if D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(Binv_new @ B_new - D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(B))))) < 0.5:
             Binv_new = iterative_inverse_7th(B_new, Binv_new, maxiter=3)
         return B_new, Binv_new
@@ -371,10 +372,18 @@ def broyden_update_jac(B, dx, df, Binv=None):
 
 
 def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac_update_rate=20, initial_trust_region=None):
+    x0 = D.ar_numpy.asarray(x0)
     if tol is None:
-        tol = 2 * D.epsilon(x0.dtype)
-    tol = float(tol)
+        tol = D.tol_epsilon(x0.dtype)
     xshape = D.ar_numpy.shape(x0)
+    if len(xshape) == 0:
+        f_vec = lambda x: D.ar_numpy.atleast_1d(f(x[0]))
+        if jac is not None:
+            jac_vec = lambda x: D.ar_numpy.atleast_2d(jac(x[0]))
+        else:
+            jac_vec = None
+        res = newtontrustregion(f_vec, D.ar_numpy.atleast_1d(x0), jac_vec, tol=tol, verbose=verbose, maxiter=maxiter)
+        return D.ar_numpy.reshape(res[0], xshape), res[1]
     xdim = 1
     for __d in xshape:
         xdim *= __d
@@ -410,7 +419,16 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
                 return __fun_jac(x)
     else:
         jac_shape = D.ar_numpy.shape(jac(x0))
-        if jac_shape != (fdim, xdim):
+        jacdim = 1
+        for __d in jac_shape:
+            jacdim *= __d
+        if jacdim == fdim:
+            def fun_jac(x):
+                nonlocal njev
+                __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape)), (fdim,))
+                njev += 1
+                return D.ar_numpy.diag(__j)
+        elif jac_shape != (fdim, xdim):
             def fun_jac(x):
                 nonlocal njev
                 __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape)), (fdim, xdim))
@@ -445,9 +463,9 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
         if verbose:
             df = F1 - F0
             dJ = Jf1 - Jf0
-            df = (df.T @ df).item() ** 0.5
+            df = (df.mT @ df).item() ** 0.5
             dJ = D.ar_numpy.sum(dJ ** 2) ** 0.5
-            print(f"[{iteration}]: x = {D.ar_numpy.to_numpy(x)}, f = {D.ar_numpy.to_numpy(F1)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn1)}, ||dF|| = {D.ar_numpy.to_numpy(df)}, ||dJ|| = {D.ar_numpy.to_numpy(dJ)}")
+            print(f"[ntr-{iteration}]: x = {D.ar_numpy.to_numpy(x)}, f = {D.ar_numpy.to_numpy(F1)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn1)}, ||dF|| = {D.ar_numpy.to_numpy(df)}, ||dJ|| = {D.ar_numpy.to_numpy(dJ)}")
         sparse = (1.0 - D.ar_numpy.sum(D.ar_numpy.abs(D.ar_numpy.to_numpy(Jf1)) > 0) / (xdim * fdim)) <= 0.7
         P = Jf1
         diagP = D.ar_numpy.diag(trust_region * D.ar_numpy.diag(P))
@@ -473,7 +491,8 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
         y_is = F1 - F0
         tr_ratio = D.ar_numpy.linalg.norm(y_ex).item()
         denom = D.ar_numpy.linalg.norm(y_is).item()
-        if denom == 0:
+        failed_to_achieve_tol = denom <= (fdim + D.ar_numpy.linalg.norm(F0)) * tol
+        if failed_to_achieve_tol:
             trust_region *= 0.9
         else:
             tr_ratio = tr_ratio / denom
@@ -486,26 +505,68 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
             Jinv = D.ar_numpy.astype(D.ar_numpy.linalg.inv(D.ar_numpy.astype(Jf1, f64_type)), Jf1.dtype)
         else:
             Jf0, (Jf1, Jinv) = Jf1, broyden_update_jac(Jf1, dx, F1 - F0, Jinv)
-        convergence_achieved = dxn <= 4 * D.ar_numpy.max(D.ar_numpy.abs(x * tol))
-        if Fn1 <= tol or convergence_achieved or not D.ar_numpy.all(D.ar_numpy.isfinite(dx)) or fail_iter > 10:
+        xtol = tol * (xdim + D.ar_numpy.linalg.norm(x))
+        success = dxn <= 0.8 * xtol
+        success = success or Fn1 < 0.8 * tol
+        convergence_failure = not D.ar_numpy.isfinite(dxn) or fail_iter > 2
+        if success or convergence_failure:
             if verbose:
-                print(f"[finished]: ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn1)}, ||dF|| = {D.ar_numpy.to_numpy(df)}")
+                print(f"[ntr-finished]: x = {D.ar_numpy.to_numpy(x)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn1)}, ||dF|| = {D.ar_numpy.to_numpy(df)}")
             break
-    return D.ar_numpy.reshape(x, xshape), (Fn1 <= 4 * fdim * tol or convergence_achieved, iteration, nfev, njev, Fn1)
+    return D.ar_numpy.reshape(x, xshape), (success and not convergence_failure, iteration, nfev, njev, Fn1)
 
 
 def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200):
+    x0 = D.ar_numpy.asarray(x0)
     if tol is None:
-        tol = 2 * D.epsilon()
-    tol = float(tol)
+        tol = D.tol_epsilon(x0.dtype)
     xshape = D.ar_numpy.shape(x0)
-    xdim = xshape[0]
+    xdim = 1
+    for __d in xshape:
+        xdim *= __d
     x = D.ar_numpy.reshape(x0, (xdim, 1))
-    F0 = f(x0)
+    
+    fshape = D.ar_numpy.shape(f(x0))
+    fdim = 1
+    for __d in fshape:
+        fdim *= __d
+    
+    inferred_backend = D.autoray.infer_backend(x0)
+
+    def fun(x):
+        return D.ar_numpy.reshape(f(D.ar_numpy.reshape(x, xshape)), (fdim, 1))
+
+    if jac is None:
+        if inferred_backend == 'torch':
+            def fun_jac(x):
+                return D.ar_numpy.reshape(torch.func.jacrev(fun, argnums=0)(x)[:,0,:,0], (fdim, xdim))
+        else:
+            __fun_jac = utilities.JacobianWrapper(fun, atol=tol, rtol=tol, flat=True)
+
+            def fun_jac(x):
+                nonlocal __fun_jac
+                return __fun_jac(x)
+    else:
+        jac_shape = D.ar_numpy.shape(jac(x0))
+        jacdim = 1
+        for __d in jac_shape:
+            jacdim *= __d
+        if jacdim == fdim:
+            def fun_jac(x):
+                __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape)), (fdim,))
+                return D.ar_numpy.diag(__j)
+        elif jac_shape != (fdim, xdim):
+            def fun_jac(x):
+                __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape)), (fdim, xdim))
+                return __j
+        else:
+            def fun_jac(x):
+                nonlocal jac
+                return jac(D.ar_numpy.reshape(x, xshape))
+    
+    F0 = fun(x)
     F1 = D.ar_numpy.copy(F0)
-    fshape = D.ar_numpy.shape(F0)
-    fdim = fshape[0]
-    J0 = jac(x0)
+    J0 = fun_jac(x)
     dx = D.ar_numpy.zeros_like(x)
     dxn = D.ar_numpy.linalg.norm(dx)
 
@@ -516,27 +577,29 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200):
         if verbose:
             df = D.ar_numpy.linalg.norm(F1 - F0)
             Fn0 = D.ar_numpy.linalg.norm(F0)
-            print(f"[{iteration}]: tr = {D.ar_numpy.to_numpy(trust_region)}, x = {D.ar_numpy.to_numpy(x)}, f = {D.ar_numpy.to_numpy(F1)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn0)}, ||dF|| = {D.ar_numpy.to_numpy(df)}")
-        dx_gn = -D.ar_numpy.solve_linear_system(J0.T @ J0, J0.T @ F0)
-        dx_sd = -J0.T @ F0
-        tparam = -dx_sd.T @ J0.T @ F0 / D.ar_numpy.linalg.norm(J0 @ dx_sd) ** 2
-        if D.ar_numpy.all(D.ar_numpy.linalg.norm(dx_gn) <= trust_region) or D.ar_numpy.linalg.norm(dx_gn - tparam * dx_sd) < tol + D.ar_numpy.max(D.ar_numpy.abs(tol * x)):
+            print(f"[hybrj-{iteration}]: tr = {D.ar_numpy.to_numpy(trust_region)}, x = {D.ar_numpy.to_numpy(x)}, f = {D.ar_numpy.to_numpy(F1)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn0)}, ||dF|| = {D.ar_numpy.to_numpy(df)}")
+        Jt_mul_F = J0.mT @ F0
+        dx_gn = -D.ar_numpy.solve_linear_system(J0.mT @ J0, Jt_mul_F)
+        dx_sd = -Jt_mul_F
+        tparam = -dx_sd.mT @ Jt_mul_F / D.ar_numpy.linalg.norm(J0 @ dx_sd) ** 2
+        xtol = tol * (xdim + D.ar_numpy.linalg.norm(x))
+        if D.ar_numpy.all(D.ar_numpy.linalg.norm(dx_gn) <= trust_region) or D.ar_numpy.linalg.norm(dx_gn - tparam * dx_sd) < xtol:
             dx = dx_gn
         elif D.ar_numpy.all(D.ar_numpy.linalg.norm(dx_sd) >= trust_region):
             dx = trust_region * dx_sd / D.ar_numpy.linalg.norm(dx_sd)
         else:
             a = tparam * dx_sd
-            an = D.ar_numpy.linalg.norm(a) ** 2
+            an = D.ar_numpy.minimum(D.ar_numpy.linalg.norm(a) ** 2, trust_region)
             b = dx_gn - a
             bn = D.ar_numpy.linalg.norm(b) ** 2
-            c = (a.T @ b)
+            c = (a.mT @ b)
             if c <= 0:
                 s = (-c + D.ar_numpy.sqrt(c ** 2 + bn * (trust_region - an))) / bn
             else:
                 s = (trust_region - an) / (c + D.ar_numpy.sqrt(c ** 2 + bn * (trust_region - an)))
             dx = tparam * dx_sd + s * (dx_gn - tparam * dx_sd)
         __x = x + dx.reshape(xdim, 1)
-        __f = f(__x.reshape(xshape)).reshape(fdim, 1)
+        __f = fun(__x)
         dxn = D.ar_numpy.linalg.norm(dx)
         y_ex = J0 @ dx
         y_is = __f - F0
@@ -546,40 +609,46 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200):
             x = __x
             F1 = F0
             F0 = __f
-            success = D.ar_numpy.linalg.norm(F0) < tol or dxn < tol + D.ar_numpy.max(D.ar_numpy.abs(tol * x))
+            success = D.ar_numpy.linalg.norm(F0) < tol or dxn <= xtol
         if no_progress:
-            J0 = jac(x.reshape(xshape)).reshape(fdim, xdim)
+            J0 = fun_jac(x)
         else:
             J0 = broyden_update_jac(J0, dx, y_is)
-
+        if D.ar_numpy.any(~D.ar_numpy.isfinite(dx)):
+            raise ValueError("Encountered nan!")
         if D.ar_numpy.max(gain) > 0.75:
-            trust_region = max(trust_region, 3 *  float(D.ar_numpy.linalg.norm(dx_gn)))
+            trust_region = D.ar_numpy.maximum(trust_region, 3 *  D.ar_numpy.linalg.norm(dx_gn))
         elif D.ar_numpy.max(gain) < 0.25:
             trust_region = trust_region * 0.5
-            success = success or trust_region <= tol + D.ar_numpy.linalg.norm(tol * x)
+            success = success or trust_region <= xtol
         if success:
             if verbose:
                 Fn0 = D.ar_numpy.linalg.norm(F0)
-                print(f"[finished]: ||F|| = {D.ar_numpy.to_numpy(Fn0)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, x = {D.ar_numpy.to_numpy(x)}, F = {D.ar_numpy.to_numpy(F0)}")
+                print(f"[hybrj-finished]: ||F|| = {D.ar_numpy.to_numpy(Fn0)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, x = {D.ar_numpy.to_numpy(x)}, F = {D.ar_numpy.to_numpy(F0)}")
             break
     return D.ar_numpy.reshape(x, xshape), (success, dxn, iteration, D.ar_numpy.reshape(F0, fshape))
 
 
 def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_scipy=True,
                     additional_args=tuple(), additional_kwargs=dict()):
+    x0 = D.ar_numpy.asarray(x0)
     if tol is None:
-        tol = 2 * D.epsilon()
-    tol = float(tol)
+        tol = D.tol_epsilon(x0.dtype)
     xshape = D.ar_numpy.shape(x0)
+    if len(xshape) == 0:
+        f_vec = lambda x: D.ar_numpy.atleast_1d(f(x[0]))
+        if jac is not None:
+            jac_vec = lambda x: D.ar_numpy.atleast_2d(jac(x[0]))
+        else:
+            jac_vec = None
+        res = nonlinear_roots(f_vec, D.ar_numpy.atleast_1d(x0), jac_vec, tol=tol, verbose=verbose, maxiter=maxiter)
+        return D.ar_numpy.reshape(res[0], xshape), res[1]
     xdim = 1
     for __d in xshape:
         xdim *= __d
     x = D.ar_numpy.reshape(x0, (xdim, 1))
 
     __f0 = f(x0, *additional_args, **additional_kwargs)
-    __f0n = D.ar_numpy.linalg.norm(D.ar_numpy.reshape(__f0, (-1,)))
-    if __f0n <= tol:
-        return x0, (True, 1, 1, 0, __f0n)
     fshape = D.ar_numpy.shape(__f0)
     fdim = 1
     for __d in fshape:
@@ -609,7 +678,16 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
                 return __fun_jac(x)
     else:
         jac_shape = D.ar_numpy.shape(jac(x0, *additional_args, **additional_kwargs))
-        if jac_shape != (fdim, xdim):
+        jacdim = 1
+        for __d in jac_shape:
+            jacdim *= __d
+        if jacdim == fdim:
+            def fun_jac(x):
+                nonlocal njev
+                __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape)), (fdim,))
+                njev += 1
+                return D.ar_numpy.diag(__j)
+        elif jac_shape != (fdim, xdim):
             def fun_jac(x):
                 nonlocal njev
                 __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape), *additional_args, **additional_kwargs), (fdim, xdim))
@@ -627,16 +705,21 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
         njev = res.njev
         init_iter = res.nfev + res.njev
         x = D.ar_numpy.reshape(res.x, (xdim, 1))
-        F = fun(x)
-        if res.success:
-            return D.ar_numpy.reshape(x, xshape), (res.success, init_iter, nfev, njev, D.ar_numpy.linalg.norm(F))
+        F = D.ar_numpy.reshape(res.fun, fshape)
+        success = res.success or ("no futher improvement" in res.message and D.ar_numpy.linalg.norm(res.fun) <= D.tol_epsilon(x0.dtype))
+        if success:
+            return D.ar_numpy.reshape(x, xshape), (success, init_iter, nfev, njev, D.ar_numpy.linalg.norm(F))
         else:
             x = D.ar_numpy.reshape(x0, (xdim, 1))
     else:
         root, (success, prec, iterations, F) = hybrj(fun, x, fun_jac, tol=tol, verbose=verbose, maxiter=maxiter)
+        success = success or D.ar_numpy.linalg.norm(F) <= D.tol_epsilon(x0.dtype)
         if success:
-            return D.ar_numpy.reshape(root, xshape), (success or D.ar_numpy.linalg.norm(F) < tol, iterations, nfev, njev, prec)
+            return D.ar_numpy.reshape(root, xshape), (success, iterations, nfev, njev, prec)
         else:
             x = D.ar_numpy.reshape(x0, (xdim, 1))
-
-    return newtontrustregion(fun, x, jac=fun_jac, tol=tol, verbose=verbose, maxiter=maxiter, jac_update_rate=10, initial_trust_region=0.0)
+    
+    root, (success, iterations, *_, prec) = newtontrustregion(fun, x, jac=fun_jac, tol=tol, verbose=verbose, maxiter=maxiter, jac_update_rate=10, initial_trust_region=0.0)
+    success = success or prec <= D.tol_epsilon(x0.dtype)
+    
+    return D.ar_numpy.reshape(root, xshape), (success, iterations, nfev, njev, prec)

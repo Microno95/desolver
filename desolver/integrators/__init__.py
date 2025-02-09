@@ -55,8 +55,17 @@ __available_methods.update(dict(
     [(func.__name__, func) for func in __implicit_integration_methods__ if hasattr(func, "__alt_names__")] +
     [(alt_name, func)      for func in __implicit_integration_methods__ if hasattr(func, "__alt_names__") for alt_name in func.__alt_names__]))
 
+
 def available_methods(names=True):
     if names:
         return sorted(set(__available_methods.keys()))
     else:
         return __available_methods
+
+
+def explicit_methods():
+    return __explicit_integration_methods__
+
+
+def implicit_methods():
+    return __implicit_integration_methods__

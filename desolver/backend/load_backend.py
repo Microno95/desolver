@@ -60,8 +60,8 @@ def contract_first_ndims(a, b, n=1):
     na = len(ar_numpy.shape(a))
     nb = len(ar_numpy.shape(b))
     einsum_str = "{},{}->{}"
-    estr1 = "".join([chr(97 + i) for i in range(na)])
-    estr2 = "".join([chr(97 + i) for i in range(nb)])
-    estr3 = "".join([chr(97 + i + n) for i in range(nb - n)])
+    estr1 = " ".join([chr(97 + i) for i in range(n)]) + " ..."
+    estr2 = " ".join([chr(97 + i) for i in range(n)]) + " ..."
+    estr3 = "..."
     einsum_str = einsum_str.format(estr1, estr2, estr3)
     return einops.einsum(a, b, einsum_str)

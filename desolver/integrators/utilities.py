@@ -5,7 +5,7 @@ from desolver.integrators.integrator_types import TableauIntegrator
 def implicit_aware_update_timestep(integrator: TableauIntegrator):
     timestep = integrator.solver_dict['timestep']
     safety_factor = integrator.solver_dict['safety_factor']
-    timestep_from_error, redo_step = integrator.update_timestep(True)
+    timestep_from_error, redo_step = integrator.update_timestep(ignore_custom_adaptation=True)
     if "niter0" in integrator.solver_dict.keys():
         if integrator.solver_dict['niter0'] != 0:
             Tk0, CTk0 = D.ar_numpy.log(integrator.solver_dict['tau0']), math.log(integrator.solver_dict['niter0'])

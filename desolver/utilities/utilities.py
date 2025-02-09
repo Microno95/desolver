@@ -85,7 +85,10 @@ class JacobianWrapper(object):
         unravelled_y = D.ar_numpy.reshape(y, (-1,))
         dy_val = self.rhs(y, *args, **kwargs)
         unravelled_dy = D.ar_numpy.reshape(dy_val, (-1,))
-        jacobian_y = D.ar_numpy.zeros((*D.ar_numpy.shape(unravelled_dy), *D.ar_numpy.shape(unravelled_y)), dtype=unravelled_dy.dtype)
+        jac_con_kwargs = dict(dtype=unravelled_dy.dtype)
+        if D.backend_like_dtype(unravelled_y.dtype) == 'torch':
+            jac_con_kwargs['device'] = unravelled_y.device
+        jacobian_y = D.ar_numpy.zeros((*D.ar_numpy.shape(unravelled_dy), *D.ar_numpy.shape(unravelled_y)), **jac_con_kwargs, like=unravelled_dy)
         y_msk = D.ar_numpy.zeros_like(unravelled_y)
         if inferred_backend == 'torch':
             jacobian_y = jacobian_y.to(dy_val).to(y.device)
@@ -285,20 +288,21 @@ def search_bisection_vec(array, val):
 
     val = D.ar_numpy.asarray(val)
     array = D.ar_numpy.asarray(array)
-    jlower = D.ar_numpy.zeros_like(val, dtype=D.int64)
-    jupper = D.ar_numpy.ones_like(val, dtype=D.int64) * (len(array) - 1)
+    i64_type = D.autoray.to_backend_dtype("int64", like=val)
+    jlower = D.ar_numpy.zeros_like(val, dtype=i64_type)
+    jupper = D.ar_numpy.ones_like(val, dtype=i64_type) * (len(array) - 1)
 
-    indices = D.ar_numpy.zeros_like(val, dtype=D.int64)
-    msk1 = val <= D.ar_numpy.gather(array, jlower)
-    msk2 = val >= D.ar_numpy.gather(array, jupper)
+    indices = D.ar_numpy.zeros_like(val, dtype=i64_type)
+    msk1 = val <= D.ar_numpy.take(array, jlower)
+    msk2 = val >= D.ar_numpy.take(array, jupper)
     indices[msk1] = jlower[msk1]
     indices[msk2] = jupper[msk2]
 
     not_conv = (jupper - jlower) > 1
 
-    while D.any(not_conv):
+    while D.ar_numpy.any(not_conv):
         jmid = (jupper + jlower) // 2
-        mid_vals = D.ar_numpy.gather(array, jmid)
+        mid_vals = D.ar_numpy.take(array, jmid)
         msk1 = val > mid_vals
         msk2 = val <= mid_vals
         jlower[msk1] = jmid[msk1]

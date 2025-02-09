@@ -479,6 +479,6 @@ class RadauIIA19(RungeKuttaIntegrator):
         else:
             return D.ar_numpy.zeros_like(self.dState)
 
-    def update_timestep(self):
+    def update_timestep(self, *args, **kwargs):
         self.solver_dict['order'] = 10.0
-        return super().update_timestep()
+        return super().update_timestep(*args, **kwargs)
