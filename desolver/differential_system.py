@@ -139,10 +139,10 @@ def handle_events(sol_tuple, events, consts, direction, is_terminal, attributes)
 
     # print(roots, success, up, down, either, g, g_cen, g_new)
     mask = (up & (direction > 0) |
-            down & (direction < 0) |
-            either & (direction == 0))
+                down & (direction < 0) |
+                either & (direction == 0))
     
-    active_events = D.ar_numpy.reshape(D.ar_numpy.nonzero(mask)[0], (-1,))
+    active_events = D.ar_numpy.reshape(D.ar_numpy.nonzero(mask), (-1,))
 
     roots = roots[active_events]
     evs = [events[idx] for idx in active_events]
@@ -565,12 +565,29 @@ class OdeSystem(object):
         >>> ode_system.events
         (StateTuple(t=..., y=..., event=event_1), StateTuple(t=..., y=..., event=event_2), etc.)        
         """
+        return self.__events
+
+    @property
+    def events_dict(self):
+        """A tuple of (time, state, event) tuples containing the times and states
+        for each event that triggered
+        
+        Examples
+        --------
+
+        >>> ode_system = desolver.OdeSystem(...)
+        >>> ode_system.integrate(events=[...])
+        >>> ode_system.events
+        (StateTuple(t=..., y=..., event=event_1), StateTuple(t=..., y=..., event=event_2), etc.)        
+        """
         event_fn = set([i.event for i in self.__events])
-        return tuple([StateTuple(
-            t=D.ar_numpy.stack([i.t for i in self.__events if i.event == ev]),
-            y=D.ar_numpy.stack([i.y for i in self.__events if i.event == ev]),
-            event=ev
-        ) for ev in event_fn])
+        return {
+            ev: StateTuple(
+                t=D.ar_numpy.stack([i.t for i in self.__events if i.event == ev]),
+                y=D.ar_numpy.stack([i.y for i in self.__events if i.event == ev]),
+                event=ev
+            ) for ev in event_fn
+        }
 
     @property
     def y(self):

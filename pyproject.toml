@@ -129,9 +129,13 @@ parallel = true
 branch = true
 relative_files = true
 source = ["desolver"]
+omit = [
+  "*/tests/*"
+]
 data_file = "coverage/.coverage"
 
 [tool.coverage.report]
+format = "html"
 # Regexes for lines to exclude from consideration
 exclude_also = [
     # Don't complain about missing debug-only code:

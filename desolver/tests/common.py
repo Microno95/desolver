@@ -12,12 +12,12 @@ implicit_integrator_set = [
     pytest.param(intg, marks=pytest.mark.slow) for intg in integrator_set if intg.is_implicit
 ]
     
-dt_set   = [D.pi / 307, D.pi / 512]
-
-integrator_param   = pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
-richardson_param   = pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
-dt_param           = pytest.mark.parametrize('dt', dt_set)
-dense_output_param = pytest.mark.parametrize('dense_output', [True, False])
+dt_set            = [D.pi / 307, D.pi / 512]
+integrator_param          = pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
+explicit_integrator_param = pytest.mark.parametrize('integrator', explicit_integrator_set)
+richardson_param          = pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
+dt_param                  = pytest.mark.parametrize('dt', dt_set)
+dense_output_param        = pytest.mark.parametrize('dense_output', [True, False])
 
 
 def set_up_basic_system(dtype_var, backend_var, integrator=None, hook_jacobian=False):

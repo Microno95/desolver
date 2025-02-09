@@ -7,12 +7,9 @@ from desolver.tests import common
 
 
 @common.richardson_param
-@common.integrator_param
-@common.dt_param
+@common.explicit_integrator_param
 @common.dense_output_param
-def test_event_detection_single(dtype_var, backend_var, device_var, integrator, use_richardson_extrapolation, dt, dense_output):
-    if use_richardson_extrapolation and integrator.is_implicit:
-        pytest.skip("Richardson Extrapolation is too slow with implicit methods")
+def test_event_detection_single(dtype_var, backend_var, device_var, integrator, use_richardson_extrapolation, dense_output):
     if "float16" in dtype_var:
         pytest.skip("Event detection with 'float16' types are unreliable due to imprecision")
     
@@ -37,7 +34,7 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
     time_event.is_terminal = True
     time_event.direction = 0
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi / 4), dt=dt, rtol=D.epsilon(dtype_var) ** 0.5,
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi / 4), dt=D.pi/512, rtol=D.epsilon(dtype_var) ** 0.5,
                      atol=D.epsilon(dtype_var) ** 0.75)
     
     a.set_kick_vars([0, 1])
@@ -61,6 +58,84 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
         print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
                                                                                                a.t[-1] - D.pi / 8))
 
+
+
+@common.richardson_param
+@common.explicit_integrator_param
+@common.dense_output_param
+def test_event_detection_multiple(dtype_var, backend_var, device_var, integrator, use_richardson_extrapolation, dense_output):
+    if "float16" in dtype_var:
+        pytest.skip("Event detection with 'float16' types are unreliable due to imprecision")
+    
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+        device = torch.device(device_var)
+        
+    array_con_args = dict(dtype=dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        array_con_args['device'] = device_var
+
+    de_mat, rhs, analytic_soln, y_init, _, _ = common.set_up_basic_system(dtype_var, backend_var, integrator, hook_jacobian=True)
+
+    if backend_var == 'torch':
+        y_init = y_init.to(device)
+
+    def time_event(t, y, **kwargs):
+        out = D.ar_numpy.asarray(t - D.pi / 2, dtype=dtype_var, like=y_init)
+        if backend_var == 'torch':
+            out = out.to(y_init)
+        return out
+
+    def second_time_event(t, y, **kwargs):
+        out = D.ar_numpy.asarray(t - D.pi / 4, dtype=dtype_var, like=y_init)
+        if backend_var == 'torch':
+            out = out.to(y_init)
+        return out
+
+    def first_y_event(t, y, **kwargs):
+        return y[0] - analytic_soln(D.pi / 8, y_init)[0]
+
+    time_event.is_terminal = True
+    time_event.direction = 0
+    second_time_event.is_terminal = False
+    second_time_event.direction = 0
+    first_y_event.is_terminal = False
+    first_y_event.direction = 0
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi), dt=D.pi/512, rtol=D.epsilon(dtype_var) ** 0.5,
+                     atol=D.epsilon(dtype_var) ** 0.5)
+    
+    a.set_kick_vars([0, 1])
+
+    method = integrator
+    if use_richardson_extrapolation:
+        method = de.integrators.generate_richardson_integrator(method)
+
+    with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
+        a.set_method(method)
+
+        def dt_max_cb(ode_sys):
+            ode_sys.dt = min(ode_sys.dt, D.pi / 8)
+        a.integrate(eta=False, events=[time_event, second_time_event, first_y_event], callback=[dt_max_cb])
+
+        assert (a.integration_status == "Integration terminated upon finding a triggered event.")
+
+        print(a.events)
+        print(D.pi / 8, analytic_soln(D.pi / 8, y_init), analytic_soln(D.pi / 8, y_init)[0] - a.events[0].y[0])
+        assert (len(a.events) == 3)
+        assert (D.ar_numpy.abs(D.ar_numpy.to_numpy(a.events[0].y[0]) - D.ar_numpy.to_numpy(analytic_soln(D.pi / 8, y_init)[0])) <= (
+                    32 * D.epsilon(dtype_var) ** 0.5))
+        assert (a.events[0].event is first_y_event)
+        assert (D.ar_numpy.abs(a.events[1].t - D.ar_numpy.asarray(D.pi / 4, **array_con_args)) <= (D.epsilon(dtype_var) ** 0.5))
+        assert (a.events[1].event is second_time_event)
+        assert (D.ar_numpy.abs(a.events[2].t - D.ar_numpy.asarray(D.pi / 2, **array_con_args)) <= (D.epsilon(dtype_var) ** 0.5))
+        assert (a.events[2].event is time_event)
+        assert (D.ar_numpy.abs(a.t[-1] - D.ar_numpy.asarray(D.pi / 2, **array_con_args)) <= (D.epsilon(dtype_var) ** 0.5))
+        print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
+                                                                                               a.t[-1] - D.pi / 2))
 
 # @ffmt_param
 # @integrator_param
@@ -94,13 +169,13 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
 #         y_init = y_init.to(device)
 
 #     def time_event(t, y, **kwargs):
-#         out = D.array(t - D.pi / 2)
+#         out = D.ar_numpy.asarray(t - D.pi / 2)
 #         if D.backend() == 'torch':
 #             out = out.to(device)
 #         return out
 
 #     def second_time_event(t, y, **kwargs):
-#         out = D.array(t - D.pi / 4)
+#         out = D.ar_numpy.asarray(t - D.pi / 4)
 #         if D.backend() == 'torch':
 #             out = out.to(device)
 #         return out
@@ -115,9 +190,9 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
 #     first_y_event.is_terminal = False
 #     first_y_event.direction = 0
 
-#     a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi), dt=dt, rtol=D.epsilon() ** 0.5,
-#                      atol=D.epsilon() ** 0.75)
-#     a.set_kick_vars(D.array([0, 1], dtype=D.bool))
+#     a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi), dt=dt, rtol=D.epsilon(dtype_var) ** 0.5,
+#                      atol=D.epsilon(dtype_var) ** 0.75)
+#     a.set_kick_vars(D.ar_numpy.asarray([0, 1], dtype=D.bool))
 
 #     method = integrator
 #     if use_richardson_extrapolation:
@@ -136,14 +211,14 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
 #         print(a.events)
 #         print(D.pi / 8, analytic_soln(D.pi / 8, y_init), analytic_soln(D.pi / 8, y_init)[0] - a.events[0].y[0])
 #         assert (len(a.events) == 3)
-#         assert (D.abs(D.to_float(a.events[0].y[0]) - D.to_float(analytic_soln(D.pi / 8, y_init)[0])) <= (
-#                     32 * D.epsilon() ** 0.5))
+#         assert (D.ar_numpy.abs(D.to_float(a.events[0].y[0]) - D.to_float(analytic_soln(D.pi / 8, y_init)[0])) <= (
+#                     32 * D.epsilon(dtype_var) ** 0.5))
 #         assert (a.events[0].event is first_y_event)
-#         assert (D.abs(a.events[1].t - D.array(D.pi / 4)) <= (D.epsilon() ** 0.5))
+#         assert (D.ar_numpy.abs(a.events[1].t - D.ar_numpy.asarray(D.pi / 4)) <= (D.epsilon(dtype_var) ** 0.5))
 #         assert (a.events[1].event is second_time_event)
-#         assert (D.abs(a.events[2].t - D.array(D.pi / 2)) <= (D.epsilon() ** 0.5))
+#         assert (D.ar_numpy.abs(a.events[2].t - D.ar_numpy.asarray(D.pi / 2)) <= (D.epsilon(dtype_var) ** 0.5))
 #         assert (a.events[2].event is time_event)
-#         assert (D.abs(a.t[-1] - D.array(D.pi / 2)) <= (D.epsilon() ** 0.5))
+#         assert (D.ar_numpy.abs(a.t[-1] - D.ar_numpy.asarray(D.pi / 2)) <= (D.epsilon(dtype_var) ** 0.5))
 #         print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
 #                                                                                                a.t[-1] - D.pi / 2))
 
@@ -189,9 +264,9 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
 
 #     third_y_event.is_terminal = True
 
-#     a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi / 6), dt=dt, rtol=D.epsilon() ** 0.5,
-#                      atol=D.epsilon() ** 0.75)
-#     a.set_kick_vars(D.array([0, 1], dtype=bool))
+#     a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi / 6), dt=dt, rtol=D.epsilon(dtype_var) ** 0.5,
+#                      atol=D.epsilon(dtype_var) ** 0.75)
+#     a.set_kick_vars(D.ar_numpy.asarray([0, 1], dtype=bool))
 
 #     method = integrator
 #     if use_richardson_extrapolation:
@@ -211,12 +286,12 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
 #         print(D.pi / 7.5)
 #         print(D.pi / 8.0)
 #         assert (len(a.events) == 3)
-#         assert (D.abs(
-#             D.to_float(a.events[2].y[0]) - D.to_float(analytic_soln(D.pi / 7, y_init)[0])) <= D.epsilon() ** 0.5)
-#         assert (D.abs(
-#             D.to_float(a.events[1].y[0]) - D.to_float(analytic_soln(D.pi / 7.5, y_init)[0])) <= D.epsilon() ** 0.5)
-#         assert (D.abs(
-#             D.to_float(a.events[0].y[0]) - D.to_float(analytic_soln(D.pi / 8, y_init)[0])) <= D.epsilon() ** 0.5)
+#         assert (D.ar_numpy.abs(
+#             D.to_float(a.events[2].y[0]) - D.to_float(analytic_soln(D.pi / 7, y_init)[0])) <= D.epsilon(dtype_var) ** 0.5)
+#         assert (D.ar_numpy.abs(
+#             D.to_float(a.events[1].y[0]) - D.to_float(analytic_soln(D.pi / 7.5, y_init)[0])) <= D.epsilon(dtype_var) ** 0.5)
+#         assert (D.ar_numpy.abs(
+#             D.to_float(a.events[0].y[0]) - D.to_float(analytic_soln(D.pi / 8, y_init)[0])) <= D.epsilon(dtype_var) ** 0.5)
 #         assert (a.events[2].event == third_y_event)
 #         assert (a.events[1].event == second_y_event)
 #         assert (a.events[0].event == first_y_event)
@@ -273,8 +348,8 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
 #         ev_proto(ev_t, 0) for ev_t in event_times
 #     ]
 
-#     a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi / 4), dt=dt, rtol=D.epsilon() ** 0.5,
-#                      atol=D.epsilon() ** 0.75)
+#     a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi / 4), dt=dt, rtol=D.epsilon(dtype_var) ** 0.5,
+#                      atol=D.epsilon(dtype_var) ** 0.75)
 
 #     method = integrator
 #     if use_richardson_extrapolation:
@@ -292,7 +367,7 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
 #         assert (len(events) - 3 <= len(a.events) <= len(events))
 #         for ev_detected in a.events:
 #             assert (D.max(
-#                 D.abs(D.to_float(ev_detected.event(ev_detected.t, ev_detected.y, **a.constants)))) <= 4 * D.epsilon())
+#                 D.ar_numpy.abs(D.to_float(ev_detected.event(ev_detected.t, ev_detected.y, **a.constants)))) <= 4 * D.epsilon(dtype_var))
 
 # @pytest.mark.parametrize('ffmt', D.available_float_fmt())
 # @pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
@@ -324,7 +399,7 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
 #         y_init = y_init.to(device)
 
 #     def time_event(t, y, **kwargs):
-#         out = D.array((t - D.pi / 8)*(t - D.pi / 16)*(t - D.pi / 32))
+#         out = D.ar_numpy.asarray((t - D.pi / 8)*(t - D.pi / 16)*(t - D.pi / 32))
 #         if D.backend() == 'torch':
 #             out = out.to(device)
 #         return out
@@ -332,8 +407,8 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
 #     time_event.is_terminal = False
 #     time_event.direction = 0
 
-#     a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=D.pi / 64, rtol=min(1e-3, D.epsilon()**0.5),
-#                      atol=min(1e-3, D.epsilon()**0.5))
+#     a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, D.pi / 4), dt=D.pi / 64, rtol=min(1e-3, D.epsilon(dtype_var)**0.5),
+#                      atol=min(1e-3, D.epsilon(dtype_var)**0.5))
 
 #     method = integrator
 #     if use_richardson_extrapolation:
@@ -347,7 +422,7 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
 #         a.integrate(eta=True, events=time_event)
 
 #         print(a.events)
-#         assert (D.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon())
+#         assert (D.ar_numpy.abs(a.t[-1] - D.pi / 8) <= 10 * D.epsilon(dtype_var))
 #         assert (len(a.events) == 3)
 #         print("Event detection with integrator {} succeeded with t[-1] = {}".format(a.integrator, a.t[-1]))
 #         a.reset()
