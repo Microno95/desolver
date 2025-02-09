@@ -249,10 +249,6 @@ class DenseOutput(object):
                     y_interp)))
         else:
             try:
-                y_interp(self.t_eval[-1])
-            except:
-                raise
-            try:
                 y_interp(t)
             except:
                 raise
@@ -260,6 +256,10 @@ class DenseOutput(object):
                 self.t_eval = [D.ar_numpy.asarray(t)]
                 self.y_interpolants = [y_interp]
             else:
+                try:
+                    y_interp(self.t_eval[-1])
+                except:
+                    raise
                 if (t - self.t_eval[-1]) < 0:
                     self.t_eval.insert(0, D.ar_numpy.asarray(t))
                     self.y_interpolants.insert(0, y_interp)
@@ -276,7 +276,7 @@ class DenseOutput(object):
         return out
 
     def __len__(self):
-        return len(self.t_eval) - 1
+        return 0 if self.t_eval is None else len(self.t_eval)
 
     @property
     def t_min(self):
@@ -325,25 +325,10 @@ class DiffRHS(object):
                     self.md_repr = str(self.rhs)
             self.equ_repr = str(self.rhs)
         self.__jac_wrapped_rhs_order = None
-        if sample_input is None:
-            inferred_backend = D.autoray.get_backend()
-        else:
-            inferred_backend = D.autoray.infer_backend(sample_input)
-        if hasattr(self.rhs, 'jac'):
-            self.__jac = self.rhs.jac
-            self.__jac_time = None
-            self.__jac_is_wrapped_rhs = False
-        elif inferred_backend == 'numpy':
-            self.__jac_wrapped_rhs_order = 5
-            self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(0.0, y, **kwargs),
-                                                base_order=self.__jac_wrapped_rhs_order, flat=False)
-            self.__jac_time = 0.0
-            self.__jac_is_wrapped_rhs = True
-        else:
-            import torch
-            self.__jac = torch.func.jacrev(self.rhs, argnums=1)
-            self.__jac_time = None
-            self.__jac_is_wrapped_rhs = False
+        self.__jac_initialised = False
+        self.__jac = None
+        self.__jac_time = None
+        self.__jac_is_wrapped_rhs = False
         self.nfev = 0
         self.njev = 0
 
@@ -362,6 +347,27 @@ class DiffRHS(object):
         Uses a Richardson Extrapolated 5th order central finite differencing method
         when a jacobian is not defined as self.rhs.jac or by self.hook_jacobian_call
         """
+        if not self.__jac_initialised:
+            if y is None:
+                inferred_backend = "numpy"
+            else:
+                inferred_backend = D.autoray.infer_backend(y)
+            if hasattr(self.rhs, 'jac'):
+                self.__jac = self.rhs.jac
+                self.__jac_time = None
+                self.__jac_is_wrapped_rhs = False
+            elif inferred_backend == 'numpy':
+                self.__jac_wrapped_rhs_order = 5
+                self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(0.0, y, **kwargs),
+                                                    base_order=self.__jac_wrapped_rhs_order, flat=False)
+                self.__jac_time = 0.0
+                self.__jac_is_wrapped_rhs = True
+            else:
+                import torch
+                self.__jac = torch.func.jacrev(self.rhs, argnums=1)
+                self.__jac_time = None
+                self.__jac_is_wrapped_rhs = False
+            self.__jac_initialised = True
         if self.__jac_is_wrapped_rhs:
             if t != self.__jac_time:
                 self.__jac_time = t
@@ -522,7 +528,7 @@ class OdeSystem(object):
         self.staggered_mask = None
         self.__dense_output = dense_output
         self.__int_status = 0
-        self.__sol = DenseOutput([self.t0], [])
+        self.__sol = DenseOutput(None, None)
 
         self.__move_to_device()
         self.__allocate_soln_space(self.__alloc_space_steps(self.tf))
@@ -906,7 +912,7 @@ class OdeSystem(object):
         """Resets the system to the initial time."""
         self.counter = 0
         self.__trim_soln_space()
-        self.__sol = DenseOutput([self.t0], [])
+        self.__sol = DenseOutput(None, None)
         self.dt = self.__dt0
         self.equ_rhs.nfev = 0
         self.__move_to_device()
@@ -1002,7 +1008,7 @@ class OdeSystem(object):
         cTime = D.ar_numpy.zeros_like(self.__t[self.counter])
         self.__allocate_soln_space(total_steps)
         try:
-            while (implicit_integration or self.dt != 0 and D.ar_numpy.abs(tf - self.__t[self.counter]) >= D.epsilon(self.__y[self.counter].dtype)) and not end_int:
+            while (implicit_integration or self.dt != 0 and D.ar_numpy.abs(tf - self.__t[self.counter]) >= D.tol_epsilon(self.__y[self.counter].dtype)) and not end_int:
                 if not implicit_integration and D.ar_numpy.abs(self.dt + self.__t[self.counter]) > D.ar_numpy.abs(tf):
                     self.dt = (tf - self.__t[self.counter])
                 self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter],

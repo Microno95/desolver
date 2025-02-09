@@ -256,6 +256,9 @@ def search_bisection(array, val):
             jlower = jmid
         else:
             jupper = jmid
+    else:
+        if array[jlower] < val:
+            jlower = jupper
 
     return jlower
 
@@ -293,8 +296,8 @@ def search_bisection_vec(array, val):
     jupper = D.ar_numpy.ones_like(val, dtype=i64_type) * (len(array) - 1)
 
     indices = D.ar_numpy.zeros_like(val, dtype=i64_type)
-    msk1 = val <= D.ar_numpy.take(array, jlower)
-    msk2 = val >= D.ar_numpy.take(array, jupper)
+    msk1 = val <= D.ar_numpy.take(array, jlower, axis=0)
+    msk2 = val >= D.ar_numpy.take(array, jupper, axis=0)
     indices[msk1] = jlower[msk1]
     indices[msk2] = jupper[msk2]
 
@@ -302,12 +305,14 @@ def search_bisection_vec(array, val):
 
     while D.ar_numpy.any(not_conv):
         jmid = (jupper + jlower) // 2
-        mid_vals = D.ar_numpy.take(array, jmid)
+        mid_vals = D.ar_numpy.take(array, jmid, axis=0)
         msk1 = val > mid_vals
         msk2 = val <= mid_vals
         jlower[msk1] = jmid[msk1]
         jupper[msk2] = jmid[msk2]
         not_conv = (jupper - jlower) > 1
+    else:
+        jlower = D.ar_numpy.where(D.ar_numpy.take(array, jlower, axis=0) < val, jupper, jlower)
 
     return jlower
 
