@@ -393,16 +393,11 @@ class DiffRHS(object):
         self.__jac_is_wrapped_rhs = False
 
     def unhook_jacobian_call(self):
-        """Detaches the jacobian function and replaces it with a finite difference
-        estimate if a jacobian function was originally attached.
+        """Detaches the current jacobian function. On next call to `jac`
+        this will be reinitialised to either a finite difference estimate
+        or a pytorch jacrev functional transform        
         """
-        if not self.__jac_is_wrapped_rhs:
-            if self.__jac_wrapped_rhs_order is None:
-                self.__jac_wrapped_rhs_order = 5
-            self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self.rhs(0.0, y, **kwargs),
-                                                base_order=self.__jac_wrapped_rhs_order, flat=True)
-            self.__jac_time = 0.0
-            self.__jac_is_wrapped_rhs = True
+        self.__jac = None
 
     def set_jac_base_order(self, order):
         if self.__jac_is_wrapped_rhs:

@@ -154,9 +154,9 @@ def brentsrootvec(f, bounds, tol=None, verbose=False, return_interval=False, acc
     """
     lower_bound, upper_bound = bounds
     if tol is None:
-        tol = 2*D.epsilon(lower_bound.dtype)
-    if tol < 2*D.epsilon(lower_bound.dtype):
-        tol = 2*D.epsilon(lower_bound.dtype)
+        tol = D.epsilon(lower_bound.dtype)
+    if tol < D.epsilon(lower_bound.dtype):
+        tol = D.epsilon(lower_bound.dtype)
     tol = D.ar_numpy.asarray(tol, like=lower_bound)
     a, b = D.ar_numpy.asarray(lower_bound, like=tol), D.ar_numpy.asarray(upper_bound, like=tol)
     
@@ -341,20 +341,20 @@ def iterative_inverse_7th(A, Ainv0, maxiter=10):
 #     return Vn
 
 
-def iterative_inverse_3rd(A, Ainv0, maxiter=10):
-    I = D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(A)))
-    Vn = Ainv0
-    initial_norm = D.ar_numpy.linalg.norm(Vn @ A - I)
-    for i in range(maxiter):
-        Vn1 = Vn @ (2 * I - A @ Vn)
-        Vn1 = Vn1 @ (3 * I - A @ Vn1 @ (3 * I - A @ Vn1))
-        new_norm = D.ar_numpy.linalg.norm(Vn1 @ A - I)
-        if new_norm < D.tol_epsilon(A.dtype) or new_norm > initial_norm:
-            break
-        else:
-            Vn = Vn1
-            initial_norm = new_norm
-    return Vn
+# def iterative_inverse_3rd(A, Ainv0, maxiter=10):
+#     I = D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(A)))
+#     Vn = Ainv0
+#     initial_norm = D.ar_numpy.linalg.norm(Vn @ A - I)
+#     for i in range(maxiter):
+#         Vn1 = Vn @ (2 * I - A @ Vn)
+#         Vn1 = Vn1 @ (3 * I - A @ Vn1 @ (3 * I - A @ Vn1))
+#         new_norm = D.ar_numpy.linalg.norm(Vn1 @ A - I)
+#         if new_norm < D.tol_epsilon(A.dtype) or new_norm > initial_norm:
+#             break
+#         else:
+#             Vn = Vn1
+#             initial_norm = new_norm
+#     return Vn
 
 
 def broyden_update_jac(B, dx, df, Binv=None):

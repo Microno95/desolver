@@ -2,6 +2,7 @@
 
 import pytest
 import copy
+import itertools
 from desolver.integrators import explicit_methods, implicit_methods, available_methods
 
 def available_backends():
@@ -41,40 +42,38 @@ def integrators(request):
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc):
-    available_dtypes = ["float16", "float32", "float64"]
     autodiff_needed = "requires_autodiff" in metafunc.fixturenames
-    argnames = []
-    argvalues = []
-    if "dtype_var" in metafunc.fixturenames:
-        argnames.append("dtype_var")
-        if "backend_var" not in metafunc.fixturenames:
-            argvalues = available_dtypes
-        else:
-            argvalues = []
-            argnames.append("backend_var")
-            for backend in available_backends():
-                argvalues.extend([(dtype, backend) for dtype in available_dtypes])
-                match backend:
-                    case "numpy":
-                        argvalues.append(("longdouble", "numpy"))
-                    case "torch":
-                        argvalues.append(("bfloat16", "torch"))
+    
+    argvalues_map = {
+        "dtype_var": ["float16", "float32", "float64"],
+        "backend_var": available_backends(),
+        "device_var": available_device_var()
+    }
+    
+    argnames = sorted([key for key in argvalues_map if key in metafunc.fixturenames])
+    argvalues = list(itertools.product(*[argvalues_map[key] for key in argnames]))
+    
+    if "dtype_var" and "backend_var" in metafunc.fixturenames:
+        expansion_map = {
+            "dtype_var": ["longdouble"],
+            "backend_var": ["numpy"]
+        }
+        if "device_var" in metafunc.fixturenames:
+            expansion_map["device_var"] = [None]
+        argvalues.extend(list(itertools.product(*[expansion_map[key] for key in argnames])))
+        
+        if "torch" in argvalues_map["backend_var"]:
+            expansion_map = {
+                "dtype_var": ["bfloat16"],
+                "backend_var": ["torch"]
+            }
             if "device_var" in metafunc.fixturenames:
-                argnames.append("device_var")
-                argvalues_old = copy.deepcopy(argvalues)
-                argvalues = []
-                for dtype, backend in argvalues_old:
-                    if backend == "numpy":
-                        argvalues.append((dtype, backend, None))
-                    else:
-                        for device in available_device_var():
-                            if device == "cpu":
-                                argvalues.append((dtype, backend, device))
-                            else:
-                                argvalues.append((dtype, backend, device))
-        if autodiff_needed:
-            if "backend_var" not in metafunc.fixturenames:
-                raise TypeError("Test configuration requests autodiff, but no dynamic backend specified!")
-            argnames.append("requires_autodiff")
-            argvalues = [(*aval, True) for aval in argvalues if len(aval) > 1 and aval[1] not in ["numpy"]]
-        metafunc.parametrize(argnames, argvalues)
+                expansion_map["device_var"] = argvalues_map["device_var"]
+            argvalues.extend(list(itertools.product(*[expansion_map[key] for key in argnames])))
+
+    if autodiff_needed:
+        if "backend_var" not in metafunc.fixturenames:
+            raise TypeError("Test configuration requests autodiff, but no dynamic backend specified!")
+        argnames.append("requires_autodiff")
+        argvalues = [(*aval, True) for aval in argvalues if len(aval) > 1 and aval[1] not in ["numpy"]]
+    metafunc.parametrize(argnames, argvalues)

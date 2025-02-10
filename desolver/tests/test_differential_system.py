@@ -142,6 +142,30 @@ def test_integration_and_representation_with_jac(dtype_var, backend_var, integra
 
     assert (len(a.y) == len(a))
     assert (len(a.t) == len(a))
+    
+    if backend_var == 'torch':
+        # Test rehooking of jac through autodiff
+        
+        (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var, integrator=integrator, hook_jacobian=True)
+
+        assert (a.integration_status == "Integration has not been run.")
+
+        a.equ_rhs.unhook_jacobian_call()
+        a.integrate()
+
+        assert (a.integration_status == "Integration completed successfully.")
+
+        print(str(a))
+        print(repr(a))
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= D.tol_epsilon(dtype_var) ** 0.5)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+        for i in a:
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+        assert (len(a.y) == len(a))
+        assert (len(a.t) == len(a))
 
 
 def test_integration_and_nearest_float_no_dense_output(dtype_var, backend_var, device_var):
