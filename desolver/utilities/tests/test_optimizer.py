@@ -195,9 +195,8 @@ def test_nonlinear_root(solver, tolerance, dtype_var, backend_var, device_var, a
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root1))) <= D.tol_epsilon(dtype_var))
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root2))) <= D.tol_epsilon(dtype_var))
 
-    np.random.seed(4)
-    for _ in range(4):
-        x0 = D.ar_numpy.asarray(np.random.uniform(D.ar_numpy.to_numpy(ub), D.ar_numpy.to_numpy(lb)), dtype=dtype_var, like=backend_var)
+    for test_idx in range(4):
+        x0 = lb + test_idx * (ub - lb) / 4
         if backend_var == 'torch':
             x0 = x0.to(device_var)
 
