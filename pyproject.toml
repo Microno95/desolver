@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "hatch-conda-build"]
+requires = ["hatch>=1.14.0", "hatchling>=1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -65,6 +65,7 @@ torch = { index = "pytorch" }
 name = "pytorch"
 # Required URL for the index.
 url = "https://download.pytorch.org/whl/cu126"
+explicit = true
 
 [tool.hatch.envs.dev]
 installer = "uv"
