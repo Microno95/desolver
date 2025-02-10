@@ -1,1 +1,1 @@
-hatch
+hatch>=1.27.0
