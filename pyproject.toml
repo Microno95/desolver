@@ -57,12 +57,19 @@ test = [
 ]
 
 [tool.uv.sources]
-torch = { index = "pytorch" }
+torch = [
+  { index = "pytorch-cu126", marker = "sys_platform == 'win32'" },
+  { index = "pytorch-cu126", marker = "sys_platform == 'linux'" },
+  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+]
 
 [[tool.uv.index]]
-# Optional name for the index.
-name = "pytorch"
-# Required URL for the index.
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
 url = "https://download.pytorch.org/whl/cu126"
 explicit = true
 
