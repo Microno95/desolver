@@ -700,7 +700,13 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
                 njev += 1
                 return jac(D.ar_numpy.reshape(x, xshape), *additional_args, **additional_kwargs)
 
+    # Check if type is 128-bit float which is unsupported by scipy.minpack
     if use_scipy and inferred_backend == 'numpy':
+        is_too_wide = np.finfo(x0.dtype).bits > 64
+    else:
+        is_too_wide = False
+    
+    if use_scipy and inferred_backend == 'numpy' and not is_too_wide:
         res = scipy.optimize.root(lambda __x: fun(__x[...,None])[...,0], x[...,0], jac=fun_jac, tol=tol)
         nfev = res.nfev
         njev = res.njev
