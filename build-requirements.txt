@@ -1,1 +1,2 @@
-hatch>=1.27.0
+hatch==1.14.0
+hatchling==1.27.0
