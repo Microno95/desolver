@@ -352,21 +352,22 @@ class DiffRHS(object):
                 inferred_backend = "numpy"
             else:
                 inferred_backend = D.autoray.infer_backend(y)
-            if hasattr(self.rhs, 'jac'):
-                self.__jac = self.rhs.jac
-                self.__jac_time = None
-                self.__jac_is_wrapped_rhs = False
-            elif inferred_backend == 'numpy':
-                self.__jac_wrapped_rhs_order = 5
-                self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(0.0, y, **kwargs),
-                                                    base_order=self.__jac_wrapped_rhs_order, flat=False)
-                self.__jac_time = 0.0
-                self.__jac_is_wrapped_rhs = True
-            else:
-                import torch
-                self.__jac = torch.func.jacrev(self.rhs, argnums=1)
-                self.__jac_time = None
-                self.__jac_is_wrapped_rhs = False
+            if self.__jac is None:
+                if hasattr(self.rhs, 'jac'):
+                    self.__jac = self.rhs.jac
+                    self.__jac_time = None
+                    self.__jac_is_wrapped_rhs = False
+                elif inferred_backend == 'numpy':
+                    self.__jac_wrapped_rhs_order = 5
+                    self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(0.0, y, **kwargs),
+                                                        base_order=self.__jac_wrapped_rhs_order, flat=False)
+                    self.__jac_time = 0.0
+                    self.__jac_is_wrapped_rhs = True
+                else:
+                    import torch
+                    self.__jac = torch.func.jacrev(self.rhs, argnums=1)
+                    self.__jac_time = None
+                    self.__jac_is_wrapped_rhs = False
             self.__jac_initialised = True
         if self.__jac_is_wrapped_rhs:
             if t != self.__jac_time:

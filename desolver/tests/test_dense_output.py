@@ -118,6 +118,7 @@ def test_dense_output(dtype_var, backend_var, use_richardson_extrapolation):
 
     if use_richardson_extrapolation:
         a.method = de.integrators.generate_richardson_integrator(a.method)
+    
     a.rtol = a.atol = D.tol_epsilon(dtype_var) ** 0.8
     a.integrate(eta=False)
 

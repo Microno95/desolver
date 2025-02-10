@@ -78,8 +78,8 @@ class CubicHermiteInterp(object):
         return h00 * self.p0 + h10 * self.trange * self.m0 + h01 * self.p1 + h11 * self.trange * self.m1
 
     def __repr__(self):
-        return f"<CubicHermiteInterp(t0={self.t0}, t1={self.t1}, |p0|={D.ar_numpy.norm(self.p0)}, |dp|={D.ar_numpy.norm(self.p0 - self.p1)}, " \
-               f"|p1|={D.ar_numpy.norm(self.p1)}, |m0|={D.ar_numpy.norm(self.m0)}, |m1|={D.ar_numpy.norm(self.m1)}, |dm|={D.ar_numpy.norm(self.m0 - self.m1)})>"
+        return f"<CubicHermiteInterp(t0={self.t0}, t1={self.t1}, |p0|={D.ar_numpy.linalg.norm(self.p0)}, |dp|={D.ar_numpy.linalg.norm(self.p0 - self.p1)}, " \
+               f"|p1|={D.ar_numpy.linalg.norm(self.p1)}, |m0|={D.ar_numpy.linalg.norm(self.m0)}, |m1|={D.ar_numpy.linalg.norm(self.m1)}, |dm|={D.ar_numpy.linalg.norm(self.m0 - self.m1)})>"
     
 
 # class FactorFunction:

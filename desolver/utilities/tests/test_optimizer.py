@@ -40,7 +40,7 @@ def test_brentsroot_same_sign(dtype_var, backend_var, device_var):
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(gt_root)))) <= D.tol_epsilon(dtype_var)
 
-    root, success = de.utilities.optimizer.brentsroot(fun, [lb, ub], D.tol_epsilon(dtype_var), verbose=0)
+    root, success = de.utilities.optimizer.brentsroot(fun, [lb, ub], D.tol_epsilon(dtype_var), verbose=1)
 
     assert (np.isinf(D.ar_numpy.to_numpy(root)))
     assert (not success)
@@ -65,7 +65,7 @@ def test_brentsroot_wrong_order(dtype_var, backend_var, device_var):
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(gt_root)))) <= D.tol_epsilon(dtype_var)
 
-    root, success = de.utilities.optimizer.brentsroot(fun, [lb, ub], D.tol_epsilon(dtype_var), verbose=0)
+    root, success = de.utilities.optimizer.brentsroot(fun, [lb, ub], D.tol_epsilon(dtype_var), verbose=1)
 
     assert (success)
     assert (np.allclose(D.ar_numpy.to_numpy(gt_root), D.ar_numpy.to_numpy(root), D.tol_epsilon(dtype_var), D.tol_epsilon(dtype_var)))
@@ -98,7 +98,7 @@ def test_brentsroot(tolerance, dtype_var, backend_var, device_var, a_val, ac_pro
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(gt_root))) <= D.tol_epsilon(dtype_var))
 
-    root, success = de.utilities.optimizer.brentsroot(fun, [lb, ub], tolerance, verbose=0)
+    root, success = de.utilities.optimizer.brentsroot(fun, [lb, ub], tolerance, verbose=1)
 
     assert (success)
     assert (np.allclose(D.ar_numpy.to_numpy(gt_root), D.ar_numpy.to_numpy(root), tol, tol))
@@ -141,7 +141,7 @@ def test_brentsrootvec(tolerance, dtype_var, backend_var, device_var):
 
     root_list, success = de.utilities.optimizer.brentsrootvec(fun_list,
                                                                 [lb, ub],
-                                                                tolerance, verbose=0)
+                                                                tolerance, verbose=1)
 
     assert (np.all(D.ar_numpy.to_numpy(success)))
     assert (np.allclose(D.ar_numpy.to_numpy(gt_root), D.ar_numpy.to_numpy(root_list), tol, tol))
@@ -156,7 +156,7 @@ def test_brentsrootvec(tolerance, dtype_var, backend_var, device_var):
 
     root_list, success = de.utilities.optimizer.brentsrootvec(fun_vec,
                                                                 [lb, ub],
-                                                                tolerance, verbose=0)
+                                                                tolerance, verbose=1)
 
     assert (np.all(D.ar_numpy.to_numpy(success)))
     assert (np.allclose(D.ar_numpy.to_numpy(gt_root), D.ar_numpy.to_numpy(root_list), tol, tol))
@@ -201,7 +201,7 @@ def test_nonlinear_root(solver, tolerance, dtype_var, backend_var, device_var, a
         if backend_var == 'torch':
             x0 = x0.to(device_var)
 
-        root, (success, *_) = solver(fun_fn, x0, jac=jac_fn, tol=tolerance, verbose=0)
+        root, (success, *_) = solver(fun_fn, x0, jac=jac_fn, tol=tolerance, verbose=1)
 
         assert (success)
         
@@ -249,7 +249,7 @@ def test_nonlinear_root_dims(solver, tolerance, dtype_var, backend_var, device_v
         if backend_var == 'torch':
             x0 = x0.to(device_var)
 
-        root, (success, *_) = solver(fun_fn, x0, jac=jac_fn, tol=tolerance, verbose=0)
+        root, (success, *_) = solver(fun_fn, x0, jac=jac_fn, tol=tolerance, verbose=1)
 
         assert (success)
         
@@ -298,7 +298,7 @@ def test_nonlinear_root_dims_no_jacobian(solver, tolerance, dtype_var, backend_v
         if backend_var == 'torch':
             x0 = x0.to(device_var)
 
-        root, (success, *_) = solver(fun_fn, x0, jac=jac_fn, tol=tolerance, verbose=0)
+        root, (success, *_) = solver(fun_fn, x0, jac=jac_fn, tol=tolerance, verbose=1)
 
         assert (success)
         

@@ -86,14 +86,44 @@ def test_getter_setters(dtype_var, backend_var, device_var):
     assert (not bool(a.constants))
 
 
-def test_integration_and_representation(dtype_var, backend_var):
+@common.integrator_param
+def test_integration_and_representation_no_jac(dtype_var, backend_var, integrator):
     dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
     if backend_var == 'torch':
         import torch
         torch.set_printoptions(precision=17)
         torch.autograd.set_detect_anomaly(True)
     
-    (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var)
+    (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var, integrator=integrator)
+
+    assert (a.integration_status == "Integration has not been run.")
+
+    a.integrate()
+
+    assert (a.integration_status == "Integration completed successfully.")
+
+    print(str(a))
+    print(repr(a))
+    assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= D.tol_epsilon(dtype_var) ** 0.5)
+    assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+    assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+    for i in a:
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+    assert (len(a.y) == len(a))
+    assert (len(a.t) == len(a))
+
+
+@common.implicit_integrator_param
+def test_integration_and_representation_with_jac(dtype_var, backend_var, integrator):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+    
+    (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var, integrator=integrator, hook_jacobian=True)
 
     assert (a.integration_status == "Integration has not been run.")
 
@@ -147,6 +177,7 @@ def test_integration_and_nearest_float_no_dense_output(dtype_var, backend_var, d
     assert (D.ar_numpy.abs(a.t[-2] - a[2 * D.pi].t) <= D.ar_numpy.abs(a.dt))
 
     assert (len(a.events) == 0)
+
 
 def test_wrong_t0(dtype_var, backend_var):
     with pytest.raises(ValueError):
@@ -348,3 +379,32 @@ def test_DiffRHS():
 
     assert (str(wrapped_rhs_both_repr) == "1")
     assert (wrapped_rhs_both_repr._repr_markdown_() == "2")
+    
+    rhs_matrix = np.array([
+        [0.0, 1.0],
+        [-1.0, 0.01]
+    ], dtype=np.float64)
+    
+    def rhs(t, state, **kwargs):
+        return rhs_matrix @ state
+    
+    jac_called = False
+    
+    def jac(t, state, **kwargs):
+        nonlocal jac_called
+        jac_called = True
+        return rhs_matrix
+
+    x0 = np.array([[0.5, 0.5]], dtype=np.float64).mT
+
+    wrapped_rhs_no_jac = de.DiffRHS(rhs)
+    
+    assert (D.ar_numpy.allclose(rhs_matrix @ x0, wrapped_rhs_no_jac(0.0, x0), D.epsilon(np.float64)**0.5))
+    assert (D.ar_numpy.allclose(rhs_matrix, wrapped_rhs_no_jac.jac(0.0, x0)[:,0,:,0], D.epsilon(np.float64)**0.5))
+    
+    wrapped_rhs_with_jac = de.DiffRHS(rhs)
+    wrapped_rhs_with_jac.hook_jacobian_call(jac)
+    
+    assert (D.ar_numpy.allclose(rhs_matrix @ x0, wrapped_rhs_with_jac(0.0, x0), D.epsilon(np.float64)**0.5))
+    assert (D.ar_numpy.allclose(rhs_matrix, wrapped_rhs_with_jac.jac(0.0, x0), D.epsilon(np.float64)**0.5))
+    assert (jac_called)

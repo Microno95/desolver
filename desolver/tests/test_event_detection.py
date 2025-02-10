@@ -6,10 +6,9 @@ from copy import deepcopy
 from desolver.tests import common
 
 
-@common.richardson_param
-@common.explicit_integrator_param
+@common.basic_integrator_param
 @common.dense_output_param
-def test_event_detection_single(dtype_var, backend_var, device_var, integrator, use_richardson_extrapolation, dense_output):
+def test_event_detection_single(dtype_var, backend_var, integrator, dense_output):
     if "float16" in dtype_var:
         pytest.skip("Event detection with 'float16' types are unreliable due to imprecision")
     
@@ -18,12 +17,8 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
         import torch
         torch.set_printoptions(precision=17)
         torch.autograd.set_detect_anomaly(True)
-        device = torch.device(device_var)
 
     de_mat, rhs, analytic_soln, y_init, _, _ = common.set_up_basic_system(dtype_var, backend_var, integrator, hook_jacobian=True)
-
-    if backend_var == 'torch':
-        y_init = y_init.to(device)
 
     def time_event(t, y, **kwargs):
         out = D.ar_numpy.asarray(t - D.pi / 8, dtype=dtype_var, like=y_init)
@@ -35,13 +30,11 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
     time_event.direction = 0
 
     a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi / 4), dt=D.pi/512, rtol=D.epsilon(dtype_var) ** 0.5,
-                     atol=D.epsilon(dtype_var) ** 0.75)
+                     atol=D.epsilon(dtype_var) ** 0.5)
     
     a.set_kick_vars([0, 1])
 
     method = integrator
-    if use_richardson_extrapolation:
-        method = de.integrators.generate_richardson_integrator(method)
 
     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
         a.set_method(method)
@@ -59,11 +52,9 @@ def test_event_detection_single(dtype_var, backend_var, device_var, integrator, 
                                                                                                a.t[-1] - D.pi / 8))
 
 
-
-@common.richardson_param
-@common.explicit_integrator_param
+@common.basic_integrator_param
 @common.dense_output_param
-def test_event_detection_multiple(dtype_var, backend_var, device_var, integrator, use_richardson_extrapolation, dense_output):
+def test_event_detection_multiple(dtype_var, backend_var, integrator, dense_output):
     if "float16" in dtype_var:
         pytest.skip("Event detection with 'float16' types are unreliable due to imprecision")
     
@@ -72,16 +63,11 @@ def test_event_detection_multiple(dtype_var, backend_var, device_var, integrator
         import torch
         torch.set_printoptions(precision=17)
         torch.autograd.set_detect_anomaly(True)
-        device = torch.device(device_var)
         
     array_con_args = dict(dtype=dtype_var, like=backend_var)
-    if backend_var == 'torch':
-        array_con_args['device'] = device_var
 
     de_mat, rhs, analytic_soln, y_init, _, _ = common.set_up_basic_system(dtype_var, backend_var, integrator, hook_jacobian=True)
 
-    if backend_var == 'torch':
-        y_init = y_init.to(device)
 
     def time_event(t, y, **kwargs):
         out = D.ar_numpy.asarray(t - D.pi / 2, dtype=dtype_var, like=y_init)
@@ -111,8 +97,6 @@ def test_event_detection_multiple(dtype_var, backend_var, device_var, integrator
     a.set_kick_vars([0, 1])
 
     method = integrator
-    if use_richardson_extrapolation:
-        method = de.integrators.generate_richardson_integrator(method)
 
     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
         a.set_method(method)

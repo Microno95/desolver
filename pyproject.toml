@@ -135,7 +135,7 @@ omit = [
 data_file = "coverage/.coverage"
 
 [tool.coverage.report]
-format = "html"
+format = "text"
 # Regexes for lines to exclude from consideration
 exclude_also = [
     # Don't complain about missing debug-only code:
@@ -155,3 +155,10 @@ exclude_also = [
     ]
 
 ignore_errors = true
+
+[tool.coverage.lcov]
+output = "coverage.lcov"
+line_checksums = true
+
+[tool.coverage.html]
+directory = "coverage/htmlcov/"

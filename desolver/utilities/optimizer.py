@@ -326,19 +326,19 @@ def iterative_inverse_7th(A, Ainv0, maxiter=10):
     return Vn
 
 
-def iterative_inverse_1st(A, Ainv0, maxiter=10):
-    I = D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(A)))
-    Vn = Ainv0
-    initial_norm = D.ar_numpy.linalg.norm(Vn @ A - I)
-    for i in range(maxiter):
-        Vn1 = Vn @ (2 * I - A @ Vn)
-        new_norm = D.ar_numpy.linalg.norm(Vn1 @ A - I)
-        if new_norm < D.tol_epsilon(A.dtype) or new_norm > initial_norm:
-            break
-        else:
-            Vn = Vn1
-            initial_norm = new_norm
-    return Vn
+# def iterative_inverse_1st(A, Ainv0, maxiter=10):
+#     I = D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(A)))
+#     Vn = Ainv0
+#     initial_norm = D.ar_numpy.linalg.norm(Vn @ A - I)
+#     for i in range(maxiter):
+#         Vn1 = Vn @ (2 * I - A @ Vn)
+#         new_norm = D.ar_numpy.linalg.norm(Vn1 @ A - I)
+#         if new_norm < D.tol_epsilon(A.dtype) or new_norm > initial_norm:
+#             break
+#         else:
+#             Vn = Vn1
+#             initial_norm = new_norm
+#     return Vn
 
 
 def iterative_inverse_3rd(A, Ainv0, maxiter=10):

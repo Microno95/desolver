@@ -6,15 +6,17 @@ import pytest
 integrator_set = set(de.available_methods(False).values())
 integrator_set = sorted(integrator_set, key=lambda x: x.__name__)
 explicit_integrator_set = [
-    pytest.param(intg) for intg in integrator_set if not intg.is_implicit
+    pytest.param(intg) for intg in integrator_set if intg((1,), D.numpy.float64).is_explicit
 ]
 implicit_integrator_set = [
-    pytest.param(intg, marks=pytest.mark.slow) for intg in integrator_set if intg.is_implicit
+    pytest.param(intg, marks=pytest.mark.slow) for intg in integrator_set if intg((1,), D.numpy.float64).is_implicit
 ]
-    
+
 dt_set            = [D.pi / 307, D.pi / 512]
 integrator_param          = pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
 explicit_integrator_param = pytest.mark.parametrize('integrator', explicit_integrator_set)
+implicit_integrator_param = pytest.mark.parametrize('integrator', implicit_integrator_set)
+basic_integrator_param    = pytest.mark.parametrize('integrator', [de.integrators.RK45CKSolver, de.integrators.RadauIIA5, de.integrators.ABAs5o6HSolver])
 richardson_param          = pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 dt_param                  = pytest.mark.parametrize('dt', dt_set)
 dense_output_param        = pytest.mark.parametrize('dense_output', [True, False])
@@ -36,7 +38,7 @@ def set_up_basic_system(dtype_var, backend_var, integrator=None, hook_jacobian=F
         def rhs_jac(t, state, **kwargs):
             nonlocal de_mat
             rhs.analytic_jacobian_called = True
-            if D.ar_numpy.backend() == 'torch':
+            if D.autoray.infer_backend(state) == 'torch':
                 de_mat = de_mat.to(state.device)
             return de_mat
 
