@@ -45,9 +45,12 @@ def test_rootfinding_transforms(fn, dtype_var, backend_var):
     blb = de.utilities.optimizer.transform_to_bounded_x(var_bounds[0], *var_bounds)
     bub = de.utilities.optimizer.transform_to_bounded_x(var_bounds[1], *var_bounds)
     
-    assert (D.ar_numpy.allclose(bx0,         D.ar_numpy.zeros_like(bx0), tol, tol))
-    assert (D.ar_numpy.allclose(blb, -D.pi/2*D.ar_numpy.ones_like(blb),  tol, tol))
-    assert (D.ar_numpy.allclose(bub,  D.pi/2*D.ar_numpy.ones_like(bub),  tol, tol))
+    neg_half_pi = D.ar_numpy.arcsin(-D.ar_numpy.ones_like(blb))
+    pos_half_pi = D.ar_numpy.arcsin( D.ar_numpy.ones_like(bub))
+    
+    assert (D.ar_numpy.allclose(bx0, D.ar_numpy.zeros_like(bx0), tol, tol))
+    assert (D.ar_numpy.allclose(blb, neg_half_pi,  tol, tol))
+    assert (D.ar_numpy.allclose(bub, pos_half_pi,  tol, tol))
     assert (D.ar_numpy.allclose(x0, de.utilities.optimizer.transform_to_unbounded_x(bx0, *var_bounds), tol, tol))
     
     bfn = de.utilities.optimizer.transform_to_bounded_fn(fn, *var_bounds)

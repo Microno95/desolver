@@ -3,6 +3,7 @@
 import pytest
 import copy
 import itertools
+import numpy as np
 from desolver.integrators import explicit_methods, implicit_methods, available_methods
 
 def available_backends():
@@ -54,13 +55,14 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
     argvalues = list(itertools.product(*[argvalues_map[key] for key in argnames]))
     
     if "dtype_var" and "backend_var" in metafunc.fixturenames:
-        expansion_map = {
-            "dtype_var": ["longdouble"],
-            "backend_var": ["numpy"]
-        }
-        if "device_var" in metafunc.fixturenames:
-            expansion_map["device_var"] = [None]
-        argvalues.extend(list(itertools.product(*[expansion_map[key] for key in argnames])))
+        if np.finfo(np.longdouble).bits > np.finfo(np.float64).bits:
+            expansion_map = {
+                "dtype_var": ["longdouble"],
+                "backend_var": ["numpy"]
+            }
+            if "device_var" in metafunc.fixturenames:
+                expansion_map["device_var"] = [None]
+            argvalues.extend(list(itertools.product(*[expansion_map[key] for key in argnames])))
         
         if "torch" in argvalues_map["backend_var"]:
             expansion_map = {
