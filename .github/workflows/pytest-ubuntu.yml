@@ -32,8 +32,9 @@ jobs:
         continue-on-error: true
         with:
           miniforge-version: latest
+          use-mamba: true
           auto-update-conda: true
-          channels: conda-forge, pytorch, defaults
+          channels: conda-forge, defaults
           python-version: ${{ matrix.python-version }}
       - name: Output conda info
         run: |
