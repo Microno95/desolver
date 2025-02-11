@@ -121,6 +121,107 @@ def test_event_detection_multiple(dtype_var, backend_var, integrator, dense_outp
         print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
                                                                                                a.t[-1] - D.pi / 2))
 
+
+@common.basic_integrator_param
+@common.dense_output_param
+def test_event_detection_multiple_roots(dtype_var, backend_var, integrator, dense_output):
+    if "float16" in dtype_var:
+        pytest.skip("Event detection with 'float16' types are unreliable due to imprecision")
+    
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+
+    de_mat, rhs, analytic_soln, y_init, _, _ = common.set_up_basic_system(dtype_var, backend_var, integrator, hook_jacobian=True)
+
+    def time_event(t, y, **kwargs):
+        out = D.ar_numpy.asarray(t, dtype=dtype_var, like=y_init)
+        out = D.ar_numpy.asarray((out - D.pi / 8)*(out - D.pi / 16)*(out - D.pi / 32))
+        if backend_var == 'torch':
+            out = out.to(y_init)
+        return out
+
+    time_event.is_terminal = False
+    time_event.direction = 0
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi / 4), dt=D.pi/512, rtol=D.epsilon(dtype_var) ** 0.5,
+                     atol=D.epsilon(dtype_var) ** 0.5)
+    
+    a.set_kick_vars([0, 1])
+
+    method = integrator
+
+    with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
+        a.set_method(method)
+
+        def dt_max_cb(ode_sys):
+            ode_sys.dt = min(ode_sys.dt, D.pi / 64)
+        a.integrate(eta=False, events=time_event, callback=dt_max_cb)
+
+        tol = D.epsilon(dtype_var) ** 0.5
+        
+        print(a)
+        print(a.events)
+        assert (len(a.events) == 3)
+        
+        assert (a.events[0].event == time_event)
+        assert (D.ar_numpy.allclose(a.events[0].t, D.pi/32, tol, tol))
+        
+        assert (a.events[1].event == time_event)
+        assert (D.ar_numpy.allclose(a.events[1].t, D.pi/16, tol, tol))
+        
+        assert (a.events[2].event == time_event)
+        assert (D.ar_numpy.allclose(a.events[2].t, D.pi/8, tol, tol))
+        print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
+                                                                                               a.t[-1] - D.pi / 8))
+
+@common.basic_integrator_param
+@common.dense_output_param
+def test_event_detection_stationary_points(dtype_var, backend_var, integrator, dense_output):
+    if "float16" in dtype_var:
+        pytest.skip("Event detection with 'float16' types are unreliable due to imprecision")
+    
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+
+    de_mat, rhs, analytic_soln, y_init, _, _ = common.set_up_basic_system(dtype_var, backend_var, integrator, hook_jacobian=True)
+
+    def stationary_event(t, y, dy, **kwargs):
+        return dy[0]
+
+    stationary_event.requires_dstate = True
+    stationary_event.is_terminal = True
+    stationary_event.direction = 0
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=dense_output, t=(0, D.pi / 4), dt=D.pi/512, rtol=D.epsilon(dtype_var) ** 0.5,
+                     atol=D.epsilon(dtype_var) ** 0.5)
+    
+    a.set_kick_vars([0, 1])
+
+    method = integrator
+
+    with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
+        a.set_method(method)
+
+        a.integrate(eta=False, events=stationary_event)
+
+        assert (a.integration_status == "Integration terminated upon finding a triggered event.")
+
+        print(a)
+        print(a.events)
+        tol = D.tol_epsilon(dtype_var)**0.5
+        assert (len(a.events) == 1)
+        assert (a.events[0].event == stationary_event)
+        vel_at_ev = a.events[0].y[1]
+        assert (D.ar_numpy.allclose(vel_at_ev, D.ar_numpy.zeros_like(vel_at_ev), tol, tol))
+        print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
+                                                                                               a.t[-1] - D.pi / 8))
+
 # @ffmt_param
 # @integrator_param
 # @richardson_param
