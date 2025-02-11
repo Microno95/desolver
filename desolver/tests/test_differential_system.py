@@ -234,6 +234,52 @@ def test_integration_and_nearest_float_no_dense_output(dtype_var, backend_var, d
     assert (len(a.events) == 0)
 
 
+def test_integration_reset(dtype_var, backend_var, device_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+        
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        arr_con_kwargs['device'] = device_var
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+
+    @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon(dtype_var) ** 0.5,
+                     atol=D.epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+
+    assert (a.integration_status == "Integration has not been run.")
+
+    a.integrate()
+    
+    assert (a.sol is None)
+
+    assert (a.integration_status == "Integration completed successfully.")
+
+    assert (D.ar_numpy.abs(a.t[-2] - a[2 * D.pi].t) <= D.ar_numpy.abs(a.dt))
+
+    assert (len(a.events) == 0)
+
+    a.reset()
+    a.integrate(eta=True)
+    
+    assert (a.sol is None)
+
+    assert (a.integration_status == "Integration completed successfully.")
+
+    assert (D.ar_numpy.abs(a.t[-2] - a[2 * D.pi].t) <= D.ar_numpy.abs(a.dt))
+
+    assert (len(a.events) == 0)
+
+
 def test_wrong_t0(dtype_var, backend_var):
     with pytest.raises(ValueError):
         dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)

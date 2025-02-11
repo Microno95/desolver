@@ -177,6 +177,7 @@ def test_event_detection_multiple_roots(dtype_var, backend_var, integrator, dens
         print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
                                                                                                a.t[-1] - D.pi / 8))
 
+
 @common.basic_integrator_param
 @common.dense_output_param
 def test_event_detection_stationary_points(dtype_var, backend_var, integrator, dense_output):
@@ -221,6 +222,7 @@ def test_event_detection_stationary_points(dtype_var, backend_var, integrator, d
         assert (D.ar_numpy.allclose(vel_at_ev, D.ar_numpy.zeros_like(vel_at_ev), tol, tol))
         print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
                                                                                                a.t[-1] - D.pi / 8))
+
 
 # @ffmt_param
 # @integrator_param
