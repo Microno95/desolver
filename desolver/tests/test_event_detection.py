@@ -167,13 +167,13 @@ def test_event_detection_multiple_roots(dtype_var, backend_var, integrator, dens
         assert (len(a.events) == 3)
         
         assert (a.events[0].event == time_event)
-        assert (D.ar_numpy.allclose(a.events[0].t, D.pi/32, tol, tol))
+        assert (D.ar_numpy.allclose(a.events[0].t, D.ar_numpy.ones_like(a.events[0].t)*D.pi/32, tol, tol))
         
         assert (a.events[1].event == time_event)
-        assert (D.ar_numpy.allclose(a.events[1].t, D.pi/16, tol, tol))
+        assert (D.ar_numpy.allclose(a.events[1].t, D.ar_numpy.ones_like(a.events[0].t)*D.pi/16, tol, tol))
         
         assert (a.events[2].event == time_event)
-        assert (D.ar_numpy.allclose(a.events[2].t, D.pi/8, tol, tol))
+        assert (D.ar_numpy.allclose(a.events[2].t, D.ar_numpy.ones_like(a.events[0].t)*D.pi/8, tol, tol))
         print("Event detection with integrator {} succeeded with t[-1] = {}, diff = {}".format(a.integrator, a.t[-1],
                                                                                                a.t[-1] - D.pi / 8))
 
