@@ -14,8 +14,61 @@ __all__ = [
     'brentsroot',
     'brentsrootvec',
     'newtontrustregion',
-    'nonlinear_roots'
+    'nonlinear_roots',
+    'transform_to_bounded_x',
+    'transform_to_unbounded_x',
+    'transform_to_bounded_fn',
+    'transform_to_bounded_jac',
 ]
+
+
+def transform_to_bounded_x(x, lower_bound, upper_bound):
+    return D.ar_numpy.where(
+        lower_bound < upper_bound,
+        D.ar_numpy.arcsin(2 * (x - lower_bound) / (upper_bound - lower_bound) - 1),
+        x
+    )
+
+
+def transform_to_bounded_dx(x, lower_bound, upper_bound):
+    dbound = 2 / (upper_bound - lower_bound)
+    dtrf = dbound * (x - lower_bound) - 1
+    return D.ar_numpy.where(
+        lower_bound < upper_bound,
+        dbound * D.ar_numpy.reciprocal(D.ar_numpy.sqrt(1 - D.ar_numpy.square(dtrf))),
+        1.0
+    )
+
+
+def transform_to_unbounded_x(x, lower_bound, upper_bound):
+    return D.ar_numpy.where(
+        lower_bound < upper_bound,
+        0.5 * (D.ar_numpy.sin(x) + 1) * (upper_bound - lower_bound) + lower_bound,
+        x
+    )
+
+
+def transform_to_unbounded_dx(x, lower_bound, upper_bound):
+    return D.ar_numpy.where(
+        lower_bound < upper_bound,
+        0.5 * D.ar_numpy.cos(x) * (upper_bound - lower_bound),
+        1.0
+    )
+
+
+def transform_to_bounded_fn(fn, lower_bound, upper_bound):
+    def bounded_fn(bx, *args, **kwargs):
+        x = transform_to_unbounded_x(bx, lower_bound, upper_bound)
+        return fn(x, *args, **kwargs)
+    return bounded_fn
+
+
+def transform_to_bounded_jac(jac, lower_bound, upper_bound):
+    def bounded_jac(bx, *args, **kwargs):
+        x = transform_to_unbounded_x(bx, lower_bound, upper_bound)
+        dx = transform_to_unbounded_dx(bx, lower_bound, upper_bound)
+        return jac(x, *args, **kwargs) * D.ar_numpy.diag(dx[:,0])
+    return bounded_jac
 
 
 def brentsroot(f, bounds, tol=None, verbose=False, return_interval=False):
@@ -372,7 +425,7 @@ def broyden_update_jac(B, dx, df, Binv=None):
         return B_new
 
 
-def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac_update_rate=20, initial_trust_region=None):
+def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac_update_rate=20, initial_trust_region=None, var_bounds=None):
     x0 = D.ar_numpy.asarray(x0)
     if tol is None:
         tol = D.tol_epsilon(x0.dtype)
@@ -383,7 +436,8 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
             jac_vec = lambda x: D.ar_numpy.atleast_2d(jac(x[0]))
         else:
             jac_vec = None
-        res = newtontrustregion(f_vec, D.ar_numpy.atleast_1d(x0), jac_vec, tol=tol, verbose=verbose, maxiter=maxiter)
+        res = newtontrustregion(f_vec, D.ar_numpy.atleast_1d(x0), jac_vec, tol=tol, verbose=verbose, 
+                                     maxiter=maxiter, initial_trust_region=initial_trust_region, var_bounds=var_bounds)
         return D.ar_numpy.reshape(res[0], xshape), res[1]
     xdim = 1
     for __d in xshape:
@@ -407,39 +461,44 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
 
     if jac is None:
         if inferred_backend == 'torch':
-            def fun_jac(x):
-                nonlocal njev
-                njev += 1
-                return D.ar_numpy.reshape(torch.func.jacrev(fun, argnums=0)(x)[:,0,:,0], (fdim, xdim))
+            __fun_jac = torch.func.jacrev(fun, argnums=0)
         else:
             __fun_jac = utilities.JacobianWrapper(fun, atol=tol, rtol=tol, flat=True)
-
-            def fun_jac(x):
-                nonlocal njev, __fun_jac
-                njev += 1
-                return __fun_jac(x)
     else:
-        jac_shape = D.ar_numpy.shape(jac(x0))
-        jacdim = 1
-        for __d in jac_shape:
-            jacdim *= __d
-        if jacdim == fdim:
-            def fun_jac(x):
-                nonlocal njev
-                __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape)), (fdim,))
-                njev += 1
-                return D.ar_numpy.diag(__j)
-        elif jac_shape != (fdim, xdim):
-            def fun_jac(x):
-                nonlocal njev
-                __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape)), (fdim, xdim))
-                njev += 1
-                return __j
-        else:
-            def fun_jac(x):
-                nonlocal njev, jac
-                njev += 1
-                return jac(D.ar_numpy.reshape(x, xshape))
+        __fun_jac = jac
+    
+    jac_shape = D.ar_numpy.shape(__fun_jac(x0))
+    jacdim = 1
+    for __d in jac_shape:
+        jacdim *= __d
+    if jacdim == fdim:
+        def fun_jac(x):
+            nonlocal njev
+            __j = D.ar_numpy.reshape(__fun_jac(D.ar_numpy.reshape(x, xshape)), (fdim,))
+            njev += 1
+            return D.ar_numpy.diag(__j)
+    elif jac_shape != (fdim, xdim):
+        def fun_jac(x):
+            nonlocal njev
+            __j = D.ar_numpy.reshape(__fun_jac(D.ar_numpy.reshape(x, xshape)), (fdim, xdim))
+            njev += 1
+            return __j
+    else:
+        def fun_jac(x):
+            nonlocal njev, jac
+            njev += 1
+            return __fun_jac(D.ar_numpy.reshape(x, xshape))
+        
+    if var_bounds is not None:
+        var_bounds = [D.ar_numpy.asarray(var_bounds[0], like=x0), D.ar_numpy.asarray(var_bounds[1], like=x0)]
+        if inferred_backend == 'torch':
+            var_bounds = [
+                var_bounds[0].to(x0.device, x0.dtype),
+                var_bounds[1].to(x0.device, x0.dtype)
+            ]
+        fun = transform_to_bounded_fn(fun, *var_bounds)
+        fun_jac = transform_to_bounded_jac(fun_jac, *var_bounds)
+        x = transform_to_bounded_x(x, *var_bounds)
 
     w_relax = 0.5
     F0 = fun(x)
@@ -514,10 +573,13 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
             if verbose:
                 print(f"[ntr-finished]: x = {D.ar_numpy.to_numpy(x)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn1)}, ||dF|| = {D.ar_numpy.to_numpy(df)}")
             break
-    return D.ar_numpy.reshape(x, xshape), (success and not convergence_failure, iteration, nfev, njev, Fn1)
+    x = D.ar_numpy.reshape(x, xshape)
+    if var_bounds is not None:
+        x = transform_to_unbounded_x(x, *var_bounds)
+    return x, (success and not convergence_failure, iteration, nfev, njev, Fn1)
 
 
-def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200):
+def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200, var_bounds=None):
     x0 = D.ar_numpy.asarray(x0)
     if tol is None:
         tol = D.tol_epsilon(x0.dtype)
@@ -539,31 +601,39 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200):
 
     if jac is None:
         if inferred_backend == 'torch':
-            def fun_jac(x):
-                return D.ar_numpy.reshape(torch.func.jacrev(fun, argnums=0)(x)[:,0,:,0], (fdim, xdim))
+            __fun_jac = torch.func.jacrev(fun, argnums=0)
         else:
             __fun_jac = utilities.JacobianWrapper(fun, atol=tol, rtol=tol, flat=True)
-
-            def fun_jac(x):
-                nonlocal __fun_jac
-                return __fun_jac(x)
     else:
-        jac_shape = D.ar_numpy.shape(jac(x0))
-        jacdim = 1
-        for __d in jac_shape:
-            jacdim *= __d
-        if jacdim == fdim:
-            def fun_jac(x):
-                __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape)), (fdim,))
-                return D.ar_numpy.diag(__j)
-        elif jac_shape != (fdim, xdim):
-            def fun_jac(x):
-                __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape)), (fdim, xdim))
-                return __j
-        else:
-            def fun_jac(x):
-                nonlocal jac
-                return jac(D.ar_numpy.reshape(x, xshape))
+        __fun_jac = jac
+    
+    jac_shape = D.ar_numpy.shape(__fun_jac(x0))
+    jacdim = 1
+    for __d in jac_shape:
+        jacdim *= __d
+    if jacdim == fdim:
+        def fun_jac(x):
+            __j = D.ar_numpy.reshape(__fun_jac(D.ar_numpy.reshape(x, xshape)), (fdim,))
+            return D.ar_numpy.diag(__j)
+    elif jac_shape != (fdim, xdim):
+        def fun_jac(x):
+            __j = D.ar_numpy.reshape(__fun_jac(D.ar_numpy.reshape(x, xshape)), (fdim, xdim))
+            return __j
+    else:
+        def fun_jac(x):
+            nonlocal jac
+            return __fun_jac(D.ar_numpy.reshape(x, xshape))
+        
+    if var_bounds is not None:
+        var_bounds = [D.ar_numpy.asarray(var_bounds[0], like=x0), D.ar_numpy.asarray(var_bounds[1], like=x0)]
+        if inferred_backend == 'torch':
+            var_bounds = [
+                var_bounds[0].to(x0.device, x0.dtype),
+                var_bounds[1].to(x0.device, x0.dtype)
+            ]
+        fun = transform_to_bounded_fn(fun, *var_bounds)
+        fun_jac = transform_to_bounded_jac(fun_jac, *var_bounds)
+        x = transform_to_bounded_x(x, *var_bounds)
     
     F0 = fun(x)
     F1 = D.ar_numpy.copy(F0)
@@ -627,12 +697,15 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200):
                 Fn0 = D.ar_numpy.linalg.norm(F0)
                 print(f"[hybrj-finished]: ||F|| = {D.ar_numpy.to_numpy(Fn0)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, x = {D.ar_numpy.to_numpy(x)}, F = {D.ar_numpy.to_numpy(F0)}")
             break
-    return D.ar_numpy.reshape(x, xshape), (success, dxn, iteration, D.ar_numpy.reshape(F0, fshape))
+    x = D.ar_numpy.reshape(x, xshape)
+    if var_bounds is not None:
+        x = transform_to_unbounded_x(x, *var_bounds)
+    return x, (success, dxn, iteration, D.ar_numpy.reshape(F0, fshape))
 
 
 def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_scipy=True,
-                    additional_args=tuple(), additional_kwargs=dict()):
-    x0 = D.ar_numpy.asarray(x0)
+                    additional_args=tuple(), additional_kwargs=dict(), var_bounds=None):
+    x0 = D.ar_numpy.asarray(x0)    
     if tol is None:
         tol = D.tol_epsilon(x0.dtype)
     xshape = D.ar_numpy.shape(x0)
@@ -666,39 +739,44 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
 
     if jac is None:
         if inferred_backend == 'torch':
-            def fun_jac(x):
-                nonlocal njev
-                njev += 1
-                return D.ar_numpy.reshape(torch.func.jacrev(fun, argnums=0)(x)[:,0,:,0], (fdim, xdim))
+            __fun_jac = torch.func.jacrev(fun, argnums=0)
         else:
             __fun_jac = utilities.JacobianWrapper(fun, atol=tol, rtol=tol, flat=True)
-
-            def fun_jac(x):
-                nonlocal njev, __fun_jac
-                njev += 1
-                return __fun_jac(x)
     else:
-        jac_shape = D.ar_numpy.shape(jac(x0, *additional_args, **additional_kwargs))
-        jacdim = 1
-        for __d in jac_shape:
-            jacdim *= __d
-        if jacdim == fdim:
-            def fun_jac(x):
-                nonlocal njev
-                __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape)), (fdim,))
-                njev += 1
-                return D.ar_numpy.diag(__j)
-        elif jac_shape != (fdim, xdim):
-            def fun_jac(x):
-                nonlocal njev
-                __j = D.ar_numpy.reshape(jac(D.ar_numpy.reshape(x, xshape), *additional_args, **additional_kwargs), (fdim, xdim))
-                njev += 1
-                return __j
-        else:
-            def fun_jac(x):
-                nonlocal njev, jac
-                njev += 1
-                return jac(D.ar_numpy.reshape(x, xshape), *additional_args, **additional_kwargs)
+        __fun_jac = lambda x: jac(x, *additional_args, **additional_kwargs)
+    
+    jac_shape = D.ar_numpy.shape(__fun_jac(x0))
+    jacdim = 1
+    for __d in jac_shape:
+        jacdim *= __d
+    if jacdim == fdim:
+        def fun_jac(x):
+            nonlocal njev
+            __j = D.ar_numpy.reshape(__fun_jac(D.ar_numpy.reshape(x, xshape)), (fdim,))
+            njev += 1
+            return D.ar_numpy.diag(__j)
+    elif jac_shape != (fdim, xdim):
+        def fun_jac(x):
+            nonlocal njev
+            __j = D.ar_numpy.reshape(__fun_jac(D.ar_numpy.reshape(x, xshape)), (fdim, xdim))
+            njev += 1
+            return __j
+    else:
+        def fun_jac(x):
+            nonlocal njev, jac
+            njev += 1
+            return __fun_jac(D.ar_numpy.reshape(x, xshape))
+        
+    if var_bounds is not None:
+        var_bounds = [D.ar_numpy.asarray(var_bounds[0], like=x0), D.ar_numpy.asarray(var_bounds[1], like=x0)]
+        if inferred_backend == 'torch':
+            var_bounds = [
+                var_bounds[0].to(x0.device, x0.dtype),
+                var_bounds[1].to(x0.device, x0.dtype)
+            ]
+        fun = transform_to_bounded_fn(fun, *var_bounds)
+        fun_jac = transform_to_bounded_jac(fun_jac, *var_bounds)
+        x = transform_to_bounded_x(x, *var_bounds)
 
     # Check if type is 128-bit float which is unsupported by scipy.minpack
     if use_scipy and inferred_backend == 'numpy':
@@ -715,18 +793,28 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
         F = D.ar_numpy.reshape(res.fun, fshape)
         success = res.success or ("no futher improvement" in res.message and D.ar_numpy.linalg.norm(res.fun) <= D.tol_epsilon(x0.dtype))
         if success:
-            return D.ar_numpy.reshape(x, xshape), (success, init_iter, nfev, njev, D.ar_numpy.linalg.norm(F))
+            x = D.ar_numpy.reshape(x, xshape)
+            if var_bounds is not None:
+                x = transform_to_unbounded_x(x, *var_bounds)
+            return x, (success, init_iter, nfev, njev, D.ar_numpy.linalg.norm(F))
         else:
             x = D.ar_numpy.reshape(x0, (xdim, 1))
     else:
         root, (success, prec, iterations, F) = hybrj(fun, x, fun_jac, tol=tol, verbose=verbose, maxiter=maxiter)
         success = success or D.ar_numpy.linalg.norm(F) <= D.tol_epsilon(x0.dtype)
         if success:
-            return D.ar_numpy.reshape(root, xshape), (success, iterations, nfev, njev, prec)
+            x = D.ar_numpy.reshape(root, xshape)
+            if var_bounds is not None:
+                x = transform_to_unbounded_x(x, *var_bounds)
+            return x, (success, iterations, nfev, njev, prec)
         else:
             x = D.ar_numpy.reshape(x0, (xdim, 1))
     
     root, (success, iterations, *_, prec) = newtontrustregion(fun, x, jac=fun_jac, tol=tol, verbose=verbose, maxiter=maxiter, jac_update_rate=10, initial_trust_region=0.0)
     success = success or prec <= D.tol_epsilon(x0.dtype)
     
-    return D.ar_numpy.reshape(root, xshape), (success, iterations, nfev, njev, prec)
+    x = D.ar_numpy.reshape(root, xshape)
+    if var_bounds is not None:
+        x = transform_to_unbounded_x(x, *var_bounds)
+    
+    return x, (success, iterations, nfev, njev, prec)

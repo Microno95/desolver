@@ -97,7 +97,7 @@ def test_integration_and_representation_no_jac(dtype_var, backend_var, integrato
     (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var, integrator=integrator)
 
     assert (a.integration_status == "Integration has not been run.")
-
+    
     a.integrate()
 
     assert (a.integration_status == "Integration completed successfully.")
@@ -166,6 +166,37 @@ def test_integration_and_representation_with_jac(dtype_var, backend_var, integra
 
         assert (len(a.y) == len(a))
         assert (len(a.t) == len(a))
+
+
+@common.basic_explicit_integrator_param
+def test_integration_with_richardson(dtype_var, backend_var, integrator):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+    
+    (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var, integrator=integrator)
+
+    assert (a.integration_status == "Integration has not been run.")
+    
+    a.method = de.integrators.generate_richardson_integrator(a.method, richardson_iter=4)
+    
+    a.integrate()
+
+    assert (a.integration_status == "Integration completed successfully.")
+
+    print(str(a))
+    print(repr(a))
+    assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= D.tol_epsilon(dtype_var) ** 0.5)
+    assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+    assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+    for i in a:
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+    assert (len(a.y) == len(a))
+    assert (len(a.t) == len(a))
 
 
 def test_integration_and_nearest_float_no_dense_output(dtype_var, backend_var, device_var):

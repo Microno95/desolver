@@ -17,6 +17,7 @@ integrator_param          = pytest.mark.parametrize('integrator', explicit_integ
 explicit_integrator_param = pytest.mark.parametrize('integrator', explicit_integrator_set)
 implicit_integrator_param = pytest.mark.parametrize('integrator', implicit_integrator_set)
 basic_integrator_param    = pytest.mark.parametrize('integrator', [de.integrators.RK45CKSolver, de.integrators.RadauIIA5, de.integrators.ABAs5o6HSolver])
+basic_explicit_integrator_param    = pytest.mark.parametrize('integrator', [de.integrators.RK45CKSolver, de.integrators.ABAs5o6HSolver])
 richardson_param          = pytest.mark.parametrize('use_richardson_extrapolation', [False, True])
 dt_param                  = pytest.mark.parametrize('dt', dt_set)
 dense_output_param        = pytest.mark.parametrize('dense_output', [True, False])

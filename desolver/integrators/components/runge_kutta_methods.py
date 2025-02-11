@@ -1,7 +1,7 @@
 import typing
 import desolver.backend as D
 
-def compute_step(rhs: typing.Callable, initial_time, initial_state, timestep, intermediate_stages_in, intermediate_stages_out, rk_tableau, additional_kwargs=None):
+def compute_step(rhs: typing.Callable, initial_time, initial_state, timestep, intermediate_stages_in, intermediate_stages_out, rk_tableau, additional_kwargs=dict()):
     r"""Computes a single iteration of a generic Runge-Kutta stage calculation
 
     A generic RK stage calculation involves taking each of the tableau coefficients of each stage,
@@ -41,8 +41,6 @@ def compute_step(rhs: typing.Callable, initial_time, initial_state, timestep, in
         Returns the computed stage values of the input RK Tableau.
     """
     
-    if additional_kwargs is None:
-        additional_kwargs = dict()
     for stage in range(intermediate_stages_in.shape[-1]):
         intermediate_dstate = timestep * D.ar_numpy.sum(intermediate_stages_in * rk_tableau[stage, 1:], axis=-1)
         intermediate_rhs = rhs(

@@ -1,6 +1,7 @@
 import desolver as de
 import desolver.backend as D
 import numpy as np
+from desolver.utilities.tests import common
 import pytest
 
 
@@ -17,6 +18,53 @@ def convert_tolerance(tolerance, dtype):
     else:
         tol = 32 * D.tol_epsilon(dtype)
     return tolerance, tol
+
+
+@pytest.mark.slow
+@common.test_fn_param
+def test_rootfinding_transforms(fn, dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        set_torch_printoptions()
+    
+    x0 = D.ar_numpy.asarray(fn.root_interval[0] + 0.5 * (fn.root_interval[1] - fn.root_interval[0]), dtype=dtype_var, like=backend_var)[None,None]
+    
+    var_bounds = [
+        D.ar_numpy.asarray(fn.root_interval[0], dtype=dtype_var, like=x0)[None,None],
+        D.ar_numpy.asarray(fn.root_interval[1], dtype=dtype_var, like=x0)[None,None]
+    ]
+    if backend_var == 'torch':
+        var_bounds = [
+            var_bounds[0].to(x0.dtype),
+            var_bounds[1].to(x0.dtype)
+        ]
+    
+    tol = D.tol_epsilon(dtype_var)
+    
+    bx0 = de.utilities.optimizer.transform_to_bounded_x(x0, *var_bounds)
+    blb = de.utilities.optimizer.transform_to_bounded_x(var_bounds[0], *var_bounds)
+    bub = de.utilities.optimizer.transform_to_bounded_x(var_bounds[1], *var_bounds)
+    
+    assert (D.ar_numpy.allclose(bx0,         D.ar_numpy.zeros_like(bx0), tol, tol))
+    assert (D.ar_numpy.allclose(blb, -D.pi/2*D.ar_numpy.ones_like(blb),  tol, tol))
+    assert (D.ar_numpy.allclose(bub,  D.pi/2*D.ar_numpy.ones_like(bub),  tol, tol))
+    assert (D.ar_numpy.allclose(x0, de.utilities.optimizer.transform_to_unbounded_x(bx0, *var_bounds), tol, tol))
+    
+    bfn = de.utilities.optimizer.transform_to_bounded_fn(fn, *var_bounds)
+    assert (D.ar_numpy.allclose(fn(x0), bfn(bx0), tol, tol))
+    assert (D.ar_numpy.allclose(fn(var_bounds[0]), bfn(blb), tol, tol))
+    assert (D.ar_numpy.allclose(fn(var_bounds[1]), bfn(bub), tol, tol))
+    
+    bfn_jac = de.utilities.optimizer.transform_to_bounded_jac(fn.jac, *var_bounds)
+    if backend_var == 'torch':
+        import torch
+        bfn_jac_wrapped = torch.func.jacrev(bfn, argnums=0)
+    else:
+        bfn_jac_wrapped = de.utilities.JacobianWrapper(bfn, atol=tol, rtol=tol, flat=True)
+    
+    assert (D.ar_numpy.allclose(bfn_jac_wrapped(bx0), bfn_jac(bx0), tol**0.5, tol**0.5))
+    assert (D.ar_numpy.allclose(bfn_jac_wrapped(blb), bfn_jac(blb), tol**0.5, tol**0.5))
+    assert (D.ar_numpy.allclose(bfn_jac_wrapped(bub), bfn_jac(bub), tol**0.5, tol**0.5))
 
 
 def test_brentsroot_same_sign(dtype_var, backend_var, device_var):
@@ -414,3 +462,36 @@ def test_nonlinear_root_dims_no_jacobian_numpy(solver, tolerance, dtype_var, a_v
         
         assert D.ar_numpy.all(conv_root1 | conv_root2)
         assert D.ar_numpy.all(D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(root))) <= tol)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize('solver', [de.utilities.optimizer.nonlinear_roots, de.utilities.optimizer.newtontrustregion, de.utilities.optimizer.hybrj])
+@common.test_fn_param
+def test_rootfinding_robustness(fn, solver, dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        set_torch_printoptions()
+    
+    tolerance, tol = convert_tolerance(None, dtype_var)
+
+    x0 = D.ar_numpy.asarray(fn.root_interval[0] + 0.5 * (fn.root_interval[1] - fn.root_interval[0]), dtype=dtype_var, like=backend_var)
+
+    root, (success, *_) = solver(fn, x0, jac=fn.jac, tol=tolerance, verbose=0)
+
+    assert (success)
+    assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fn(root))) <= tol)
+    
+    root, (success, *_) = solver(fn, x0, jac=None, tol=tolerance, verbose=0)
+
+    assert (success)
+    assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fn(root))) <= tol)
+    
+    root, (success, *_) = solver(fn, x0, jac=fn.jac, tol=tolerance, verbose=1, var_bounds=fn.root_interval)
+
+    assert (success)
+    assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fn(root))) <= tol)
+    
+    root, (success, *_) = solver(fn, x0, jac=None, tol=tolerance, verbose=1, var_bounds=fn.root_interval)
+
+    assert (success)
+    assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fn(root))) <= tol)
