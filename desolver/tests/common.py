@@ -63,6 +63,8 @@ def set_up_basic_system(dtype_var, backend_var, integrator=None, hook_jacobian=F
     a.set_kick_vars(D.ar_numpy.array([0,1], dtype=D.autoray.to_backend_dtype('bool', like=backend_var), like=backend_var))
     if integrator is None:
         integrator = a.method
+    else:
+        a.method = integrator
     dt = (D.epsilon(dtype_var) ** 0.75)**(1.0/(2+a.integrator.order))/(2*D.pi)
     a.dt = dt
 

@@ -497,10 +497,9 @@ class OdeSystem(object):
             self.equ_rhs = copy.copy(equ_rhs)
         else:
             if hasattr(equ_rhs, "equ_repr"):
-                self.equ_rhs = DiffRHS(equ_rhs.rhs, y0, equ_rhs.equ_repr, equ_rhs.md_repr)
+                self.equ_rhs = DiffRHS(equ_rhs, y0, equ_rhs.equ_repr, equ_rhs.md_repr)
             else:
                 self.equ_rhs = DiffRHS(equ_rhs, y0)
-                
         
         self.__inferred_backend = D.autoray.infer_backend(y0)
         if self.__inferred_backend == 'torch':
@@ -530,6 +529,11 @@ class OdeSystem(object):
         self.__dense_output = dense_output
         self.__int_status = 0
         self.__sol = DenseOutput(None, None)
+        
+        rhs_shape = tuple(self.equ_rhs(self.__t[0], self.__y[0], **self.constants).shape)
+        y0_shape = tuple(y0.shape)
+        if rhs_shape != y0_shape:
+            raise ValueError(f"Expected rhs to return a shape that is compatible with y0, got shapes Shape[y0]={y0_shape} and Shape[dy]={rhs_shape}")
 
         self.__move_to_device()
         self.__allocate_soln_space(self.__alloc_space_steps(self.tf))
@@ -823,7 +827,7 @@ class OdeSystem(object):
             integrator_kwargs['atol'] = self.atol
             integrator_kwargs['rtol'] = self.rtol
 
-            if self.method.symplectic and not self.method.is_implicit:
+            if self.__method.symplectic and not self.__method.is_implicit:
                 integrator_kwargs['staggered_mask'] = self.staggered_mask
 
             if self.integrator:
@@ -834,7 +838,7 @@ class OdeSystem(object):
                 old_states_exist = False
                 old_dState = None
                 old_dTime = None
-            self.integrator = self.method(self.dim, **integrator_kwargs)
+            self.integrator = self.__method(self.dim, **integrator_kwargs)
             if old_states_exist and preserve_states:
                 self.integrator.dState = old_dState
                 self.integrator.dTime = old_dTime
