@@ -429,7 +429,7 @@ class DiffRHS(object):
             __new_diff_rhs.hook_jacobian_call(copy.deepcopy(self.__jac, memo))
         return __new_diff_rhs
 
-    __base_attributes = ["rhs", "equ_repr", "md_repr", "nfev", "njev", "__jac", "__jac_is_wrapped_rhs",
+    __base_attributes = ["rhs", "equ_repr", "md_repr", "nfev", "njev", "__jac_initialised", "__jac", "__jac_is_wrapped_rhs",
                          "__jac_wrapped_rhs_order", "__jac_time"]
 
     def __getattr__(self, name):
@@ -1013,17 +1013,14 @@ class OdeSystem(object):
         else:
             tqdm_progress_bar = None
 
-        try:
+        if callback is None:
+            callback = []
+        elif isinstance(callback, (tuple,list)):
             callback = list(callback)
-        except:
-            if callback is None:
-                callback = []
-            else:
-                callback = [callback]
+        else:
+            callback = [callback]
 
         end_int = False
-        cState = D.ar_numpy.zeros_like(self.__y[self.counter])
-        cTime = D.ar_numpy.zeros_like(self.__t[self.counter])
         self.__allocate_soln_space(total_steps)
         try:
             while (implicit_integration or self.dt != 0 and D.ar_numpy.abs(tf - self.__t[self.counter]) >= D.tol_epsilon(self.__y[self.counter].dtype)) and not end_int:
@@ -1041,14 +1038,8 @@ class OdeSystem(object):
                 # https://reference.wolfram.com/language/tutorial/NDSolveSPRK.html
                 #
 
-                dState = dState + cState
-                dTime = dTime + cTime
-
                 self.__y[self.counter + 1] = self.__y[self.counter] + dState
                 self.__t[self.counter + 1] = self.__t[self.counter] + dTime
-
-                cState = (self.__y[self.counter + 1] - self.__y[self.counter]) - dState
-                cTime = (self.__t[self.counter + 1] - self.__t[self.counter]) - dTime
 
                 self.counter += 1
 
@@ -1061,7 +1052,6 @@ class OdeSystem(object):
                         next_time = self.__t[self.counter]
                         next_state = self.__y[self.counter]
                         prev_time = self.__t[self.counter - 1]
-                        prev_state = self.__y[self.counter - 1]
                         self.counter -= 1
 
                         sol_tuple = (self.__sol, prev_time, next_time)
@@ -1093,8 +1083,8 @@ class OdeSystem(object):
                             if self.counter + len(roots) + 1 >= len(self.__y):
                                 total_steps = self.__alloc_space_steps(tf - dTime) + 1 + len(roots)
                                 self.__allocate_soln_space(total_steps)
-                            self.__t[self.counter + 1] = prev_time + dTime
-                            self.__y[self.counter + 1] = prev_state + dState
+                            self.__t[self.counter + 1] = next_time
+                            self.__y[self.counter + 1] = next_state
                             self.counter += 1
 
                     if not self.__dense_output:

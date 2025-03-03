@@ -145,10 +145,11 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
         ))
         if not self._explicit:
             solver_dict_preserved.update(dict(
-                tau0=0, tau1=0, niter0=0, niter1=0
+                tau0=2, tau1=2, niter0=0, niter1=0
             ))
             self.solver_dict.update(solver_dict_preserved)
             self.adaptation_fn = integrator_utilities.implicit_aware_update_timestep
+            self.__jac_eye = None
         self.solver_dict_keep_keys = set(solver_dict_preserved.keys())
 
     def __call__(self, rhs, initial_time, initial_state, constants, timestep):
@@ -214,18 +215,22 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
     def algebraic_system_jacobian(self, next_state, rhs, initial_time, initial_state, timestep, constants):
         __aux_states = D.ar_numpy.reshape(next_state, self.stage_values.shape)
         __step = self.numel
-        __jac = D.ar_numpy.eye(self.tableau_intermediate.shape[0] * __step, **self.array_constructor_kwargs)
+        if self.__jac_eye is None:
+            self.__jac_eye = D.ar_numpy.eye(self.tableau_intermediate.shape[0] * __step, **self.array_constructor_kwargs)
+            self.__jac = D.ar_numpy.copy(self.__jac_eye)
+        D.ar_numpy.copyto(self.__jac, self.__jac_eye)
         __rhs_jac = D.ar_numpy.stack([
             rhs.jac(initial_time + tbl[0] * timestep,
                     initial_state + timestep * D.ar_numpy.sum(tbl[1:] * __aux_states, axis=-1),
                     **constants)
             for tbl in self.tableau_intermediate
         ])
-        for idx in range(0, __jac.shape[0], __step):
-            for jdx in range(0, __jac.shape[1], __step):
-                __jac[idx:idx + __step, jdx:jdx + __step] -= timestep * self.tableau_intermediate[
+        for idx in range(0, self.__jac.shape[0], __step):
+            for jdx in range(0, self.__jac.shape[1], __step):
+                self.__jac[idx:idx + __step, jdx:jdx + __step] -= timestep * self.tableau_intermediate[
                     idx // __step, 1 + jdx // __step] * __rhs_jac[idx // __step].reshape(__step, __step)
-        if __jac.shape[0] == 1 and __jac.shape[1] == 1:
+        __jac = self.__jac
+        if self.__jac.shape[0] == 1 and self.__jac.shape[1] == 1:
             __jac = D.ar_numpy.reshape(__jac, tuple())
         return __jac
 
@@ -255,7 +260,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
                 utilities.optimizer.nonlinear_roots(
                     self.algebraic_system, initial_guess,
                     jac=self.algebraic_system_jacobian, verbose=False,
-                    tol=desired_tol, maxiter=30,
+                    tol=desired_tol, maxiter=8,
                     additional_args=(rhs, initial_time, initial_state, timestep, constants))
 
             if not success and prec > desired_tol:
@@ -371,7 +376,7 @@ class ExplicitSymplecticIntegrator(TableauIntegrator):
                 aux = timestep * self.initial_rhs
             else:
                 aux = timestep * rhs(current_time, initial_state + self.dState, **constants)
-            current_time = current_time + timestep * self.tableau_intermediate[stage, 0]
+            current_time = current_time + timestep * self.tableau_intermediate[stage, 1]
             self.dState += aux * (self.tableau_intermediate[stage, 1] * self.drift_mask + self.tableau_intermediate[stage, 2] * self.kick_mask)
 
         self.dTime = D.ar_numpy.copy(timestep)

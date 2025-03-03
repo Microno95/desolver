@@ -13,6 +13,7 @@ implicit_integrator_set = [
 ]
 
 dt_set            = [D.pi / 307, D.pi / 512]
+symplectic_integrator_set      = set(intg for intg in integrator_set if intg((1,), D.numpy.float64).symplectic)
 integrator_param          = pytest.mark.parametrize('integrator', explicit_integrator_set + implicit_integrator_set)
 explicit_integrator_param = pytest.mark.parametrize('integrator', explicit_integrator_set)
 implicit_integrator_param = pytest.mark.parametrize('integrator', implicit_integrator_set)
@@ -65,7 +66,7 @@ def set_up_basic_system(dtype_var, backend_var, integrator=None, hook_jacobian=F
         integrator = a.method
     else:
         a.method = integrator
-    dt = (D.epsilon(dtype_var) ** 0.75)**(1.0/(2+a.integrator.order))/(2*D.pi)
+    dt = D.tol_epsilon(dtype_var)**(0.75/(2+a.integrator.order))/(2*D.pi)
     a.dt = dt
 
     return de_mat, rhs, analytic_soln, y_init, dt, a

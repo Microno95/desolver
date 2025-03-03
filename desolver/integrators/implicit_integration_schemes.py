@@ -249,6 +249,8 @@ class RadauIA3(RungeKuttaIntegrator):
     tableau_final = numpy.array(
         [[0, 1 / 4, 3 / 4]], dtype=numpy.float64
     )
+    
+    
 
 
 class RadauIA5(RungeKuttaIntegrator):

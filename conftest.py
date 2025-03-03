@@ -4,6 +4,9 @@ import pytest
 import copy
 import itertools
 import numpy as np
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 from desolver.integrators import explicit_methods, implicit_methods, available_methods
 
 def available_backends():
@@ -21,6 +24,7 @@ def available_device_var():
         import torch
         if torch.cuda.is_available():
             available_device_var.append("cuda:0")
+        torch.set_num_threads(1)
     except ImportError:
         pass
     return available_device_var
