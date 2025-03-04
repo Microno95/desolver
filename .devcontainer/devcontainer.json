@@ -1,0 +1,102 @@
+{
+	// For quick reference: https://containers.dev/implementors/json_reference/
+	"name": "Miniforge3",
+	"image": "condaforge/miniforge3:24.3.0-0",
+	//"build": {
+	//	"context": "..",
+	//	"dockerfile": "Dockerfile"
+	//},
+
+	// 1. Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": []
+
+	// 2. Use 'mounts' to make a list of local directories available inside the container. More info: https://code.visualstudio.com/remote/advancedcontainers/add-local-file-mount
+	// "mounts": [],
+
+	// 3. Use 'runArgs' to pass arguments to the container. 
+	// run the container with all GPUs
+	"runArgs": [
+		"--gpus",
+		"all"
+	],
+
+	// 4. Features to add to the Dev Container. More info: https://containers.dev/implementors/features.
+	"features": {
+		// ZSH without OMZ
+		"ghcr.io/devcontainers/features/common-utils:2": {
+			"installZsh": true,
+			"configureZshAsDefaultShell": true,
+			"installOhMyZsh": true,
+			"installOhMyZshConfig": true,
+			"upgradePackages": true,
+			"username": "automatic",
+			"userUid": "automatic",
+			"userGid": "automatic"
+		},
+		// git
+		"ghcr.io/devcontainers/features/git:1": {
+			"ppa": true,
+			"version": "os-provided"
+		},
+		"ghcr.io/schlich/devcontainer-features/powerlevel10k:1": {},
+		"ghcr.io/nils-geistmann/devcontainers-features/zsh:0": {
+			"setLocale": true,
+			"theme": "robbyrussell",
+			"plugins": "git docker",
+			"desiredLocale": "en_US.UTF-8 UTF-8"
+		},
+		"ghcr.io/devcontainers-extra/features/zsh-plugins:0": {
+			"plugins": "ssh-agent npm",
+			"omzPlugins": "https://github.com/zsh-users/zsh-autosuggestions",
+			"username": "vscode"
+		}
+	},
+
+	// 5. Configure tool-specific properties.
+	"customizations": {
+		// Configure properties specific to VS Code.
+		"vscode": {
+			// Set *default* container specific settings.json values on container create.
+			"settings": {
+				"python.defaultInterpreterPath": "/opt/conda/bin/python"
+			},
+			// installs useful extensions
+			"extensions": [
+				"ms-python.python",
+				"ms-python.debugpy",
+				"ms-python.vscode-pylance",
+				"ms-python.isort",
+				"ms-toolsai.jupyter",
+				"ms-toolsai.jupyter-keymap",
+				"ms-toolsai.vscode-jupyter-cell-tags",
+				"ms-toolsai.jupyter-renderers",
+				"ms-toolsai.vscode-jupyter-slideshow",
+				"ms-toolsai.tensorboard",
+				"charliermarsh.ruff"
+			]
+		}
+	},
+	
+	// 6. Set `remoteUser` to `root` to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
+	"remoteUser": "vscode"
+
+	// the following commands are related to container lifecylce. More info: https://containers.dev/implementors/json_reference/#lifecycle-scripts
+	
+	// 7. Use 'initializeCommand' to run commands ON THE HOST before container is created or started.
+	// "initializeCommand": "",
+
+	// 8. Use 'onCreateCommand' to run commands INSIDE THE CONTAINER after it started for the first time.
+	// "onCreateCommand": "",
+	
+	// 9. Use 'updateContentCommand' to run commands if the root filetree have any changes, during container creation.
+	// "updateContentCommand": "",
+
+	// 10. Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "pip3 install --user -r requirements.txt",
+
+	// 11. Use 'postStartCommand' to run a command each time the container starts successfully.
+	// "postStartCommand": "",
+	
+	// 12. Use 'postAttachCommand' to run a command each time a tool attaches to the container successfully. 
+	// "postAttachCommand": "",
+}

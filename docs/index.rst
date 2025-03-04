@@ -23,7 +23,6 @@ desolver
     :caption: Example Uses of desolver
 
     numpy
-    pyaudi
     pytorch
 
 Indices and tables

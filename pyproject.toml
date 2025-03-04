@@ -1,16 +1,18 @@
 [build-system]
-requires = ["hatchling", "hatch-conda-build"]
+requires = ["hatch>=1.14.0", "hatchling>=1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "desolver"
-version = "4.5.0"
+version = "5.0.0"
 dependencies = [
-    'numpy>=1.18',
+    'numpy>=2',
     'tqdm>=4.47.0',
-    'scipy>=1.4.1'
+    'scipy>=1.4.1',
+    'autoray>=0.7.0',
+    'einops>=0.8.0'
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
   {name = "Ekin Ozturk'", email = "ekin.ozturk@alumni.utoronto.ca"},
 ]
@@ -20,7 +22,7 @@ maintainers = [
 description = "Differential Equation System Solver"
 readme = "README.rst"
 license = "MIT"
-license-files = ["LICEN[CS]E.*"]
+license-files = ["LICEN[CS]E*"]
 keywords = ['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode']
 classifiers = [
     'Development Status :: 5 - Production/Stable',
@@ -37,16 +39,12 @@ classifiers = [
 
     # Specify the Python versions you support here. In particular, ensure
     # that you indicate whether you support Python 2, Python 3 or both.
-    'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12'
 ]
 
 [project.optional-dependencies]
-pyaudi = [
-    "pyaudi>=1.6.5"
-]
 torch = [
     "torch>=2.5.0",
 ]
@@ -58,7 +56,34 @@ test = [
     "pytest>=5.4.3",
 ]
 
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu126", marker = "sys_platform == 'win32'" },
+  { index = "pytorch-cu126", marker = "sys_platform == 'linux'" },
+  { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+]
 
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[tool.hatch.envs.dev]
+installer = "uv"
+extra-dependencies = [
+  "jupyter",
+  "matplotlib",
+  "scipy",
+  "torch>=2.5.0",
+  "networkx",
+  "tqdm",
+  "ipywidgets"
+]
 
 [tool.hatch.envs.hatch-test]
 installer = "uv"
@@ -85,7 +110,6 @@ matrix.test-mode.env-vars = [
 matrix.test-mode.features = [
     "test",
   { value = "torch", if = ["torch"] },
-#   { value = "pyaudi", if = ["pyaudi"] },
 ]
 
 [project.urls]
@@ -112,9 +136,13 @@ parallel = true
 branch = true
 relative_files = true
 source = ["desolver"]
+omit = [
+  "*/tests/*"
+]
 data_file = "coverage/.coverage"
 
 [tool.coverage.report]
+format = "text"
 # Regexes for lines to exclude from consideration
 exclude_also = [
     # Don't complain about missing debug-only code:
@@ -134,3 +162,10 @@ exclude_also = [
     ]
 
 ignore_errors = true
+
+[tool.coverage.lcov]
+output = "coverage.lcov"
+line_checksums = true
+
+[tool.coverage.html]
+directory = "coverage/htmlcov/"

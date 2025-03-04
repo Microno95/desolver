@@ -1,29 +1,15 @@
-import os
 import sys
-import numpy
+import einops
 
-from .common import *
+from desolver.backend.common import *
+from desolver.backend.autoray_backend import *
+from desolver.backend.numpy_backend import *
+try:
+    from desolver.backend.torch_backend import *
+except ImportError:
+    pass
 
-if 'DES_BACKEND' in os.environ:
-    set_backend(os.environ['DES_BACKEND'])
-    assert (backend() == str(os.environ['DES_BACKEND']))
-
-if backend() == 'numpy':
-    from .numpy_backend import *
-
-    try:
-        from .pyaudi_backend import *
-
-        print("PyAudi backend is available.", file=sys.stderr)
-    except:
-        pass
-elif backend() == 'torch':
-    from .torch_backend import *
-
-    print("Default dtype set to float32 due to use of torch backend")
-    set_float_fmt("float32")
-
-print("Using " + str(backend()) + " backend", file=sys.stderr)
+print("Using `autoray` backend", file=sys.stderr)
 
 
 def contract_first_ndims(a, b, n=1):
@@ -67,18 +53,15 @@ def contract_first_ndims(a, b, n=1):
     4.0
     ```
     """
-    if len(shape(a)) > len(shape(b)):
+    if len(ar_numpy.shape(a)) > len(ar_numpy.shape(b)):
         a, b = b, a
-    if n > len(shape(a)):
+    if n > len(ar_numpy.shape(a)):
         raise ValueError("Cannot contract along more dims than there exists!")
-    na = len(shape(a))
-    nb = len(shape(b))
+    na = len(ar_numpy.shape(a))
+    nb = len(ar_numpy.shape(b))
     einsum_str = "{},{}->{}"
-    estr1 = "".join([chr(97 + i) for i in range(na)])
-    estr2 = "".join([chr(97 + i) for i in range(nb)])
-    estr3 = "".join([chr(97 + i + n) for i in range(nb - n)])
+    estr1 = " ".join([chr(97 + i) for i in range(n)]) + " ..."
+    estr2 = " ".join([chr(97 + i) for i in range(n)]) + " ..."
+    estr3 = "..."
     einsum_str = einsum_str.format(estr1, estr2, estr3)
-    return einsum(einsum_str, a, b)
-
-
-del os, sys
+    return einops.einsum(a, b, einsum_str)

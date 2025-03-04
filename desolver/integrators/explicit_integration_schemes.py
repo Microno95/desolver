@@ -1,7 +1,6 @@
 import numpy
 
-from .integrator_types import RungeKuttaIntegrator, ExplicitSymplecticIntegrator
-from .. import backend as D
+from desolver.integrators.integrator_types import RungeKuttaIntegrator, ExplicitSymplecticIntegrator
 
 __all__ = [
     'RK1412Solver',
@@ -35,7 +34,7 @@ class RK1412Solver(RungeKuttaIntegrator):
     
     __alt_names__ = ("Explicit RK1412", "RK1412", "Runge-Kutta 14(12)", "RK1412Feag")
     
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.,                                     0.,                                         0.,                                      0.,                                     0.,                                   0.,                                    0.,                                    0.,                                     0.,                                     0.,                                      0.,                                      0.,                                       0.,                                     0.,                                         0.,                                         0.,                                       0.,                                        0.,                                      0.,                                        0.,                                       0.,                                      0.,                                      0.,                                      0.,                                    0.,                                       0.,                                      0.,                                       0.,                                      0.,                                       0.,                                     0.,                                      0.,                                     0.,        0.,                                    0.,                                      0., ],
     [11111111111111111./100000000000000000., 11111111111111111./100000000000000000.,     0.,                                      0.,                                     0.,                                   0.,                                    0.,                                    0.,                                     0.,                                     0.,                                      0.,                                      0.,                                       0.,                                     0.,                                         0.,                                         0.,                                       0.,                                        0.,                                      0.,                                        0.,                                       0.,                                      0.,                                      0.,                                      0.,                                    0.,                                       0.,                                      0.,                                       0.,                                      0.,                                       0.,                                     0.,                                      0.,                                     0.,        0.,                                    0.,                                      0., ],
     [13888888888888889./25000000000000000.,  -83333333333333333./100000000000000000.,    138888888888888889./100000000000000000., 0.,                                     0.,                                   0.,                                    0.,                                    0.,                                     0.,                                     0.,                                      0.,                                      0.,                                       0.,                                     0.,                                         0.,                                         0.,                                       0.,                                        0.,                                      0.,                                        0.,                                       0.,                                      0.,                                      0.,                                      0.,                                    0.,                                       0.,                                      0.,                                       0.,                                      0.,                                       0.,                                     0.,                                      0.,                                     0.,        0.,                                    0.,                                      0., ],
@@ -73,7 +72,7 @@ class RK1412Solver(RungeKuttaIntegrator):
     [1./1.,                                  7145878509724289./25000000000000000.,       29166666666666667./100000000000000000.,  7./32.,                                 0.,                                   21./128.,                              0.,                                    10909717747277833./50000000000000000.,  18039289847869777./100000000000000000., 0.,                                      10285691970242251./50000000000000000.,   94810856086629./390625000000000.,         24646578081362931./100000000000000000., -13799677631635633./4000000000000000.,      2860944527000451./12500000000000000.,       14164529985107571./50000000000000000.,    321085125837766641./100000000000000000.,   -2235387773648457./10000000000000000.,   -70712115720441907./100000000000000000.,   8028083628757177./2500000000000000.,      70477174154834883./50000000000000000.,   -15136205344374261./100000000000000000., 9308764363175357./25000000000000000.,    12648937320318067./50000000000000000., -321085125837766641./100000000000000000., -14164529985107571./50000000000000000.,  -2860944527000451./12500000000000000.,    -24646578081362931./100000000000000000., -94810856086629./390625000000000.,        -10285691970242251./50000000000000000., -18039289847869777./100000000000000000., -10909717747277833./50000000000000000., -21./128., -7./32.,                               -29166666666666667./100000000000000000., 0., ]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0., 892857142857143./50000000000000000., 3./512., 3./256., 0., 9./512., 0., 3./128., 15./512., 0., 9./256., 21./512., 3./64., 0., 27./512., 15./256., 33./512., 0., 5267605678587651./50000000000000000., 8528067312087609./50000000000000000., 10311469866467597./50000000000000000., 10311469866467597./50000000000000000., 8528067312087609./50000000000000000., 5267605678587651./50000000000000000., -33./512., -15./256., -27./512., -3./64., -21./512., -9./256., -15./512., -3./128., -9./512., -3./256., -3./512., 892857142857143./50000000000000000.],
          [0., 892857142857143./50000000000000000., 242968749999999999./50000000000000000000., 3./256., 0., 9./512., 0., 3./128., 15./512., 0., 9./256., 21./512., 3./64., 0., 27./512., 15./256., 33./512., 0., 5267605678587651./50000000000000000., 8528067312087609./50000000000000000., 10311469866467597./50000000000000000., 10311469866467597./50000000000000000., 8528067312087609./50000000000000000., 5267605678587651./50000000000000000., -33./512., -15./256., -27./512., -3./64., -21./512., -9./256., -15./512., -3./128., -9./512., -3./256., -242968749999999999./50000000000000000000., 892857142857143./50000000000000000.]], dtype=numpy.float64
     )
@@ -94,7 +93,7 @@ class RK108Solver(RungeKuttaIntegrator):
     
     __alt_names__ = ("Explicit RK108", "RK108", "Runge-Kutta 10(8)", "RK108Feag")
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.,                                           0.,                                           0.,                                          0.,                                            0.,                                          0.,                                           0.,                                            0.,                                            0.,                                            0.,                                           0.,                                             0.,                                             0.,                                            0.,                                           0.,                                            0.,                                           0.,       0., ],
     [1./10.,                                       1./10.,                                       0.,                                          0.,                                            0.,                                          0.,                                           0.,                                            0.,                                            0.,                                            0.,                                           0.,                                             0.,                                             0.,                                            0.,                                           0.,                                            0.,                                           0.,       0., ],
     [53935784080298178753./100000000000000000000., -22879414034382286013./25000000000000000000., 29090688043565464561./20000000000000000000., 0.,                                            0.,                                          0.,                                           0.,                                            0.,                                            0.,                                            0.,                                           0.,                                             0.,                                             0.,                                            0.,                                           0.,                                            0.,                                           0.,       0., ],
@@ -114,13 +113,13 @@ class RK108Solver(RungeKuttaIntegrator):
     [1./1.,                                        18178130070009528389./100000000000000000000., 27./40.,                                     17137907992359491997./50000000000000000000.,   0.,                                          25911121454832274451./100000000000000000000., -7165579334359041781./20000000000000000000.,   -20918979188176661219./20000000000000000000.,  93032784541562698329./100000000000000000000.,  88975479715854051223./50000000000000000000.,  1./10.,                                         -28254756953904408161./100000000000000000000.,  -15932735011997254917./100000000000000000000., -7275794732350075543./50000000000000000000.,  -25911121454832274451./100000000000000000000., -17137907992359491997./50000000000000000000., -27./40., 0., ]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0., 3333333333333333333./100000000000000000000., 1./40., 3333333333333333333./100000000000000000000., 0., 1./20., 0., 1./25., 0., 2365468476861543627./12500000000000000000., 27742918851774317651./100000000000000000000., 27742918851774317651./100000000000000000000., 2365468476861543627./12500000000000000000., -1./25., -1./20., -3333333333333333333./100000000000000000000., -1./40., 3333333333333333333./100000000000000000000.],
          [0., 3333333333333333333./100000000000000000000., 1./36., 3333333333333333333./100000000000000000000., 0., 1./20., 0., 1./25., 0., 2365468476861543627./12500000000000000000., 27742918851774317651./100000000000000000000., 27742918851774317651./100000000000000000000., 2365468476861543627./12500000000000000000., -1./25., -1./20., -3333333333333333333./100000000000000000000., -1./36., 3333333333333333333./100000000000000000000.]], dtype=numpy.float64
     )
         
-#     def get_error_estimate(self, dState, dTime, aux, tableau_idx_expand):
-#         return (aux[0] - aux[-1]) / 360 + (dState - aux[-1]) / dTime # D.sum(self.final_state[1][tableau_idx_expand] * aux, axis=0) * dTime / 1000 # 
+#     def get_error_estimate(self, dState, dTime, aux, tableau_intermediate_idx_expand):
+#         return (aux[0] - aux[-1]) / 360 + (dState - aux[-1]) / dTime # D.sum(self.tableau_final[1][tableau_intermediate_idx_expand] * aux, axis=0) * dTime / 1000 # 
 
 class RK8713MSolver(RungeKuttaIntegrator):
     """
@@ -136,7 +135,7 @@ class RK8713MSolver(RungeKuttaIntegrator):
     
     __alt_names__ = ("Explicit RK8713M", "RK87", "Runge-Kutta 8(7)", "RK8713M")
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.0,                    0.0,                  0.0,      0.0,       0.0,                      0.0,                    0.0,                     0.0,                     0.0,                     0.0,                     0.0,                   0.0,                  0.0, 0.0],
          [1/18,                   1/18,                 0.0,      0.0,       0.0,                      0.0,                    0.0,                     0.0,                     0.0,                     0.0,                     0.0,                   0.0,                  0.0, 0.0],
          [1/12,                   1/48,                 1/16,     0.0,       0.0,                      0.0,                    0.0,                     0.0,                     0.0,                     0.0,                     0.0,                   0.0,                  0.0, 0.0],
@@ -152,7 +151,7 @@ class RK8713MSolver(RungeKuttaIntegrator):
          [1,                      403863854/491063109,  0.0,      0.0,      -5068492393/434740067,    -411421997/543043805,    652783627/914296604,     11173962825/925320556,  -13158990841/6184727034,  3936647629/1978049680,  -160528059/685178525,   248638103/1413531060, 0.0, 0.0]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0., 13451932/455176623, 0.0, 0.0, 0.0, 0.0, -808719846/976000145, 1757004468/5645159321, 656045339/265891186, -3867574721/1518517206, 465885868/322736535,  53011238/667516719,   2/45,                 0.0],
          [0., 14005451/335480064, 0.0, 0.0, 0.0, 0.0, -59238493/1068277825, 181606767/758867731,   561292985/797845732, -1041891430/1371343529, 760417239/1151165299, 118820643/751138087, -528747749/2220607170, 1/4]], dtype=numpy.float64
     )
@@ -171,7 +170,7 @@ class RK45CKSolver(RungeKuttaIntegrator):
     
     __alt_names__ = ("Explicit RK45CK", "RK45CK", "Runge-Kutta-Cash-Karp", "RK45")
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.0,  0.0,        0.0,     0.0,       0.0,          0.0,      0.0],
          [1/5,  1/5,        0.0,     0.0,       0.0,          0.0,      0.0],
          [3/10, 3/40,       9/40,    0.0,       0.0,          0.0,      0.0],
@@ -180,7 +179,7 @@ class RK45CKSolver(RungeKuttaIntegrator):
          [7/8,  1631/55296, 175/512, 575/13824, 44275/110592, 253/4096, 0.0]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0., 37/378,     0, 250/621,     125/594,     0,         512/1771],
          [0., 2825/27648, 0, 18575/48384, 13525/55296, 277/14336, 1/4     ]], dtype=numpy.float64
     )
@@ -199,9 +198,9 @@ class RK5Solver(RungeKuttaIntegrator):
     
     __alt_names__ = ("Explicit RK5", "RK5", "Runge-Kutta 5")
 
-    tableau = numpy.copy(RK45CKSolver.tableau)
+    tableau_intermediate = numpy.copy(RK45CKSolver.tableau_intermediate)
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0., 37/378,     0, 250/621,     125/594,     0,         512/1771]], dtype=numpy.float64
     )
     
@@ -214,14 +213,14 @@ class RK4Solver(RungeKuttaIntegrator):
     
     __alt_names__ = ("Explicit RK4", "RK4", "Runge-Kutta 4")
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0,   0,   0,   0, 0],
          [1/2, 1/2, 0,   0, 0],
          [1/2, 0,   1/2, 0, 0],
          [1,   0,   0,   1, 0]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0., 1/6, 1/3, 1/3, 1/6]], dtype=numpy.float64
     )
 
@@ -234,12 +233,12 @@ class MidpointSolver(RungeKuttaIntegrator):
     
     __alt_names__ = ("Explicit Midpoint", "Midpoint")
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0,    0,   0],
          [1/2,  1/2, 0]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0,    0,   1]], dtype=numpy.float64
     )
 
@@ -252,12 +251,12 @@ class HeunsSolver(RungeKuttaIntegrator):
 
     __alt_names__ = ("Explicit Heun's", "Heun's")
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0,    0,   0  ],
-         [1,    1,   0  ]], dtype=numpy.float64
+         [2/3,  2/3, 0  ]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0,    1/4, 3/4]], dtype=numpy.float64
     )
 
@@ -270,11 +269,11 @@ class EulerSolver(RungeKuttaIntegrator):
     
     __alt_names__ = ("Explicit Euler", "Euler")
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0,    0]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0,    1]], dtype=numpy.float64
     )
 
@@ -287,14 +286,14 @@ class EulerTrapSolver(RungeKuttaIntegrator):
     
     __alt_names__ = ("Explicit Euler-Trapezoidal", "Euler-Trapezoidal", "Euler-Trap", "Predictor-Corrector Euler")
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0,   0,   0,     0,   0  ],
          [1,   1,   0,     0,   0  ],
          [1,   1/2, 1/2,   0,   0  ],
          [1,   1/2, 0,     1/2, 0  ]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0,   1/2, 0,    0,   1/2]], dtype=numpy.float64
     )
 
@@ -309,12 +308,12 @@ class HeunEulerSolver(RungeKuttaIntegrator):
     
     __alt_names__ = ("Explicit Adaptive Heun-Euler", "Adaptive Heun-Euler", "AHE")
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0,   0,   0],
          [1,   1,   0]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0,    1/2, 1/2],
          [0,    1,   0   ]], dtype=numpy.float64
     )
@@ -330,7 +329,7 @@ class SymplecticEulerSolver(ExplicitSymplecticIntegrator):
     
     __alt_names__ = ("Explicit Symplectic Forward Euler", "Symplectic Forward Euler")
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.5, 0,   0.5],
          [0,   1.0, 0  ],
          [0.5, 0,   0.5]], dtype=numpy.float64
@@ -353,7 +352,7 @@ class BABs9o7HSolver(ExplicitSymplecticIntegrator):
     __alt_names__ = ("Explicit BABS9O7H", "BABS9O7H")
 
     # Based on arXiv:1501.04345v2 - BAB's9o7H
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
        [[ 0.                  ,  0.                  ,  0.04649290043965892 ],
         [ 0.                  ,  0.1289555065927298  ,  0.                  ],
         [ 0.                  ,  0.                  ,  0.154901012702888   ],
@@ -392,14 +391,14 @@ class ABAs5o6HSolver(ExplicitSymplecticIntegrator):
     __alt_names__ = ("Explicit ABAS5O6H", "ABAS5O6H")
 
     # Based on arXiv:1501.04345v2 - ABAs5o6H
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
       [[ 0.                  ,  0.                  ,  0.15585935917621682 ],
        [ 0.                  , -0.6859195549562167  ,  0.                  ],
        [ 0.                  ,  0.                  , -0.007025499091957318],
        [ 0.                  ,  0.9966295909529364  ,  0.                  ],
-       [ 0.                  ,  0.                  ,  0.35116613991574047 ],
-       [ 0.                  ,  0.3785799280065607  ,  0.                  ],
-       [ 0.                  ,  0.                  ,  0.35116613991574047 ],
+       [ 0.                  ,  0.                  ,  0.351166139915740498],
+       [ 0.                  ,  0.3785799280065606  ,  0.                  ],
+       [ 0.                  ,  0.                  ,  0.351166139915740498],
        [ 0.                  ,  0.9966295909529364  ,  0.                  ],
        [ 0.                  ,  0.                  , -0.007025499091957318],
        [ 0.                  , -0.6859195549562167  ,  0.                  ],
@@ -415,7 +414,7 @@ class DOPRI45(RungeKuttaIntegrator):
 
     __alt_names__ = ("Dormand-Prince", )
 
-    tableau = numpy.array(
+    tableau_intermediate = numpy.array(
         [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
          [0.2, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
          [0.3, 3/40, 9/40, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -425,7 +424,7 @@ class DOPRI45(RungeKuttaIntegrator):
          [1.0, 35/384, 0.0, 500/1113, 125/192, -2187/6784, 11/84, 0.0]], dtype=numpy.float64
     )
 
-    final_state = numpy.array(
+    tableau_final = numpy.array(
         [[0.0, 35/384, 0.0, 500/1113, 125/192, -2187/6784, 11/84, 0.0],
          [0.0, 5179/57600, 0.0, 7571/16695, 393/640, -92097/339200, 187/2100, 1/40]], dtype=numpy.float64
     )

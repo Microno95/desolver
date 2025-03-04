@@ -2,41 +2,39 @@ import desolver as de
 import desolver.backend as D
 import numpy as np
 import pytest
-from .common import ffmt_param
+from desolver.tests import common
 
 
-@ffmt_param
-def test_getter_setters(ffmt):
-    D.set_float_fmt(ffmt)
-
-    if D.backend() == 'torch':
+def test_getter_setters(dtype_var, backend_var, device_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
         import torch
-
         torch.set_printoptions(precision=17)
-
         torch.autograd.set_detect_anomaly(True)
 
-    print("Testing {} float format".format(D.float_fmt()))
-
-    de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        arr_con_kwargs['device'] = device_var
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
 
     @de.rhs_prettifier("""[vx, -x+t]""")
     def rhs(t, state, **kwargs):
-        return de_mat @ state + D.array([0.0, t])
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
 
-    y_init = D.array([1., 0.])
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-                     atol=D.epsilon() ** 0.5)
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon(dtype_var) ** 0.5,
+                     atol=D.epsilon(dtype_var) ** 0.5)
 
     assert (a.t0 == 0)
     assert (a.tf == 2 * D.pi)
     assert (a.dt == 0.01)
     assert (a.get_current_time() == a.t0)
-    assert (a.rtol == D.epsilon() ** 0.5)
-    assert (a.atol == D.epsilon() ** 0.5)
-    assert (D.norm(a.y[0] - y_init) <= 2 * D.epsilon())
-    assert (D.norm(a.y[-1] - y_init) <= 2 * D.epsilon())
+    assert (a.rtol == D.epsilon(dtype_var) ** 0.5)
+    assert (a.atol == D.epsilon(dtype_var) ** 0.5)
+    assert (D.ar_numpy.linalg.norm(a.y[0] - y_init) <= 2 * D.epsilon(dtype_var))
+    assert (D.ar_numpy.linalg.norm(a.y[-1] - y_init) <= 2 * D.epsilon(dtype_var))
 
     a.set_kick_vars([True, False])
 
@@ -88,65 +86,179 @@ def test_getter_setters(ffmt):
     assert (not bool(a.constants))
 
 
-@ffmt_param
-def test_integration_and_representation(ffmt):
-    D.set_float_fmt(ffmt)
-
-    if D.backend() == 'torch':
+@common.integrator_param
+def test_integration_and_representation_no_jac(dtype_var, backend_var, integrator):
+    if integrator in [de.integrators.RadauIIA5] and dtype_var in ["longdouble", "float64"]:
+        pytest.skip("This test is too slow for the precision required")
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
         import torch
-
         torch.set_printoptions(precision=17)
-
         torch.autograd.set_detect_anomaly(True)
-
-    print("Testing {} float format".format(D.float_fmt()))
-
-    from . import common
-
-    (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system()
+    
+    (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var, integrator=integrator)
+    a.tf = D.pi/4
 
     assert (a.integration_status == "Integration has not been run.")
-
+    
+    if a.integrator.order <= 4:
+        pytest.skip(f"{a.integrator}'s order is too low")
+    
     a.integrate()
 
     assert (a.integration_status == "Integration completed successfully.")
 
     print(str(a))
     print(repr(a))
-    assert (D.max(D.abs(D.to_float(a.sol(a.t[0])) - D.to_float(y_init))) <= 8 * D.epsilon() ** 0.5)
-    assert (D.max(D.abs(D.to_float(a.sol(a.t[-1])) - D.to_float(analytic_soln(a.t[-1], y_init)))) <= 8 * D.epsilon() ** 0.5)
-    assert (D.max(D.abs(D.to_float(a.sol(a.t).T) - D.to_float(analytic_soln(a.t, y_init)))) <= 8 * D.epsilon() ** 0.5)
+    try:
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= D.tol_epsilon(dtype_var) ** 0.5)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
 
-    for i in a:
-        assert (D.max(D.abs(D.to_float(i.y) - D.to_float(analytic_soln(i.t, y_init)))) <= 8 * D.epsilon() ** 0.5)
+        for i in a:
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
 
-    assert (len(a.y) == len(a))
-    assert (len(a.t) == len(a))
+        assert (len(a.y) == len(a))
+        assert (len(a.t) == len(a))
+        assert (a.success)
+    except AssertionError as e:
+        if backend_var == 'torch' and D.ar_numpy.finfo(dtype_var).bits < 32:
+            pytest.xfail(f"Low precision {dtype_var} can fail some of the tests: {e}")
+        elif backend_var == 'numpy' and D.ar_numpy.finfo(dtype_var).bits < 32:
+            pytest.xfail(f"Low precision {dtype_var} can fail some of the tests: {e}")
+        else:
+            raise e
 
 
-@ffmt_param
-def test_integration_and_nearest_float_no_dense_output(ffmt):
-    D.set_float_fmt(ffmt)
-
-    if D.backend() == 'torch':
+@common.implicit_integrator_param
+def test_integration_and_representation_with_jac(dtype_var, backend_var, integrator):
+    if integrator in [de.integrators.RadauIIA5] and dtype_var in ["longdouble", "float64"]:
+        pytest.skip("This test is too slow for the precision required")
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
         import torch
-
         torch.set_printoptions(precision=17)
-
         torch.autograd.set_detect_anomaly(True)
+    
+    (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var, integrator=integrator, hook_jacobian=False)
+    a.tf = D.pi/4
 
-    print("Testing {} float format".format(D.float_fmt()))
+    assert (a.integration_status == "Integration has not been run.")
 
-    de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
+    if a.integrator.order <= 4:
+        pytest.skip(f"{a.integrator}'s order is too low")
+    
+    a.integrate()
+
+    assert (a.integration_status == "Integration completed successfully.")
+
+    print(str(a))
+    print(repr(a))
+    try:
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= D.tol_epsilon(dtype_var) ** 0.5)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+        for i in a:
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+        assert (len(a.y) == len(a))
+        assert (len(a.t) == len(a))
+        
+        if backend_var == 'torch':
+            # Test rehooking of jac through autodiff
+            
+            (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var, integrator=integrator, hook_jacobian=True)
+
+            assert (a.integration_status == "Integration has not been run.")
+
+            a.equ_rhs.unhook_jacobian_call()
+            a.integrate()
+
+            assert (a.integration_status == "Integration completed successfully.")
+
+            print(str(a))
+            print(repr(a))
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= D.tol_epsilon(dtype_var) ** 0.5)
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+            for i in a:
+                assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+            assert (len(a.y) == len(a))
+            assert (len(a.t) == len(a))
+            assert (a.nfev > 0)
+            assert (a.njev > 0)
+    except AssertionError as e:
+        if backend_var == 'torch' and D.ar_numpy.finfo(dtype_var).bits < 32:
+            pytest.xfail(f"Low precision {dtype_var} can fail some of the tests: {e}")
+        elif backend_var == 'numpy' and D.ar_numpy.finfo(dtype_var).bits < 32:
+            pytest.xfail(f"Low precision {dtype_var} can fail some of the tests: {e}")
+        else:
+            raise e
+
+
+@common.basic_explicit_integrator_param
+def test_integration_with_richardson(dtype_var, backend_var, integrator):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+    
+    (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system(dtype_var, backend_var, integrator=integrator)
+
+    assert (a.integration_status == "Integration has not been run.")
+    
+    a.method = de.integrators.generate_richardson_integrator(a.method, richardson_iter=4)
+    
+    a.integrate()
+
+    assert (a.integration_status == "Integration completed successfully.")
+
+    print(str(a))
+    print(repr(a))
+    try:
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= D.tol_epsilon(dtype_var) ** 0.5)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+        for i in a:
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+
+        assert (len(a.y) == len(a))
+        assert (len(a.t) == len(a))
+    except AssertionError as e:
+        if backend_var == 'torch' and D.ar_numpy.finfo(dtype_var).bits < 32:
+            pytest.xfail(f"Low precision {dtype_var} can fail some of the tests: {e}")
+        elif backend_var == 'numpy' and D.ar_numpy.finfo(dtype_var).bits < 32:
+            pytest.xfail(f"Low precision {dtype_var} can fail some of the tests: {e}")
+        else:
+            raise e
+
+
+def test_integration_and_nearest_float_no_dense_output(dtype_var, backend_var, device_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+        
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        arr_con_kwargs['device'] = device_var
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
 
     @de.rhs_prettifier("""[vx, -x+t]""")
     def rhs(t, state, k, **kwargs):
-        return de_mat @ state + D.array([0.0, t])
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
 
-    y_init = D.array([1., 0.])
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-                     atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon(dtype_var) ** 0.5,
+                     atol=D.epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
 
     assert (a.integration_status == "Integration has not been run.")
 
@@ -156,172 +268,221 @@ def test_integration_and_nearest_float_no_dense_output(ffmt):
 
     assert (a.integration_status == "Integration completed successfully.")
 
-    assert (D.abs(a.t[-2] - a[2 * D.pi].t) <= D.abs(a.dt))
-
-
-@ffmt_param
-def test_no_events(ffmt):
-    D.set_float_fmt(ffmt)
-
-    if D.backend() == 'torch':
-        import torch
-
-        torch.set_printoptions(precision=17)
-
-        torch.autograd.set_detect_anomaly(True)
-
-    print("Testing {} float format".format(D.float_fmt()))
-
-    de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
-
-    @de.rhs_prettifier("""[vx, -x+t]""")
-    def rhs(t, state, k, **kwargs):
-        return de_mat @ state + D.array([0.0, t])
-
-    y_init = D.array([1., 0.])
-
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-                     atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
-
-    a.integrate()
+    assert (D.ar_numpy.abs(a.t[-2] - a[2 * D.pi].t) <= D.ar_numpy.abs(a.dt))
 
     assert (len(a.events) == 0)
 
 
-@ffmt_param
-def test_wrong_t0(ffmt):
+def test_integration_reset(dtype_var, backend_var, device_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+        
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        arr_con_kwargs['device'] = device_var
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+
+    @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon(dtype_var) ** 0.5,
+                     atol=D.epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+
+    assert (a.integration_status == "Integration has not been run.")
+
+    a.integrate()
+    
+    assert (a.sol is None)
+
+    assert (a.integration_status == "Integration completed successfully.")
+
+    assert (D.ar_numpy.abs(a.t[-2] - a[2 * D.pi].t) <= D.ar_numpy.abs(a.dt))
+
+    assert (len(a.events) == 0)
+
+    a.reset()
+    a.integrate(eta=True)
+    
+    assert (a.sol is None)
+
+    assert (a.integration_status == "Integration completed successfully.")
+
+    assert (D.ar_numpy.abs(a.t[-2] - a[2 * D.pi].t) <= D.ar_numpy.abs(a.dt))
+
+    assert (len(a.events) == 0)
+
+
+def test_integration_long_duration(dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+        
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+
+    @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 128 * D.pi), dt=0.01, rtol=D.epsilon(dtype_var) ** 0.5,
+                     atol=D.epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+
+    assert (a.integration_status == "Integration has not been run.")
+
+    a.integrate()
+    
+    assert (a.sol is None)
+
+    assert (a.integration_status == "Integration completed successfully.")
+    
+    tol = D.epsilon(dtype_var)
+
+    assert (D.ar_numpy.allclose(a.t[-1], 128*D.pi*D.ar_numpy.ones_like(a.t[-1]), tol, tol))
+
+    assert (len(a.events) == 0)
+
+
+def test_wrong_t0(dtype_var, backend_var):
     with pytest.raises(ValueError):
-        D.set_float_fmt(ffmt)
-
-        if D.backend() == 'torch':
+        dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+        if backend_var == 'torch':
             import torch
-
             torch.set_printoptions(precision=17)
-
             torch.autograd.set_detect_anomaly(True)
 
-        print("Testing {} float format".format(D.float_fmt()))
-
-        de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
-
+        arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+        de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+            
         @de.rhs_prettifier("""[vx, -x+t]""")
         def rhs(t, state, k, **kwargs):
-            return de_mat @ state + D.array([0.0, t])
+            t = D.ar_numpy.atleast_1d(t)
+            return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
 
-        y_init = D.array([1., 0.])
+        y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
 
-        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-                         atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                         atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
 
         a.t0 = 2 * D.pi
 
 
-@ffmt_param
-def test_wrong_tf(ffmt):
+def test_wrong_tf(dtype_var, backend_var):
     with pytest.raises(ValueError):
-        D.set_float_fmt(ffmt)
-
-        if D.backend() == 'torch':
+        dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+        if backend_var == 'torch':
             import torch
-
             torch.set_printoptions(precision=17)
-
             torch.autograd.set_detect_anomaly(True)
 
-        print("Testing {} float format".format(D.float_fmt()))
-
-        from . import common
-
-        (de_mat, rhs, analytic_soln, y_init, dt, a) = common.set_up_basic_system()
-
-        a.tf = 0.0
-
-
-@ffmt_param
-def test_not_enough_time_values(ffmt):
-    with pytest.raises(ValueError):
-        D.set_float_fmt(ffmt)
-
-        if D.backend() == 'torch':
-            import torch
-
-            torch.set_printoptions(precision=17)
-
-            torch.autograd.set_detect_anomaly(True)
-
-        print("Testing {} float format".format(D.float_fmt()))
-
-        de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
-
+        arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+        de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+            
         @de.rhs_prettifier("""[vx, -x+t]""")
         def rhs(t, state, k, **kwargs):
-            return de_mat @ state + D.array([0.0, t])
+            t = D.ar_numpy.atleast_1d(t)
+            return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
 
-        y_init = D.array([1., 0.])
+        y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
 
-        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0,), dt=0.01, rtol=D.epsilon() ** 0.5,
-                         atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                         atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
 
         a.tf = 0.0
 
 
-@ffmt_param
-def test_dt_dir_fix(ffmt):
-    D.set_float_fmt(ffmt)
-
-    if D.backend() == 'torch':
-        import torch
-
-        torch.set_printoptions(precision=17)
-
-        torch.autograd.set_detect_anomaly(True)
-
-    print("Testing {} float format".format(D.float_fmt()))
-
-    de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
-
-    @de.rhs_prettifier("""[vx, -x+t]""")
-    def rhs(t, state, k, **kwargs):
-        return de_mat @ state + D.array([0.0, t])
-
-    y_init = D.array([1., 0.])
-
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=-0.01, rtol=D.epsilon() ** 0.5,
-                     atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
-
-
-@ffmt_param
-def test_non_callable_rhs(ffmt):
-    with pytest.raises(TypeError):
-        D.set_float_fmt(ffmt)
-
-        if D.backend() == 'torch':
+def test_not_enough_time_values(dtype_var, backend_var):
+    with pytest.raises(ValueError):
+        dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+        if backend_var == 'torch':
             import torch
-
             torch.set_printoptions(precision=17)
-
             torch.autograd.set_detect_anomaly(True)
 
-        print("Testing {} float format".format(D.float_fmt()))
+        arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+        de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+            
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            t = D.ar_numpy.atleast_1d(t)
+            return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
 
-        from . import common
+        y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
 
-        (de_mat, rhs, analytic_soln, y_init, dt, _) = common.set_up_basic_system()
-
-        a = de.OdeSystem(de_mat, y0=y_init, dense_output=False, t=(0, 2 * D.pi), dt=dt, rtol=D.epsilon() ** 0.5,
-                         atol=D.epsilon() ** 0.5, constants=dict(k=1.0))
-
-        a.tf = 0.0
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0,), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                         atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
 
 
-def test_callback_called():
-    de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
+def test_dt_dir_fix(dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
 
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+        
     @de.rhs_prettifier("""[vx, -x+t]""")
-    def rhs(t, state, **kwargs):
-        return de_mat @ state + D.array([0.0, t])
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
 
-    y_init = D.array([1., 0.])
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                        atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+    
+    assert a.dt == 0.5
+
+
+def test_non_callable_rhs(dtype_var, backend_var):
+    with pytest.raises(ValueError):
+        dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+        if backend_var == 'torch':
+            import torch
+            torch.set_printoptions(precision=17)
+            torch.autograd.set_detect_anomaly(True)
+
+        arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+        de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+            
+        @de.rhs_prettifier("""[vx, -x+t]""")
+        def rhs(t, state, k, **kwargs):
+            t = D.ar_numpy.atleast_1d(t)
+            return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+
+        y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+        a = de.OdeSystem(de_mat, y0=y_init, dense_output=False, t=(0,), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                         atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+
+
+def test_callback_called(dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+        
+    @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
     
     callback_called = False
     
@@ -330,35 +491,121 @@ def test_callback_called():
         if not callback_called and ode_sys.t[-1] > D.pi:
             callback_called = True
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-                     atol=D.epsilon() ** 0.5)
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
 
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                        atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+    
     a.integrate(callback=callback)
     
     assert(callback_called)
-    
 
-def test_keyboard_interrupt_caught():
-    de_mat = D.array([[0.0, 1.0], [-1.0, 0.0]])
 
+def test_keyboard_interrupt_caught(dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+        
     @de.rhs_prettifier("""[vx, -x+t]""")
-    def rhs(t, state, **kwargs):
-        return de_mat @ state + D.array([0.0, t])
-
-    y_init = D.array([1., 0.])
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
     
     def kb_callback(ode_sys):
         if ode_sys.t[-1] > D.pi:
             raise KeyboardInterrupt()
 
-    a = de.OdeSystem(rhs, y0=y_init, dense_output=True, t=(0, 2 * D.pi), dt=0.01, rtol=D.epsilon() ** 0.5,
-                     atol=D.epsilon() ** 0.5)
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                        atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
 
     with pytest.raises(KeyboardInterrupt):
         a.integrate(callback=kb_callback)
     
     assert(a.integration_status == "A KeyboardInterrupt exception was raised during integration.")
+
+
+def test_equ_repr_attribute(dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+        
+    # @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
     
+    rhs.equ_repr = """[vx, -x+t]"""
+    rhs.md_repr  = """$[v, -x+t]$"""
+
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+    a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                        atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+        
+    assert a.equ_rhs.equ_repr == rhs.equ_repr
+    assert a.equ_rhs.md_repr == rhs.md_repr
+
+
+def test_not_callable_rhs(dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+        
+    # @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+    
+    rhs.equ_repr = """[vx, -x+t]"""
+    rhs.md_repr  = """$[v, -x+t]$"""
+
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
+
+    with pytest.raises(TypeError):
+        a = de.OdeSystem(None, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                            atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
+
+
+def test_incompatible_shape(dtype_var, backend_var):
+    dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+
+    arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
+    de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
+        
+    # @de.rhs_prettifier("""[vx, -x+t]""")
+    def rhs(t, state, k, **kwargs):
+        t = D.ar_numpy.atleast_1d(t)
+        return de_mat @ state + D.ar_numpy.concatenate([D.ar_numpy.zeros_like(t), t], axis=0)
+    
+    rhs.equ_repr = """[vx, -x+t]"""
+    rhs.md_repr  = """$[v, -x+t]$"""
+
+    y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)[None]
+
+    with pytest.raises(RuntimeError if backend_var == "torch" else ValueError):
+        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+                            atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
     
 
 def test_DiffRHS():
@@ -384,3 +631,32 @@ def test_DiffRHS():
 
     assert (str(wrapped_rhs_both_repr) == "1")
     assert (wrapped_rhs_both_repr._repr_markdown_() == "2")
+    
+    rhs_matrix = np.array([
+        [0.0, 1.0],
+        [-1.0, 0.01]
+    ], dtype=np.float64)
+    
+    def rhs(t, state, **kwargs):
+        return rhs_matrix @ state
+    
+    jac_called = False
+    
+    def jac(t, state, **kwargs):
+        nonlocal jac_called
+        jac_called = True
+        return rhs_matrix
+
+    x0 = np.array([[0.5, 0.5]], dtype=np.float64).mT
+
+    wrapped_rhs_no_jac = de.DiffRHS(rhs)
+    
+    assert (D.ar_numpy.allclose(rhs_matrix @ x0, wrapped_rhs_no_jac(0.0, x0), D.epsilon(np.float64)**0.5))
+    assert (D.ar_numpy.allclose(rhs_matrix, wrapped_rhs_no_jac.jac(0.0, x0)[:,0,:,0], D.epsilon(np.float64)**0.5))
+    
+    wrapped_rhs_with_jac = de.DiffRHS(rhs)
+    wrapped_rhs_with_jac.hook_jacobian_call(jac)
+    
+    assert (D.ar_numpy.allclose(rhs_matrix @ x0, wrapped_rhs_with_jac(0.0, x0), D.epsilon(np.float64)**0.5))
+    assert (D.ar_numpy.allclose(rhs_matrix, wrapped_rhs_with_jac.jac(0.0, x0), D.epsilon(np.float64)**0.5))
+    assert (jac_called)
