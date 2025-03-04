@@ -78,7 +78,7 @@
 	},
 	
 	// 6. Set `remoteUser` to `root` to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
-	"remoteUser": "vscode"
+	"remoteUser": "vscode",
 
 	// the following commands are related to container lifecylce. More info: https://containers.dev/implementors/json_reference/#lifecycle-scripts
 	
@@ -92,7 +92,7 @@
 	// "updateContentCommand": "",
 
 	// 10. Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "pip3 install --user -r requirements.txt",
+	"postCreateCommand": "sudo apt install ffmpeg",
 
 	// 11. Use 'postStartCommand' to run a command each time the container starts successfully.
 	// "postStartCommand": "",
