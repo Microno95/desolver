@@ -42,7 +42,10 @@ def compute_step(rhs: typing.Callable, initial_time, initial_state, timestep, in
     """
     
     for stage in range(intermediate_stages_in.shape[-1]):
-        intermediate_dstate = timestep * D.ar_numpy.sum(intermediate_stages_in * rk_tableau[stage, 1:], axis=-1)
+        stage_coeffs = rk_tableau[stage, 1:]
+        nonzero_coeffs_mask = stage_coeffs != 0.0
+        nonzero_coeffs_mask = D.ar_numpy.where(~D.ar_numpy.any(nonzero_coeffs_mask), D.ar_numpy.ones_like(nonzero_coeffs_mask), nonzero_coeffs_mask)
+        intermediate_dstate = timestep * D.ar_numpy.sum(intermediate_stages_in[...,nonzero_coeffs_mask] * stage_coeffs[nonzero_coeffs_mask], axis=-1)
         intermediate_rhs = rhs(
             initial_time + timestep * rk_tableau[stage, 0], 
             initial_state + intermediate_dstate,
