@@ -538,7 +538,6 @@ class OdeSystem(object):
         if rhs_shape != y0_shape:
             raise ValueError(f"Expected rhs to return a shape that is compatible with y0, got shapes Shape[y0]={y0_shape} and Shape[dy]={rhs_shape}")
 
-        self.__move_to_device()
         self.__allocate_soln_space(self.__alloc_space_steps(self.tf))
         self.__fix_dt_dir(self.tf, self.t0)
         self.__events = []
@@ -669,7 +668,6 @@ class OdeSystem(object):
     @dt.setter
     def dt(self, new_dt):
         self.__dt = D.ar_numpy.asarray(new_dt, **self.__array_con_kwargs)
-        self.__move_to_device()
         self.__fix_dt_dir(self.tf, self.t0)
         return self.__dt
 
@@ -698,7 +696,6 @@ class OdeSystem(object):
         if D.ar_numpy.abs(self.tf - new_t0) <= D.epsilon(self.__y[self.counter].dtype):
             raise ValueError("The start time of the integration cannot be greater than or equal to {}!".format(self.tf))
         self.__t0 = new_t0
-        self.__move_to_device()
         self.__fix_dt_dir(self.tf, self.t0)
 
     @property
@@ -726,7 +723,6 @@ class OdeSystem(object):
         if D.ar_numpy.abs(self.t0 - new_tf) <= D.epsilon(self.__y[self.counter].dtype):
             raise ValueError("The end time of the integration cannot be equal to the start time: {}!".format(self.t0))
         self.__tf = new_tf
-        self.__move_to_device()
         self.__fix_dt_dir(self.tf, self.t0)
 
     def __fix_dt_dir(self, t1, t0):
@@ -734,34 +730,6 @@ class OdeSystem(object):
             self.__dt = -self.__dt
         else:
             self.__dt = self.__dt
-
-    def __move_to_device(self):
-        if self.device is not None and self.__inferred_backend == 'torch':
-            self.__y[0] = self.__y[0].to(self.device)
-            self.__t[0] = self.__t[0].to(self.device)
-            self.__t0 = self.__t0.to(self.device)
-            self.__tf = self.__tf.to(self.device)
-            self.__dt = self.__dt.to(self.device)
-            self.__dt0 = self.__dt0.to(self.device)
-            try:
-                self.__atol = self.__atol.to(self.device)
-            except AttributeError:
-                pass
-            except:
-                raise
-            try:
-                self.__rtol = self.__rtol.to(self.device)
-            except AttributeError:
-                pass
-            except:
-                raise
-            try:
-                self.equ_rhs.rhs = self.equ_rhs.rhs.to(self.device)
-            except AttributeError:
-                pass
-            except:
-                raise
-        return
 
     def __alloc_space_steps(self, tf):
         """Returns the number of steps to allocate for a given final integration time
@@ -936,7 +904,6 @@ class OdeSystem(object):
         self.__sol = DenseOutput(None, None)
         self.dt = self.__dt0
         self.equ_rhs.nfev = 0
-        self.__move_to_device()
         self.__int_status = 0
         if self.__events:
             self.__events = []
