@@ -1026,7 +1026,7 @@ class OdeSystem(object):
         end_int = False
         self.__allocate_soln_space(total_steps)
         try:
-            while (implicit_integration or self.dt != 0 and D.ar_numpy.abs(tf - self.__t[self.counter]) >= D.tol_epsilon(self.__y[self.counter].dtype)) and not end_int:
+            while (implicit_integration or (self.dt != 0 and D.ar_numpy.abs(tf - self.__t[self.counter]) >= D.tol_epsilon(self.__y[self.counter].dtype))) and not end_int:
                 if not implicit_integration and D.ar_numpy.abs(self.dt + self.__t[self.counter]) > D.ar_numpy.abs(tf):
                     self.dt = (tf - self.__t[self.counter])
                 self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter],
@@ -1130,6 +1130,7 @@ class OdeSystem(object):
         return "\n".join([
             """{:>10}: {:<128}""".format("message", self.integration_status),
             """{:>10}: {:<128}""".format("nfev", str(self.nfev)),
+            """{:>10}: {:<128}""".format("njev", str(self.njev)),
             """{:>10}: {:<128}""".format("sol", str(self.sol)),
             """{:>10}: {:<128}""".format("t0", str(self.t0)),
             """{:>10}: {:<128}""".format("tf", str(self.tf)),
@@ -1147,6 +1148,7 @@ class OdeSystem(object):
 {:>10}: {:<128}  
 {:>10}: {:<128}  
 {:>10}: {:<128}  
+{:>10}: {:<128}  
 {:>10}: 
 ```  
 {}
@@ -1158,6 +1160,7 @@ class OdeSystem(object):
 """.format(
             "message", self.integration_status,
             "nfev", str(self.nfev),
+            "njev", str(self.njev),
             "sol", str(self.sol),
             "t0", str(self.t0),
             "tf", str(self.tf),

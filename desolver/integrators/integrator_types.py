@@ -5,6 +5,8 @@ from desolver import exception_types
 from desolver.integrators import utilities as integrator_utilities
 from desolver.integrators import components
 from desolver.utilities.optimizer import broyden_update_jac
+
+import warnings
 import abc
 
 __all__ = [
@@ -24,8 +26,6 @@ class TableauIntegrator(IntegratorTemplate, abc.ABC):
         self.numel = 1
         for i in self.dim:
             self.numel *= int(i)
-        self.rtol = rtol if rtol is not None else 32 * D.epsilon(dtype)
-        self.atol = atol if atol is not None else 32 * D.epsilon(dtype)
         self.dtype = dtype
         self.device = device
         self.array_constructor_kwargs = dict(dtype=self.dtype)
@@ -34,6 +34,8 @@ class TableauIntegrator(IntegratorTemplate, abc.ABC):
         if self.array_constructor_kwargs['like'] == 'torch':
             self.array_constructor_kwargs['device'] = self.device
         # ---- #
+        self.rtol = D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0]*rtol if rtol is not None else 32 * D.epsilon(dtype)
+        self.atol = D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0]*atol if atol is not None else 32 * D.epsilon(dtype)
         self.dState = D.ar_numpy.zeros(self.dim, **self.array_constructor_kwargs)
         self.dTime = D.ar_numpy.zeros(tuple(), **self.array_constructor_kwargs)
         self.tableau_intermediate = D.ar_numpy.asarray(self.__class__.tableau_intermediate, **self.array_constructor_kwargs)
@@ -141,12 +143,15 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
         self.solver_dict.update(dict(
             initial_state=self.stage_values[...,0],
             diff=D.ar_numpy.zeros(sys_dim, **self.array_constructor_kwargs),
-            timestep=1.0,
-            dState=self.stage_values[...,0]
+            timestep=D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0],
+            dState=self.stage_values[...,0],
+            num_step_retries=64
         ))
         if not self._explicit:
             solver_dict_preserved.update(dict(
-                tau0=2, tau1=2, niter0=0, niter1=0, newton_prec0=0.0, newton_prec1=0.0
+                tau0=D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0], tau1=D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0], niter0=0, niter1=0,
+                newton_prec0=D.ar_numpy.zeros((1,), **self.array_constructor_kwargs)[0], newton_prec1=D.ar_numpy.zeros((1,), **self.array_constructor_kwargs)[0],
+                newton_iterations=32
             ))
             self.solver_dict.update(solver_dict_preserved)
             self.adaptation_fn = integrator_utilities.implicit_aware_update_timestep
@@ -170,13 +175,14 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
         if self.is_implicit and self.__rhs_jac is None:
             self.__rhs_jac = rhs.jac(initial_time, initial_state, **constants)
         
+        current_timestep = timestep
         try:
             timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants,
-                                                            timestep)
-        except (D.numpy.linalg.LinAlgError, ValueError):
+                                                            current_timestep)
+        except (*D.linear_algebra_exceptions, ValueError):
             self._requires_high_precision = True
             timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants,
-                                                            timestep)
+                                                            current_timestep)
             self._requires_high_precision = False
 
         if self.is_adaptive or self.is_implicit:
@@ -193,15 +199,15 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
                 redo_step = True
                 timestep = timestep * 0.8
             if redo_step:
-                for _ in range(64):
+                for _ in range(self.solver_dict.get("num_step_retries", 64)):
                     self.solver_dict['redo_count'] += 1
                     try:
                         timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants,
-                                                                        timestep)
-                    except (D.numpy.linalg.LinAlgError, ValueError):
+                                                                             D.ar_numpy.minimum(timestep, current_timestep))
+                    except (*D.linear_algebra_exceptions, ValueError):
                         self._requires_high_precision = True
                         timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants,
-                                                                        timestep)
+                                                                             D.ar_numpy.minimum(timestep, current_timestep))
                     self.solver_dict['diff'] = timestep * self.get_error_estimate()
                     self.solver_dict['timestep'] = self.dTime
                     self.solver_dict['dState'] = self.dState
@@ -249,7 +255,10 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
             else:
                 jac_block = self.__rhs_jac.reshape(__step, __step)
             for jdx in range(0, self.__jac.shape[1], __step):
-                self.__jac[idx:idx + __step, jdx:jdx + __step] -= timestep * self.tableau_intermediate[idx // __step, 1 + jdx // __step] * jac_block
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in matmul")
+                    warnings.filterwarnings("ignore", category=RuntimeWarning, message="overflow encountered in subtract")
+                    self.__jac[idx:idx + __step, jdx:jdx + __step] -= timestep * self.tableau_intermediate[idx // __step, 1 + jdx // __step] * jac_block
         __jac = self.__jac
         if self.__jac.shape[0] == 1 and self.__jac.shape[1] == 1:
             __jac = D.ar_numpy.reshape(__jac, tuple())
@@ -277,9 +286,8 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
                 utilities.optimizer.nonlinear_roots(
                     self.algebraic_system, initial_guess,
                     jac=self.algebraic_system_jacobian, verbose=False,
-                    tol=desired_tol, maxiter=32,
+                    tol=desired_tol, maxiter=self.solver_dict.get("newton_iterations", 32),
                     additional_args=(rhs, initial_time, initial_state, timestep, constants))
-            
             self.solver_dict["newton_iteration_success"] = self.solver_dict["newton_iteration_success"] and prec < desired_tol
             if not self.solver_dict["newton_iteration_success"]:
                 self.__rhs_jac = None
@@ -300,7 +308,11 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
             self.final_rhs = rhs(initial_time + self.dTime, initial_state + self.dState, **constants)
         
         if self.is_implicit and self.__rhs_jac is not None:
-            self.__rhs_jac = broyden_update_jac(self.__rhs_jac.reshape(self.numel, self.numel), self.dState.reshape(self.numel, 1), (self.final_rhs - self.initial_rhs).reshape(self.numel, 1)).reshape(self.__rhs_jac.shape)
+            self.__rhs_jac = broyden_update_jac(
+                self.__rhs_jac.reshape(self.numel, self.numel),
+                self.dState.reshape(self.numel, 1),
+                (self.final_rhs - self.initial_rhs).reshape(self.numel, 1)
+            ).reshape(self.__rhs_jac.shape)
 
         return timestep, (self.dTime, self.dState)
 

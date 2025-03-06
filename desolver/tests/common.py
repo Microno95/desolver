@@ -66,7 +66,7 @@ def set_up_basic_system(dtype_var, backend_var, integrator=None, hook_jacobian=F
         integrator = a.method
     else:
         a.method = integrator
-    dt = D.tol_epsilon(dtype_var)**(0.75/(2+a.integrator.order))/(2*D.pi)
+    dt = D.tol_epsilon(dtype_var)**(1.0/(2+a.integrator.order))/(2*D.pi)
     a.dt = dt
 
     return de_mat, rhs, analytic_soln, y_init, dt, a
