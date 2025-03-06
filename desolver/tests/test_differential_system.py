@@ -147,20 +147,26 @@ def test_integration_and_representation_with_jac(dtype_var, backend_var, integra
 
     if a.integrator.order <= 4:
         pytest.skip(f"{a.integrator}'s order is too low")
+        
+    if D.ar_numpy.finfo(dtype_var).eps > 64:
+        tol = a.atol = a.rtol = 1e-12
+        test_tol = (tol*32)**0.5
+    else:
+        test_tol = D.tol_epsilon(dtype_var) ** 0.5
     
-    a.integrate()
+    a.integrate(eta=True)
 
     assert (a.integration_status == "Integration completed successfully.")
 
     print(str(a))
     print(repr(a))
     try:
-        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= D.tol_epsilon(dtype_var) ** 0.5)
-        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
-        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= test_tol)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= test_tol)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
 
         for i in a:
-            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= test_tol)
 
         assert (len(a.y) == len(a))
         assert (len(a.t) == len(a))
@@ -173,18 +179,23 @@ def test_integration_and_representation_with_jac(dtype_var, backend_var, integra
             assert (a.integration_status == "Integration has not been run.")
 
             a.equ_rhs.unhook_jacobian_call()
+            if D.ar_numpy.finfo(dtype_var).eps > 64:
+                tol = a.atol = a.rtol = 1e-12
+                test_tol = (tol*32)**0.5
+            else:
+                test_tol = D.tol_epsilon(dtype_var) ** 0.5
             a.integrate()
 
             assert (a.integration_status == "Integration completed successfully.")
 
             print(str(a))
             print(repr(a))
-            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= D.tol_epsilon(dtype_var) ** 0.5)
-            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
-            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= test_tol)
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= test_tol)
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
 
             for i in a:
-                assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= D.tol_epsilon(dtype_var) ** 0.5)
+                assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= test_tol)
 
             assert (len(a.y) == len(a))
             assert (len(a.t) == len(a))
@@ -660,3 +671,35 @@ def test_DiffRHS():
     assert (D.ar_numpy.allclose(rhs_matrix @ x0, wrapped_rhs_with_jac(0.0, x0), D.epsilon(np.float64)**0.5))
     assert (D.ar_numpy.allclose(rhs_matrix, wrapped_rhs_with_jac.jac(0.0, x0), D.epsilon(np.float64)**0.5))
     assert (jac_called)
+
+
+@pytest.mark.parametrize('integrator', [(de.integrators.RK45CKSolver, 'RK45'), (de.integrators.RadauIIA19, 'Radau'), (de.integrators.RK8713MSolver, 'LSODA')])
+def test_solve_ivp_parity(integrator):
+    from scipy.integrate import solve_ivp
+    
+    de_mat = np.array([[0.0, 1.0], [-1.0, 0.0]], dtype=np.float64)
+        
+    def fun(t, state):
+        t = np.atleast_1d(t)
+        return de_mat @ state + np.concatenate([np.zeros_like(t), t], axis=0) - 0.001*state**2
+    
+    t_span = [0.0, 10.0]
+    y0 = np.array([0.0, 1.0], dtype=np.float64)
+    atol = rtol = 1e-10
+    
+    desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, method=integrator[0])
+    scipy_res = solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, method=integrator[1])
+    
+    print(desolver_res)
+    print(scipy_res)
+    test_tol = 1e-6
+    
+    print(scipy_res.t[0] - desolver_res.t[0])
+    assert np.allclose(scipy_res.t[0], desolver_res.t[0], test_tol, test_tol)
+    print(scipy_res.t[-1] - desolver_res.t[-1])
+    assert np.allclose(scipy_res.t[-1], desolver_res.t[-1], test_tol, test_tol)
+    print(scipy_res.y[...,0] - desolver_res.y[...,0])
+    assert np.allclose(scipy_res.y[...,0], desolver_res.y[...,0], test_tol, test_tol)
+    print(scipy_res.y[...,-1] - desolver_res.y[...,-1])
+    assert np.allclose(scipy_res.y[...,-1], desolver_res.y[...,-1], test_tol, test_tol)
+    

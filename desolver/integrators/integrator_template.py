@@ -55,13 +55,12 @@ class IntegratorTemplate(abc.ABC):
         dState = self.solver_dict['dState']
         order = self.solver_dict['order']
         if "system_scaling" in self.solver_dict:
-            system_scaling = 0.8 * self.solver_dict["system_scaling"]
-            system_scaling = 0.2 * D.ar_numpy.maximum(D.ar_numpy.abs(initial_state), D.ar_numpy.abs(dState / timestep))
+            self.solver_dict["system_scaling"] = 0.8 * self.solver_dict["system_scaling"] +  0.2 * D.ar_numpy.maximum(D.ar_numpy.abs(initial_state), D.ar_numpy.abs(dState / timestep))
         else:
-            system_scaling = D.ar_numpy.maximum(D.ar_numpy.abs(initial_state), D.ar_numpy.abs(dState / timestep))
-        self.solver_dict["system_scaling"] = system_scaling
-        total_error_tolerance = (atol + rtol * system_scaling)
-        epsilon_current = D.ar_numpy.reciprocal(D.ar_numpy.linalg.norm(diff / total_error_tolerance))
+            self.solver_dict["system_scaling"] = D.ar_numpy.maximum(D.ar_numpy.abs(initial_state), D.ar_numpy.abs(dState / timestep))
+        total_error_tolerance = (atol + rtol * self.solver_dict["system_scaling"])
+        with D.numpy.errstate(divide='ignore'):
+            epsilon_current = D.ar_numpy.reciprocal(D.ar_numpy.linalg.norm(diff / total_error_tolerance))
         if "epsilon_last" in self.solver_dict:
             epsilon_last = self.solver_dict["epsilon_last"]
         else:

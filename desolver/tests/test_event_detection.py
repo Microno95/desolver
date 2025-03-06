@@ -2,7 +2,6 @@ import desolver as de
 import desolver.backend as D
 import numpy as np
 import pytest
-from copy import deepcopy
 from desolver.tests import common
 
 
