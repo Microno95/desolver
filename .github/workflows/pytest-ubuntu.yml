@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Test and Upload Coverage
+name: Python application
 
 on:
   push:
@@ -25,6 +25,8 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
         os: ["macos-latest", "ubuntu-latest", "windows-latest"]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
@@ -66,6 +68,8 @@ jobs:
     defaults:
       run:
         shell: bash -el {0}
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -102,5 +106,4 @@ jobs:
           name: desolver-combined-reports # optional
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true # optional (default = false)
-  
       
