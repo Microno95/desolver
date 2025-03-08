@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatch>=1.14.0", "hatchling>=1.27.0"]
+requires = ["hatch>=1.14.0", "hatchling>=1.27.0", "hatch-fancy-pypi-readme"]
 build-backend = "hatchling.build"
 
 [project]
@@ -20,7 +20,7 @@ maintainers = [
   {name = "Ekin Ozturk'", email = "ekin.ozturk@alumni.utoronto.ca"},
 ]
 description = "Differential Equation System Solver"
-readme = "README.rst"
+dynamic = ["readme"]
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
 keywords = ['ode solver', 'differential equation', 'differential system', 'ode system', 'non-linear ode']
@@ -43,6 +43,13 @@ classifiers = [
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12'
 ]
+
+[project.urls]
+Homepage = "https://github.com/Microno95/desolver.git"
+Documentation = "https://desolver.readthedocs.io/"
+Repository = "https://github.com/Microno95/desolver.git"
+Issues = "https://github.com/Microno95/desolver/issues"
+Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
 torch = [
@@ -82,7 +89,8 @@ extra-dependencies = [
   "torch>=2.5.0",
   "networkx",
   "tqdm",
-  "ipywidgets"
+  "ipywidgets",
+  "twine"
 ]
 
 [tool.hatch.envs.hatch-test]
@@ -111,13 +119,6 @@ matrix.test-mode.features = [
     "test",
   { value = "torch", if = ["torch"] },
 ]
-
-[project.urls]
-Homepage = "https://desolver.readthedocs.io/"
-Documentation = "https://desolver.readthedocs.io/"
-Repository = "https://github.com/Microno95/desolver"
-"Bug Tracker" = "https://github.com/Microno95/desolver/issues"
-Changelog = "https://github.com/Microno95/desolver/blob/master/CHANGELOG.md"
 
 [tool.hatch.build.targets.sdist]
 exclude = [
@@ -169,3 +170,18 @@ line_checksums = true
 
 [tool.coverage.html]
 directory = "coverage/htmlcov/"
+
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/x-rst"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path="README.rst"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path="AVAILABLE_METHODS.rst"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path="REFERENCES.rst"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path="CHANGELOG.rst"

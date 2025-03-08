@@ -1,5 +1,5 @@
 Changelog
-===============
+=========
 
 Version 5.0.0
 -------------
@@ -33,3 +33,4 @@ Version 2.5.0
 Version 2.2.0
 -------------
 * PyTorch backend is now implemented. It is now possible to numerically integrate a system of equations that use pytorch tensors and then compute gradients from these.
+

@@ -1,5 +1,5 @@
 Implemented Integration Methods
-==============================
+===============================
 
 Explicit Methods
 ----------------
@@ -51,3 +51,4 @@ Fixed Step Methods
 #. Gauss-Legendre 4
 #. Radau IA 5
 #. Radau IIA  6
+
