@@ -5,7 +5,7 @@ Installing desolver
 
 `desolver` is a pure python module that builds upon the functionalities provided by numpy for a relatively efficient numerical integration library.
 
-Furthermore, as `desolver` relies on `autoray <https://github.com/jcmgray/autoray>` for the backend of array/tensors operations, `desolver` can easily extend to the use of other libraries such as pytorch, tensorflow, etc. in order to leverage accelerators and optimised gradient computation schemes for faster numerical integration.
+Furthermore, as `desolver` relies on `autoray <https://github.com/jcmgray/autoray>`_ for the backend of array/tensors operations, `desolver` can easily extend to the use of other libraries such as pytorch, tensorflow, etc. in order to leverage accelerators and optimised gradient computation schemes for faster numerical integration.
 
 With the use of libraries equipped with automatic differentiation, it is possible to compute the gradients of the integrated system.
 
