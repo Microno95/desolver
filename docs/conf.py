@@ -34,9 +34,9 @@ release = '5.0.0'
 extensions = [
     "sphinx.ext.autosectionlabel",
     "nbsphinx",
+    'sphinx.ext.autodoc',
     "sphinx.ext.napoleon",
     'sphinx.ext.mathjax',
-    'sphinx.ext.githubpages',
     'IPython.sphinxext.ipython_console_highlighting',
 #     "sphinx.ext.intersphinx" 
 ]
@@ -64,8 +64,8 @@ if not on_rtd:  # only import and set the theme if we're building docs locally
     html_theme_path = [sphinx_theme.get_html_theme_path('stanford-theme')]
 else:
     html_theme_options = {
-        "page_width": "60%",
-        "sidebar_width": "12.5%",
+        "page_width": "980px",
+        "sidebar_width": "180px",
         "codecov_button": "true",
         "github_button": "true",
         "github_repo": "desolver",
