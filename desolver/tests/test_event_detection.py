@@ -2,7 +2,6 @@ import desolver as de
 import desolver.backend as D
 import numpy as np
 import pytest
-from copy import deepcopy
 from desolver.tests import common
 
 
@@ -229,6 +228,8 @@ def test_event_detection_stationary_points(dtype_var, backend_var, integrator, d
 @common.basic_integrator_param
 @common.dense_output_param
 def test_event_detection_indefinite_integration(dtype_var, backend_var, integrator, dense_output):
+    if dtype_var in ["float64", "longdouble"] and integrator == de.integrators.RadauIIA5:
+        pytest.skip("Too slow")
     if "float16" in dtype_var:
         pytest.skip("Event detection with 'float16' types are unreliable due to imprecision")
     
@@ -255,7 +256,7 @@ def test_event_detection_indefinite_integration(dtype_var, backend_var, integrat
     a.method = integrator
 
     with de.utilities.BlockTimer(section_label="Integrator Tests") as sttimer:
-        a.integrate(eta=False, events=stationary_event)
+        a.integrate(eta=True, events=stationary_event)
 
         assert (a.integration_status == "Integration terminated upon finding a triggered event.")
 

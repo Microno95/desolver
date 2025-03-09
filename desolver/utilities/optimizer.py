@@ -1,6 +1,9 @@
 import numpy
+import warnings
 import numpy as np
 import scipy.optimize
+import scipy.linalg
+import scipy.sparse.linalg
 try:
     import torch
     torch_available = True
@@ -413,7 +416,9 @@ def iterative_inverse_7th(A, Ainv0, maxiter=10):
 def broyden_update_jac(B, dx, df, Binv=None):
     y_ex = B @ dx
     y_is = df
-    kI = (y_is - y_ex) / D.ar_numpy.sum(y_ex.mT @ y_ex)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning, message="overflow encountered in matmul")
+        kI = (y_is - y_ex) / D.ar_numpy.sum(y_ex.mT @ y_ex)
     B_new = D.ar_numpy.reshape((1 + kI * B * dx) * B, (df.shape[0], dx.shape[0]))
     if Binv is not None:
         Binv_new = Binv + ((dx - Binv @ y_is) / (y_is.mT @ y_is)) @ y_is.mT
@@ -431,9 +436,11 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
         tol = D.tol_epsilon(x0.dtype)
     xshape = D.ar_numpy.shape(x0)
     if len(xshape) == 0:
-        f_vec = lambda x: D.ar_numpy.atleast_1d(f(x[0]))
+        def f_vec(x):
+            return D.ar_numpy.atleast_1d(f(x[0]))
         if jac is not None:
-            jac_vec = lambda x: D.ar_numpy.atleast_2d(jac(x[0]))
+            def jac_vec(x):
+                return D.ar_numpy.atleast_2d(jac(x[0]))
         else:
             jac_vec = None
         res = newtontrustregion(f_vec, D.ar_numpy.atleast_1d(x0), jac_vec, tol=tol, verbose=verbose, 
@@ -500,7 +507,6 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
         fun_jac = transform_to_bounded_jac(fun_jac, *var_bounds)
         x = transform_to_bounded_x(x, *var_bounds)
 
-    w_relax = 0.5
     F0 = fun(x)
     Jf0 = fun_jac(x)
     F1, Jf1 = D.ar_numpy.copy(F0), D.ar_numpy.copy(Jf0)
@@ -513,8 +519,10 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
     f64_type = D.autoray.to_backend_dtype('float64', like=inferred_backend)
     Jinv = D.ar_numpy.astype(D.ar_numpy.linalg.inv(D.ar_numpy.astype(Jf1, f64_type)), Jf1.dtype)
         
-    if D.ar_numpy.linalg.norm(Jinv @ Jf1 - I) < 0.5:
-        Jinv = iterative_inverse_7th(Jf1, Jinv, maxiter=3)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in matmul")
+        if D.ar_numpy.linalg.norm(Jinv @ Jf1 - I) < 0.5:
+            Jinv = iterative_inverse_7th(Jf1, Jinv, maxiter=3)
     trust_region = 5.0 if initial_trust_region is None else initial_trust_region
     iteration = 0
     fail_iter = 0
@@ -529,7 +537,11 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
         sparse = (1.0 - D.ar_numpy.sum(D.ar_numpy.abs(Jf1) > 0) / (xdim * fdim)) <= 0.7
         P = Jf1
         diagP = D.ar_numpy.diag(trust_region * D.ar_numpy.diag(P))
-        dx = D.ar_numpy.reshape(D.ar_numpy.solve_linear_system(Jinv @ (P + diagP), -Jinv @ F1, sparse=sparse), (xdim, 1))
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in matmul")
+            warnings.filterwarnings("ignore", category=scipy.linalg.LinAlgWarning)
+            warnings.filterwarnings("ignore", category=scipy.sparse.linalg.MatrixRankWarning)
+            dx = D.ar_numpy.reshape(D.ar_numpy.solve_linear_system(Jinv @ (P + diagP), -Jinv @ F1, sparse=sparse), (xdim, 1))
         no_progress = True
         F0 = F1
         Fn0 = Fn1
@@ -650,7 +662,11 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200, var_bounds=None):
             Fn0 = D.ar_numpy.linalg.norm(F0)
             print(f"[hybrj-{iteration}]: tr = {D.ar_numpy.to_numpy(trust_region)}, x = {D.ar_numpy.to_numpy(x)}, f = {D.ar_numpy.to_numpy(F1)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn0)}, ||dF|| = {D.ar_numpy.to_numpy(df)}")
         Jt_mul_F = J0.mT @ F0
-        dx_gn = -D.ar_numpy.solve_linear_system(J0.mT @ J0, Jt_mul_F)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in matmul")
+            warnings.filterwarnings("ignore", category=scipy.linalg.LinAlgWarning)
+            warnings.filterwarnings("ignore", category=scipy.sparse.linalg.MatrixRankWarning)
+            dx_gn = -D.ar_numpy.solve_linear_system(J0.mT @ J0, Jt_mul_F)
         dx_sd = -Jt_mul_F
         tparam = -dx_sd.mT @ Jt_mul_F / D.ar_numpy.linalg.norm(J0 @ dx_sd) ** 2
         xtol = tol * (xdim + D.ar_numpy.linalg.norm(x))
@@ -710,9 +726,11 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
         tol = D.tol_epsilon(x0.dtype)
     xshape = D.ar_numpy.shape(x0)
     if len(xshape) == 0:
-        f_vec = lambda x: D.ar_numpy.atleast_1d(f(x[0]))
+        def f_vec(x):
+            return D.ar_numpy.atleast_1d(f(x[0]))
         if jac is not None:
-            jac_vec = lambda x: D.ar_numpy.atleast_2d(jac(x[0]))
+            def jac_vec(x):
+                return D.ar_numpy.atleast_2d(jac(x[0]))
         else:
             jac_vec = None
         res = nonlinear_roots(f_vec, D.ar_numpy.atleast_1d(x0), jac_vec, tol=tol, verbose=verbose, maxiter=maxiter)
@@ -743,7 +761,8 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
         else:
             __fun_jac = utilities.JacobianWrapper(fun, atol=tol, rtol=tol, flat=True)
     else:
-        __fun_jac = lambda x: jac(x, *additional_args, **additional_kwargs)
+        def __fun_jac(x):
+            return jac(x, *additional_args, **additional_kwargs)
     
     jac_shape = D.ar_numpy.shape(__fun_jac(x0))
     jacdim = 1

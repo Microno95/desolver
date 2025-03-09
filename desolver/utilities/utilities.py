@@ -116,9 +116,11 @@ class JacobianWrapper(object):
     def richardson(self, y, *args, dy=0.5, factor=4.0, **kwargs):
         A = [[self.estimate(y, dy=dy * (factor ** -m), *args, **kwargs)] for m in range(self.richardson_iter)]
         denom = factor ** self.base_order
-        for m in range(1, self.richardson_iter):
-            for n in range(1, m):
-                A[m].append(A[m][n - 1] + (A[m][n - 1] - A[m - 1][n - 1]) / (denom ** n - 1))
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='overflow encountered', category=RuntimeWarning)
+            for m in range(1, self.richardson_iter):
+                for n in range(1, m):
+                    A[m].append(A[m][n - 1] + (A[m][n - 1] - A[m - 1][n - 1]) / (denom ** n - 1))
         return A[-1][-1]
 
     def adaptive_richardson(self, y, *args, dy=0.5, factor=4, **kwargs):
@@ -128,15 +130,17 @@ class JacobianWrapper(object):
         factor = 1.0 * factor
         denom = factor ** self.base_order
         prev_error = numpy.inf
-        for m in range(1, self.richardson_iter):
-            A.append([self.estimate(y, *args, dy=dy * (factor ** (-m)), **kwargs)])
-            for n in range(1, m + 1):
-                A[m].append(A[m][n - 1] + (A[m][n - 1] - A[m - 1][n - 1]) / (denom ** n - 1))
-            if m >= 3:
-                prev_error, t_conv = self.check_converged(A[m][m], A[m][m] - A[m - 1][m - 1], prev_error)
-                if t_conv:
-                    self.order = self.base_order + m
-                    break
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='overflow encountered', category=RuntimeWarning)
+            for m in range(1, self.richardson_iter):
+                A.append([self.estimate(y, *args, dy=dy * (factor ** (-m)), **kwargs)])
+                for n in range(1, m + 1):
+                    A[m].append(A[m][n - 1] + (A[m][n - 1] - A[m - 1][n - 1]) / (denom ** n - 1))
+                if m >= 3:
+                    prev_error, t_conv = self.check_converged(A[m][m], A[m][m] - A[m - 1][m - 1], prev_error)
+                    if t_conv:
+                        self.order = self.base_order + m
+                        break
         return A[-2][-1]
 
     def check_converged(self, initial_state, diff, prev_error):
