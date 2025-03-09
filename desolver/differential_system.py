@@ -981,7 +981,7 @@ class OdeSystem(object):
             behaviour of the system is highly unreliable. This could be due to numerical issues.
             
         """
-        if t:
+        if t is not None:
             tf = t
         else:
             tf = self.tf
@@ -1028,9 +1028,13 @@ class OdeSystem(object):
         try:
             while (implicit_integration or (self.dt != 0 and D.ar_numpy.abs(tf - self.__t[self.counter]) >= D.tol_epsilon(self.__y[self.counter].dtype))) and not end_int:
                 if not implicit_integration and D.ar_numpy.abs(self.dt + self.__t[self.counter]) > D.ar_numpy.abs(tf):
-                    self.dt = (tf - self.__t[self.counter])
-                self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter],
-                                                           self.constants, timestep=self.dt)
+                    is_final_step = True
+                    dt = (tf - self.__t[self.counter])
+                else:
+                    is_final_step = False
+                    dt = self.dt
+                new_dt, (dTime, dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter],
+                                                           self.constants, timestep=dt)
 
                 if self.counter + 1 >= len(self.__y):
                     total_steps = self.__alloc_space_steps(tf - dTime) + 1
@@ -1108,6 +1112,9 @@ class OdeSystem(object):
                     tqdm_progress_bar.desc = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.__t[self.counter], tf,
                                                                                      self.dt).ljust(8)
                     tqdm_progress_bar.update()
+                
+                if not is_final_step:
+                    self.dt = new_dt
 
         except KeyboardInterrupt as e:
             self.__int_status = e
@@ -1248,22 +1255,29 @@ def solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False,
     if "max_step" in options or "min_step" in options:
         max_step = options.get("max_step", np.inf)
         min_step = options.get("min_step", 0.0)
-        callbacks.append(lambda ode_sys: D.ar_numpy.clip(ode_sys, min=min_step, max=max_step))
+        def __step_cb(ode_sys):
+            ode_sys.dt = D.ar_numpy.clip(ode_sys.dt, min=min_step, max=max_step)
+        callbacks.insert(0, __step_cb)
     
     integration_options = dict(callback=callbacks, events=events, eta=options.get("show_prog_bar", False))
     if t_eval is None:
         ode_system.integrate(**integration_options)
+        t_res = ode_system.t
+        y_res = D.ar_numpy.transpose(ode_system.y, axes=[*range(1, len(ode_system.y.shape)), 0])
     else:
         t_eval = D.ar_numpy.sort(t_eval)
         if t_eval[0] < t_span[0] or t_eval[-1] > t_span[1]:
             raise ValueError(f"Expected `t_eval` to be in the range [{t_span[0]}, {t_span[1]}]")
+        t_res = []
+        y_res = []
         for t in t_eval:
             ode_system.integrate(t=t, **integration_options)
-        if t_span[1] > t_eval[-1]:
-            ode_system.integrate(t=t_span[1], **integration_options)
+            t_res.append(ode_system[-1].t)
+            y_res.append(ode_system[-1].y)
+        t_res = D.ar_numpy.stack(t_res, axis=0)
+        y_res = D.ar_numpy.stack(y_res, axis=-1)
     
-    yres = ode_system.y
-    return OdeResult(t=ode_system.t, y=D.ar_numpy.transpose(yres, axes=[*range(1, len(yres.shape)), 0]), sol=ode_system.sol, t_events=ode_system.events, 
+    return OdeResult(t=t_res, y=y_res, sol=ode_system.sol, t_events=ode_system.events, 
                      y_events=ode_system.events, nfev=ode_system.nfev, njev=ode_system.njev,
                      status=ode_system.integration_status, message=ode_system.integration_status,
                      success=ode_system.success, ode_system=ode_system)

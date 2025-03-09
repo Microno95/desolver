@@ -819,3 +819,38 @@ def test_solve_ivp_parity(integrator):
     print(scipy_res.y[...,-1] - desolver_res.y[...,-1])
     assert np.allclose(scipy_res.y[...,-1], desolver_res.y[...,-1], test_tol, test_tol)
     
+    t_eval = np.linspace(*t_span, 32)
+    
+    desolver_res = de.solve_ivp(fun, t_span=t_span, t_eval=t_eval, y0=y0, atol=atol, rtol=rtol, method=integrator[0])
+    scipy_res = solve_ivp(fun, t_span=t_span, t_eval=t_eval, y0=y0, atol=atol, rtol=rtol, method=integrator[1])
+    
+    print(desolver_res)
+    print(scipy_res)
+    test_tol = 1e-6
+    
+    print(scipy_res.t - desolver_res.t)
+    assert np.allclose(scipy_res.t, desolver_res.t, test_tol, test_tol)
+    print(scipy_res.y - desolver_res.y)
+    assert np.allclose(scipy_res.y, desolver_res.y, test_tol, test_tol)
+        
+    def fun(t, state, k, m):
+        de_mat = np.array([[0.0, 1.0], [-k/m, 0.0]], dtype=np.float64)
+        t = np.atleast_1d(t)
+        return de_mat @ state + np.concatenate([np.zeros_like(t), t], axis=0) - 0.001*state**2
+
+    desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, method=integrator[0], args=(4.0, 0.1))
+    scipy_res = solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, method=integrator[1], args=(4.0, 0.1))
+    
+    print(desolver_res)
+    print(scipy_res)
+    test_tol = 1e-6
+    
+    print(scipy_res.t[0] - desolver_res.t[0])
+    assert np.allclose(scipy_res.t[0], desolver_res.t[0], test_tol, test_tol)
+    print(scipy_res.t[-1] - desolver_res.t[-1])
+    assert np.allclose(scipy_res.t[-1], desolver_res.t[-1], test_tol, test_tol)
+    print(scipy_res.y[...,0] - desolver_res.y[...,0])
+    assert np.allclose(scipy_res.y[...,0], desolver_res.y[...,0], test_tol, test_tol)
+    print(scipy_res.y[...,-1] - desolver_res.y[...,-1])
+    assert np.allclose(scipy_res.y[...,-1], desolver_res.y[...,-1], test_tol, test_tol)
+    

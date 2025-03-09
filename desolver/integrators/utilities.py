@@ -38,7 +38,7 @@ def implicit_aware_update_timestep(integrator: TableauIntegrator):
             tau = tau3
         else:
             tau = D.ar_numpy.minimum(tau2, tau3)
-        tau = (1 + D.ar_numpy.arctan(tau - 1))
-        return D.ar_numpy.minimum(tau * timestep, timestep_from_error), redo_step
+        tau = (1 + 0.1*D.ar_numpy.arctan((tau - 1)/0.1))
+        return tau * timestep_from_error, redo_step
     else:
         return timestep_from_error, redo_step
