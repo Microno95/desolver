@@ -853,4 +853,17 @@ def test_solve_ivp_parity(integrator):
     assert np.allclose(scipy_res.y[...,0], desolver_res.y[...,0], test_tol, test_tol)
     print(scipy_res.y[...,-1] - desolver_res.y[...,-1])
     assert np.allclose(scipy_res.y[...,-1], desolver_res.y[...,-1], test_tol, test_tol)
+
+    desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, min_step=1e-2, method=integrator[0], args=(4.0, 0.1))
+    assert np.diff(desolver_res.t)[:-1].min() >= 1e-2 - 1e-8
+
+    desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, max_step=1e-2, method=integrator[0], args=(4.0, 0.1))
+    assert np.diff(desolver_res.t)[:-1].max() <= 1e-2 + 1e-8
     
+    with pytest.raises(ValueError):
+        t_eval = np.array([-1.0, 0.0, 10.0])
+        desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, t_eval=t_eval, method=integrator[0], args=(4.0, 0.1))
+    
+    with pytest.raises(ValueError):
+        t_eval = np.array([0.0, 10.0, 11.0])
+        desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, t_eval=t_eval, method=integrator[0], args=(4.0, 0.1))

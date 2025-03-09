@@ -1099,6 +1099,9 @@ class OdeSystem(object):
                             self.__sol.remove_interpolant(0)
 
                 steps += 1
+                
+                if not is_final_step:
+                    self.dt = new_dt
 
                 for i in callback:
                     i(self)
@@ -1112,9 +1115,6 @@ class OdeSystem(object):
                     tqdm_progress_bar.desc = "{:>10.2f} | {:.2f} | {:<10.2e}".format(self.__t[self.counter], tf,
                                                                                      self.dt).ljust(8)
                     tqdm_progress_bar.update()
-                
-                if not is_final_step:
-                    self.dt = new_dt
 
         except KeyboardInterrupt as e:
             self.__int_status = e
@@ -1247,17 +1247,22 @@ def solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False,
         fn_args_kwargs = inspect.getfullargspec(fn)
         constants = {key:value for key,value in zip(fn_args_kwargs[0][2:], args)}
         
-    ode_system = OdeSystem(equ_rhs=fun, y0=y0, t=t_span, dense_output=dense_output, dt=options.get('first_step', 1.0),
+    max_step = options.get("max_step", np.inf)
+    min_step = options.get("min_step", 0.0)
+    
+    initial_dt = options.get('first_step', 1.0)
+    initial_dt = D.ar_numpy.minimum(initial_dt, max_step)
+    initial_dt = D.ar_numpy.maximum(initial_dt, min_step)
+    
+    ode_system = OdeSystem(equ_rhs=fun, y0=y0, t=t_span, dense_output=dense_output, dt=initial_dt,
                            atol=options.get('atol', None), rtol=options.get('rtol', None), constants=constants)
     
     ode_system.method = method
     callbacks = list(options.get("callbacks", []))
     if "max_step" in options or "min_step" in options:
-        max_step = options.get("max_step", np.inf)
-        min_step = options.get("min_step", 0.0)
         def __step_cb(ode_sys):
             ode_sys.dt = D.ar_numpy.clip(ode_sys.dt, min=min_step, max=max_step)
-        callbacks.insert(0, __step_cb)
+        callbacks.append(__step_cb)
     
     integration_options = dict(callback=callbacks, events=events, eta=options.get("show_prog_bar", False))
     if t_eval is None:
