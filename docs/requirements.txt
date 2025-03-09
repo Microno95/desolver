@@ -4,7 +4,7 @@ tqdm>=4.47.0
 torch
 torchvision
 torchaudio
-stanford_theme
+sphinx_theme
 nbsphinx
 ipython
 pandoc>=1.0.2

@@ -24,7 +24,7 @@ copyright = '2021, Ekin Ozturk'
 author = 'Ekin Ozturk'
 
 # The full version, including alpha/beta/rc tags
-release = '4.4.1'
+release = '5.0.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -60,9 +60,9 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'setup.py', '**/*backend
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
 if not on_rtd:  # only import and set the theme if we're building docs locally
-    import stanford_theme
+    import sphinx_theme
     html_theme = 'stanford_theme'
-    html_theme_path = [stanford_theme.get_html_theme_path()]
+    html_theme_path = [sphinx_theme.get_html_theme_path('stanford-theme')]
 
 # otherwise, readthedocs.org uses their theme by default, so no need to specify it
 
