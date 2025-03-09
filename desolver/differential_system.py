@@ -8,6 +8,8 @@ from desolver import exception_types as etypes
 from desolver import utilities as deutil
 
 import numpy as np
+import inspect
+from scipy.integrate._ivp.ivp import OdeResult
 
 CubicHermiteInterp = deutil.interpolation.CubicHermiteInterp
 root_finder = deutil.optimizer.brentsrootvec
@@ -16,7 +18,8 @@ root_polisher = deutil.optimizer.newtontrustregion
 __all__ = [
     'DiffRHS',
     'rhs_prettifier',
-    'OdeSystem'
+    'OdeSystem',
+    'solve_ivp'
 ]
 
 StateTuple = collections.namedtuple('StateTuple', ['t', 'y', 'event'])
@@ -539,7 +542,7 @@ class OdeSystem(object):
         self.__allocate_soln_space(self.__alloc_space_steps(self.tf))
         self.__fix_dt_dir(self.tf, self.t0)
         self.__events = []
-        self.initialise_integrator(preserve_states=False)
+        self.initialise_integrator(preserve_states=False)    
 
     @property
     def sol(self):
@@ -1023,7 +1026,7 @@ class OdeSystem(object):
         end_int = False
         self.__allocate_soln_space(total_steps)
         try:
-            while (implicit_integration or self.dt != 0 and D.ar_numpy.abs(tf - self.__t[self.counter]) >= D.tol_epsilon(self.__y[self.counter].dtype)) and not end_int:
+            while (implicit_integration or (self.dt != 0 and D.ar_numpy.abs(tf - self.__t[self.counter]) >= D.tol_epsilon(self.__y[self.counter].dtype))) and not end_int:
                 if not implicit_integration and D.ar_numpy.abs(self.dt + self.__t[self.counter]) > D.ar_numpy.abs(tf):
                     self.dt = (tf - self.__t[self.counter])
                 self.dt, (dTime, dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter],
@@ -1127,6 +1130,7 @@ class OdeSystem(object):
         return "\n".join([
             """{:>10}: {:<128}""".format("message", self.integration_status),
             """{:>10}: {:<128}""".format("nfev", str(self.nfev)),
+            """{:>10}: {:<128}""".format("njev", str(self.njev)),
             """{:>10}: {:<128}""".format("sol", str(self.sol)),
             """{:>10}: {:<128}""".format("t0", str(self.t0)),
             """{:>10}: {:<128}""".format("tf", str(self.tf)),
@@ -1144,6 +1148,7 @@ class OdeSystem(object):
 {:>10}: {:<128}  
 {:>10}: {:<128}  
 {:>10}: {:<128}  
+{:>10}: {:<128}  
 {:>10}: 
 ```  
 {}
@@ -1155,6 +1160,7 @@ class OdeSystem(object):
 """.format(
             "message", self.integration_status,
             "nfev", str(self.nfev),
+            "njev", str(self.njev),
             "sol", str(self.sol),
             "t0", str(self.t0),
             "tf", str(self.tf),
@@ -1217,3 +1223,48 @@ class OdeSystem(object):
 
     def __len__(self):
         return self.counter + 1
+
+
+def solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False,
+              events=None, vectorized=False, args=None, **options):
+    """
+    Drop-in replacement for `scipy.integrate.solve_ivp`, provides a functional
+    interface to the `desolver` integration routines.
+    """
+    
+    constants = None
+    if args is not None:
+        fn = fun
+        while isinstance(fn, DiffRHS):
+            fn = fn.rhs
+        fn_args_kwargs = inspect.getfullargspec(fn)
+        constants = {key:value for key,value in zip(fn_args_kwargs[0][2:], args)}
+        
+    ode_system = OdeSystem(equ_rhs=fun, y0=y0, t=t_span, dense_output=dense_output, dt=options.get('first_step', 1.0),
+                           atol=options.get('atol', None), rtol=options.get('rtol', None), constants=constants)
+    
+    ode_system.method = method
+    callbacks = list(options.get("callbacks", []))
+    if "max_step" in options or "min_step" in options:
+        max_step = options.get("max_step", np.inf)
+        min_step = options.get("min_step", 0.0)
+        callbacks.append(lambda ode_sys: D.ar_numpy.clip(ode_sys, min=min_step, max=max_step))
+    
+    integration_options = dict(callback=callbacks, events=events, eta=options.get("show_prog_bar", False))
+    if t_eval is None:
+        ode_system.integrate(**integration_options)
+    else:
+        t_eval = D.ar_numpy.sort(t_eval)
+        if t_eval[0] < t_span[0] or t_eval[-1] > t_span[1]:
+            raise ValueError(f"Expected `t_eval` to be in the range [{t_span[0]}, {t_span[1]}]")
+        for t in t_eval:
+            ode_system.integrate(t=t, **integration_options)
+        if t_span[1] > t_eval[-1]:
+            ode_system.integrate(t=t_span[1], **integration_options)
+    
+    yres = ode_system.y
+    return OdeResult(t=ode_system.t, y=D.ar_numpy.transpose(yres, axes=[*range(1, len(yres.shape)), 0]), sol=ode_system.sol, t_events=ode_system.events, 
+                     y_events=ode_system.events, nfev=ode_system.nfev, njev=ode_system.njev,
+                     status=ode_system.integration_status, message=ode_system.integration_status,
+                     success=ode_system.success, ode_system=ode_system)
+    

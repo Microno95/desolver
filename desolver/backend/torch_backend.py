@@ -3,6 +3,7 @@ from desolver.backend.common import *
 import torch
 import autoray
 
+linear_algebra_exceptions.append(torch._C._LinAlgError)
 
 def __solve_linear_system(A, b, sparse=False):
     __A = A
