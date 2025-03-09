@@ -10,7 +10,6 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-import stanford_theme
 import os
 import sys
 sys.path.insert(0, os.path.abspath('..'))
@@ -20,7 +19,7 @@ master_doc = 'index'
 # -- Project information -----------------------------------------------------
 
 project = 'desolver'
-copyright = '2021, Ekin Ozturk'
+copyright = '2025, Ekin Ozturk'
 author = 'Ekin Ozturk'
 
 # The full version, including alpha/beta/rc tags
