@@ -1,11 +1,9 @@
-scipy>=1.4.1
-numpy>=1.18.0
-coverage
-pytest>=5.4.3
-pytest-cov>=2.10.0
-pytest-xdist>=1.32.0
+numpy>=2
 tqdm>=4.47.0
-stanford_theme
+scipy>=1.4.1
+autoray>=0.7.0
+einops>=0.8.0
+sphinx_theme
 nbsphinx
 ipython
 pandoc>=1.0.2
