@@ -65,8 +65,12 @@ if not on_rtd:  # only import and set the theme if we're building docs locally
     html_theme_path = [sphinx_theme.get_html_theme_path('stanford-theme')]
 else:
     html_theme_options = {
-        "page_width": "75%",
-        "sidebar_width": "5%"
+        "page_width": "60%",
+        "sidebar_width": "12.5%",
+        "codecov_button": "true",
+        "github_button": "true",
+        "github_repo": "desolver",
+        "github_user": "microno95"
     }
 
 # otherwise, readthedocs.org uses their theme by default, so no need to specify it
