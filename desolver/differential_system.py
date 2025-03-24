@@ -517,7 +517,7 @@ class OdeSystem(object):
         self.__rtol = rtol
         self.__atol = atol
         self.__consts = constants if constants is not None else dict()
-        self.__y = D.ar_numpy.copy(y0)[None]
+        self.__y = D.ar_numpy.clone(y0)[None]
         self.__t = D.ar_numpy.asarray(t[0], **self.__array_con_kwargs)[None]
         self.dim = D.ar_numpy.shape(self.__y[0])
         self.counter = 0

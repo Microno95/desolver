@@ -3,7 +3,6 @@ from desolver import backend as D
 from desolver.integrators.integrator_types import TableauIntegrator
 
 def implicit_aware_update_timestep(integrator: TableauIntegrator):
-    timestep = integrator.solver_dict['timestep']
     timestep_from_error, redo_step = integrator.update_timestep(ignore_custom_adaptation=True)
     if "niter0" in integrator.solver_dict.keys():
         # Adjust the timestep according to the computational cost of 
