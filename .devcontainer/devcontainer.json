@@ -1,7 +1,7 @@
 {
 	// For quick reference: https://containers.dev/implementors/json_reference/
-	"name": "Miniforge3",
-	"image": "condaforge/miniforge3:24.3.0-0",
+	"name": "Python 3",
+	"image": "mcr.microsoft.com/devcontainers/python:3.12-bullseye",
 	//"build": {
 	//	"context": "..",
 	//	"dockerfile": "Dockerfile"
@@ -22,7 +22,7 @@
 
 	// 4. Features to add to the Dev Container. More info: https://containers.dev/implementors/features.
 	"features": {
-		// ZSH without OMZ
+		// ZSH with OMZ
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"installZsh": true,
 			"configureZshAsDefaultShell": true,
@@ -41,7 +41,7 @@
 		"ghcr.io/schlich/devcontainer-features/powerlevel10k:1": {},
 		"ghcr.io/nils-geistmann/devcontainers-features/zsh:0": {
 			"setLocale": true,
-			"theme": "robbyrussell",
+			"theme": "agnoster",
 			"plugins": "git docker",
 			"desiredLocale": "en_US.UTF-8 UTF-8"
 		},
@@ -49,7 +49,8 @@
 			"plugins": "ssh-agent npm",
 			"omzPlugins": "https://github.com/zsh-users/zsh-autosuggestions",
 			"username": "vscode"
-		}
+		},
+		"ghcr.io/devcontainers-extra/features/hatch:2": {}
 	},
 
 	// 5. Configure tool-specific properties.
@@ -78,7 +79,7 @@
 	},
 	
 	// 6. Set `remoteUser` to `root` to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
-	"remoteUser": "vscode"
+	"remoteUser": "vscode",
 
 	// the following commands are related to container lifecylce. More info: https://containers.dev/implementors/json_reference/#lifecycle-scripts
 	
@@ -92,7 +93,7 @@
 	// "updateContentCommand": "",
 
 	// 10. Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "pip3 install --user -r requirements.txt",
+	"postCreateCommand": "sudo apt -qq update && sudo apt install -qq ffmpeg -y"
 
 	// 11. Use 'postStartCommand' to run a command each time the container starts successfully.
 	// "postStartCommand": "",
