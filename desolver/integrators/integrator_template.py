@@ -47,21 +47,24 @@ class IntegratorTemplate(abc.ABC):
         with D.ar_numpy.no_grad(like=self.solver_dict['initial_state']):
             if self.adaptation_fn and not ignore_custom_adaptation:
                 return self.adaptation_fn(self)
-            initial_state = self.solver_dict['initial_state']
-            diff = self.solver_dict['diff']
             timestep = self.solver_dict['timestep']
             safety_factor = self.solver_dict['safety_factor']
             atol = self.solver_dict['atol']
             rtol = self.solver_dict['rtol']
-            dState = self.solver_dict['dState']
+            filter_mask = D.ar_numpy.isfinite(atol) & D.ar_numpy.isfinite(rtol)
+            initial_state = self.solver_dict['initial_state'][filter_mask]
+            dState = self.solver_dict['dState'][filter_mask]
+            diff = self.solver_dict['diff'][filter_mask]
+            atol = atol[filter_mask]
+            rtol = rtol[filter_mask]
             order = self.solver_dict['order']
             if "system_scaling" in self.solver_dict:
-                self.solver_dict["system_scaling"] = 0.8 * self.solver_dict["system_scaling"] +  0.2 * D.ar_numpy.maximum(D.ar_numpy.abs(initial_state), D.ar_numpy.abs(dState / timestep))
+                self.solver_dict["system_scaling"] = 0.8 * self.solver_dict["system_scaling"] + 0.2 * D.ar_numpy.maximum(D.ar_numpy.abs(initial_state), D.ar_numpy.abs(dState / timestep))
             else:
                 self.solver_dict["system_scaling"] = D.ar_numpy.maximum(D.ar_numpy.abs(initial_state), D.ar_numpy.abs(dState / timestep))
             total_error_tolerance = (atol + rtol * self.solver_dict["system_scaling"])
             with D.numpy.errstate(divide='ignore'):
-                epsilon_current = D.ar_numpy.reciprocal(D.ar_numpy.linalg.norm(diff / total_error_tolerance))
+                epsilon_current = D.ar_numpy.reciprocal(D.ar_numpy.sqrt(D.ar_numpy.sum((diff / total_error_tolerance)**2)))
             if "epsilon_last" in self.solver_dict:
                 epsilon_last = self.solver_dict["epsilon_last"]
             else:

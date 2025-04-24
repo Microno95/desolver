@@ -22,7 +22,7 @@ def implicit_aware_update_timestep(integrator: TableauIntegrator):
         # ---- #
         # Adjust the timestep according to the precision achieved by the 
         # nonlinear system solver at each timestep
-        total_error_tolerance = integrator.solver_dict['atol'] + integrator.solver_dict['rtol']
+        total_error_tolerance = D.ar_numpy.sqrt(D.ar_numpy.mean((integrator.solver_dict['atol'] + integrator.solver_dict['rtol'])**2))
         tau3 = D.ar_numpy.ones_like(integrator.solver_dict['timestep'])
         if integrator.solver_dict['newton_prec1'] > 0.0:
             with D.numpy.errstate(divide='ignore'):

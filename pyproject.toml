@@ -90,7 +90,8 @@ extra-dependencies = [
   "networkx",
   "tqdm",
   "ipywidgets",
-  "twine"
+  "twine",
+  "jax[cuda12]"
 ]
 
 [tool.hatch.envs.hatch-test]

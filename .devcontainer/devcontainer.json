@@ -41,7 +41,7 @@
 		"ghcr.io/schlich/devcontainer-features/powerlevel10k:1": {},
 		"ghcr.io/nils-geistmann/devcontainers-features/zsh:0": {
 			"setLocale": true,
-			"theme": "agnoster",
+			"theme": "robbyrussell",
 			"plugins": "git docker",
 			"desiredLocale": "en_US.UTF-8 UTF-8"
 		},
