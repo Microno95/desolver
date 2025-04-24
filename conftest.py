@@ -46,6 +46,11 @@ def integrators(request):
     return request.param
 
 
+@pytest.fixture(scope='function', params=[None] if "torch" in available_backends() else [])
+def pytorch_only(request):
+    return request.param
+
+
 def pytest_generate_tests(metafunc: pytest.Metafunc):
     autodiff_needed = "requires_autodiff" in metafunc.fixturenames
     
@@ -82,4 +87,5 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
             raise TypeError("Test configuration requests autodiff, but no dynamic backend specified!")
         argnames.append("requires_autodiff")
         argvalues = [(*aval, True) for aval in argvalues if len(aval) > 1 and aval[1] not in ["numpy"]]
+    
     metafunc.parametrize(argnames, argvalues)

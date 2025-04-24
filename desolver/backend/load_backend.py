@@ -1,11 +1,14 @@
 import sys
 import einops
 
+__AVAILABLE_BACKENDS__ = ["numpy"]
+
 from desolver.backend.common import *
 from desolver.backend.autoray_backend import *
 from desolver.backend.numpy_backend import *
 try:
     from desolver.backend.torch_backend import *
+    __AVAILABLE_BACKENDS__.append("torch")
 except ImportError:
     pass
 
@@ -65,3 +68,7 @@ def contract_first_ndims(a, b, n=1):
     estr3 = "..."
     einsum_str = einsum_str.format(estr1, estr2, estr3)
     return einops.einsum(a, b, einsum_str)
+
+
+def is_backend_available(backend_name):
+    return backend_name.lower().strip() in __AVAILABLE_BACKENDS__
