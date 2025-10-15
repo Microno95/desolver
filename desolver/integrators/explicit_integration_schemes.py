@@ -11,6 +11,7 @@ __all__ = [
     'RK4Solver',
     'MidpointSolver',
     'HeunsSolver',
+    'RalstonsSolver',
     'EulerSolver',
     'EulerTrapSolver',
     'HeunEulerSolver',
