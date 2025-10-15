@@ -11,6 +11,7 @@ __all__ = [
     'RK4Solver',
     'MidpointSolver',
     'HeunsSolver',
+    'RalstonsSolver',
     'EulerSolver',
     'EulerTrapSolver',
     'HeunEulerSolver',
@@ -242,6 +243,24 @@ class MidpointSolver(RungeKuttaIntegrator):
         [[0,    0,   1]], dtype=numpy.float64
     )
 
+class RalstonsSolver(RungeKuttaIntegrator):
+    """
+    The derived class that implements Heun's method.
+    """
+    
+    __order__ = 2.0
+
+    __alt_names__ = ("Explicit Ralston's", "Ralston's")
+
+    tableau_intermediate = numpy.array(
+        [[0,    0,   0  ],
+         [2/3,  2/3, 0  ]], dtype=numpy.float64
+    )
+
+    tableau_final = numpy.array(
+        [[0,    1/4, 3/4]], dtype=numpy.float64
+    )
+
 class HeunsSolver(RungeKuttaIntegrator):
     """
     The derived class that implements Heun's method.
@@ -252,12 +271,12 @@ class HeunsSolver(RungeKuttaIntegrator):
     __alt_names__ = ("Explicit Heun's", "Heun's")
 
     tableau_intermediate = numpy.array(
-        [[0,    0,   0  ],
-         [2/3,  2/3, 0  ]], dtype=numpy.float64
+        [[0, 0, 0],
+         [1, 1, 0]], dtype=numpy.float64
     )
 
     tableau_final = numpy.array(
-        [[0,    1/4, 3/4]], dtype=numpy.float64
+        [[0, 1/2, 1/2]], dtype=numpy.float64
     )
 
 class EulerSolver(RungeKuttaIntegrator):

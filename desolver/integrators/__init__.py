@@ -18,6 +18,7 @@ __explicit_integration_methods__ = [
     RK4Solver,
     MidpointSolver,
     HeunsSolver,
+    RalstonsSolver,
     EulerSolver,
     EulerTrapSolver,
     HeunEulerSolver,
