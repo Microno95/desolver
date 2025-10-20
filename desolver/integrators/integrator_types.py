@@ -137,7 +137,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
         self._implicit_stages = [col for col in range(self.stages) if D.ar_numpy.any(self.tableau_intermediate[col, col + 1:] != 0.0)]
         self._requires_high_precision = False
 
-        solver_dict_preserved = dict(safety_factor=0.8, order=self.order, atol=self.atol, rtol=self.rtol, redo_count=0)
+        solver_dict_preserved = dict(safety_factor=0.8, order=self.order, atol=self.atol*D.ar_numpy.ones(sys_dim, **self.array_constructor_kwargs), rtol=self.rtol*D.ar_numpy.ones(sys_dim, **self.array_constructor_kwargs), redo_count=0)
         self.solver_dict = dict()
         self.solver_dict.update(solver_dict_preserved)
         self.solver_dict.update(dict(
@@ -157,7 +157,9 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
             self.adaptation_fn = integrator_utilities.implicit_aware_update_timestep
             self.__jac_eye = None
             self.__rhs_jac = None
-        self.solver_dict_keep_keys = set(solver_dict_preserved.keys())
+        self.solver_dict_keep_keys = set(solver_dict_preserved.keys()) | {"num_step_retries"}
+        self.solver_dict['atol'] = self.solver_dict['atol']*D.ar_numpy.ones_like(self.dState)
+        self.solver_dict['rtol'] = self.solver_dict['rtol']*D.ar_numpy.ones_like(self.dState)
 
     def __call__(self, rhs, initial_time, initial_state, constants, timestep):
         self.solver_dict = {k:v for k,v in self.solver_dict.items() if k in self.solver_dict_keep_keys}
@@ -191,8 +193,6 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
             self.solver_dict['initial_state'] = initial_state
             self.solver_dict['initial_time'] = initial_time
             self.solver_dict['timestep'] = self.dTime
-            self.solver_dict['atol'] = self.atol
-            self.solver_dict['rtol'] = self.rtol
             self.solver_dict['dState'] = self.dState
             timestep, redo_step = self.update_timestep()
             if self.is_implicit and not self.solver_dict.get("newton_iteration_success"):
@@ -201,13 +201,12 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
             if redo_step:
                 for _ in range(self.solver_dict.get("num_step_retries", 64)):
                     self.solver_dict['redo_count'] += 1
+                    trial_timestep = D.ar_numpy.copysign(D.ar_numpy.minimum(D.ar_numpy.abs(timestep), D.ar_numpy.abs(current_timestep)), current_timestep)
                     try:
-                        timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants,
-                                                                             D.ar_numpy.minimum(timestep, current_timestep))
+                        timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants, trial_timestep)
                     except (*D.linear_algebra_exceptions, ValueError):
                         self._requires_high_precision = True
-                        timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants,
-                                                                             D.ar_numpy.minimum(timestep, current_timestep))
+                        timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants, trial_timestep)
                     self.solver_dict['diff'] = timestep * self.get_error_estimate()
                     self.solver_dict['timestep'] = self.dTime
                     self.solver_dict['dState'] = self.dState
@@ -219,7 +218,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
                         break
                 if redo_step:
                     raise exception_types.FailedToMeetTolerances(
-                        "Failed to integrate system from {} to {} ".format(self.dTime, self.dTime + timestep) +
+                        "Failed to integrate system from {} to {} ".format(initial_time, initial_time + self.dTime) +
                         "to the tolerances required: rtol={}, atol={}".format(self.rtol, self.atol)
                     )
         
@@ -242,7 +241,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
         if self._requires_high_precision:
             __aux_states = D.ar_numpy.reshape(next_state, self.stage_values.shape)
         __step = self.numel
-        if self.__jac_eye is None:
+        if not hasattr(self, "__jac_eye") or self.__jac_eye is None:
             self.__jac_eye = D.ar_numpy.eye(self.tableau_intermediate.shape[0] * __step, **self.array_constructor_kwargs)
             self.__jac = D.ar_numpy.copy(self.__jac_eye)
         D.ar_numpy.copyto(self.__jac, self.__jac_eye)
@@ -279,9 +278,9 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
 
         if self.is_implicit:
             initial_guess = self.stage_values
-            if self.__rhs_jac is None:
+            if not hasattr(self, "__rhs_jac") or self.__rhs_jac is None:
                 self.__rhs_jac = rhs.jac(initial_time, initial_state, **constants)
-            desired_tol = D.ar_numpy.max(D.ar_numpy.abs(self.atol + D.ar_numpy.max(D.ar_numpy.abs(self.rtol * initial_state)))) * 0.5
+            desired_tol = D.ar_numpy.min(D.ar_numpy.abs(self.atol + D.ar_numpy.max(D.ar_numpy.abs(self.rtol * initial_state)))) * 0.5
             aux_root, (self.solver_dict["newton_iteration_success"], num_iter, _, _, prec) = \
                 utilities.optimizer.nonlinear_roots(
                     self.algebraic_system, initial_guess,
@@ -488,6 +487,8 @@ def generate_richardson_integrator(basis_integrator, richardson_iter=2):
             self.__interpolants = None
             self.__interpolant_times = None
             self.solver_dict = dict(safety_factor=0.5 if self.basis_integrators[0].is_implicit else 0.9, atol=self.atol, rtol=self.rtol, order=self.basis_integrators[0].order + richardson_iter // 2)
+            self.solver_dict['atol'] = self.solver_dict['atol']*D.ar_numpy.ones_like(self.dState)
+            self.solver_dict['rtol'] = self.solver_dict['rtol']*D.ar_numpy.ones_like(self.dState)
 
         def dense_output(self):
             return self.__interpolant_times, self.__interpolants
