@@ -319,98 +319,42 @@ def brentsrootvec(f, bounds, tol=None, verbose=False, return_interval=False, acc
     else:
         return b, true_conv
 
-
-# def preconditioner(A, tol=None):
-#     if tol is None:
-#         if D.epsilon() <= 1e-5:
-#             tol = 32*D.epsilon()
-#         else:
-#             tol = D.epsilon()
-#     if tol < 32*D.epsilon() and D.epsilon() <= 1e-5:
-#         tol = 32*D.epsilon()
-#     I    = D.eye(A.shape[0])
-#     if D.backend() == 'torch':
-#         I = I.to(A)
-#     Pinv = D.ar_numpy.zeros_like(A)
-#     A2   = A*A
-#     nA   = 0.5 * (D.ar_numpy.sum(A2, axis=0)**0.5 + D.ar_numpy.sum(A2, axis=1)**0.5)
-#     nA   = (nA > 32*D.epsilon())*nA + (nA <= 32*D.epsilon())
-#     Pinv = D.ar_numpy.diag(nA)
-
-#     Ik = Pinv@A
-#     for _ in range(3):
-#         AP = A@Pinv
-#         Wn = -147*I + AP@(53*I + AP@(-11*I + AP))
-#         In0 = 0.75*Pinv + 0.25*0.25*Pinv@(32*I + AP@(-113*I + AP@(231*I + AP@(-301*I + AP@(259*I + AP@Wn)))))
-#         In1 = 2*Pinv - Ik@Pinv
-#         if D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(I - In0@A)) < D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(I - In1@A)):
-#             In = In0
-#         else:
-#             In = In1
-#         if D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(I - In@A)) >= D.ar_numpy.linalg.norm(D.ar_numpy.to_numpy(I - Ik)):
-#             break
-#         else:
-#             Pinv = In
-#         nPinv = D.ar_numpy.linalg.norm(Pinv@A)
-#         Pinv  = Pinv / nPinv
-#         Ik    = Pinv@A
-#         if D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(Ik))) - 1 <= tol:
-#             break
-#     return Pinv
-
-# def estimate_cond(A):
-#     out = D.ar_numpy.abs(A)
-#     out = out[out > 0]
-#     out = D.ar_numpy.sqrt(D.ar_numpy.max(out) / D.ar_numpy.min(out))
-#     if out <= 32*D.epsilon():
-#         out = D.ar_numpy.ones_like(out)
-#     return out
-
-def iterative_inverse_7th(A, Ainv0, maxiter=10):
-    I = D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(A)))
+def iterative_right_inverse_8th(A, Ainv0, maxiter=10):
+    """
+    From http://dx.doi.org/10.1016/j.amc.2017.08.010, Eq. 7.1
+    """
+    I = D.ar_numpy.diag(D.ar_numpy.ones_like(A[...,:,0]))
     Vn = Ainv0
-    initial_norm = D.ar_numpy.linalg.norm(Vn @ A - I)
+    initial_norm = D.ar_numpy.linalg.norm(A @ Vn - I)
+    c1 = 0.25*((27-2*93**0.5)**0.5 + 1)
+    c2 = 0.25*(1 - (27-2*93**0.5)**0.5)
+    c3 = (5*93**0.5 - 93)/496
+    d1 = (-93 - 5*93**0.5)/496
+    d2 = -93**0.5/4
+    mu = 3/8
+    psi = 321/1984
     for i in range(maxiter):
-        Vn1 = (1 / 16) * Vn @ (120 * I + A @ Vn @ (-393 * I + A @ Vn @ (-861 * I + A @ Vn @ (
-                    651 * I + A @ Vn @ (-315 * I + A @ Vn @ (931 * I + A @ Vn @ (-15 * I + A @ Vn)))))))
-        new_norm = D.ar_numpy.linalg.norm(Vn1 @ A - I)
-        if new_norm < D.tol_epsilon(A.dtype) or new_norm > initial_norm:
+        Kn = I - A @ Vn
+        Kn2 = Kn@Kn
+        Kn4 = Kn2@Kn2
+        Mk = (I+c1*Kn2+Kn4)@(I+c2*Kn2+Kn4)
+        Tk = Mk + c3*Kn2
+        Sk = Mk + d1*Kn2 + d2*Kn4
+        Vn1_1d2 = Vn@((I + Kn)@(Tk@Sk + mu*Kn2 + psi*Kn4))
+        Vn1 = Vn1_1d2@A@Vn1_1d2
+        new_norm = D.ar_numpy.linalg.norm(A @ Vn1 - I)
+        if new_norm < D.tol_epsilon(A.dtype):
+            Vn = Vn1
+            break
+        elif new_norm > 4*initial_norm:
             break
         else:
             Vn = Vn1
             initial_norm = new_norm
     return Vn
 
-
-# def iterative_inverse_1st(A, Ainv0, maxiter=10):
-#     I = D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(A)))
-#     Vn = Ainv0
-#     initial_norm = D.ar_numpy.linalg.norm(Vn @ A - I)
-#     for i in range(maxiter):
-#         Vn1 = Vn @ (2 * I - A @ Vn)
-#         new_norm = D.ar_numpy.linalg.norm(Vn1 @ A - I)
-#         if new_norm < D.tol_epsilon(A.dtype) or new_norm > initial_norm:
-#             break
-#         else:
-#             Vn = Vn1
-#             initial_norm = new_norm
-#     return Vn
-
-
-# def iterative_inverse_3rd(A, Ainv0, maxiter=10):
-#     I = D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(A)))
-#     Vn = Ainv0
-#     initial_norm = D.ar_numpy.linalg.norm(Vn @ A - I)
-#     for i in range(maxiter):
-#         Vn1 = Vn @ (2 * I - A @ Vn)
-#         Vn1 = Vn1 @ (3 * I - A @ Vn1 @ (3 * I - A @ Vn1))
-#         new_norm = D.ar_numpy.linalg.norm(Vn1 @ A - I)
-#         if new_norm < D.tol_epsilon(A.dtype) or new_norm > initial_norm:
-#             break
-#         else:
-#             Vn = Vn1
-#             initial_norm = new_norm
-#     return Vn
+def iterative_left_inverse_8th(A, Ainv0, maxiter=10):
+    return iterative_right_inverse_8th(A.mT, Ainv0.mT, maxiter=maxiter).mT
 
 
 def broyden_update_jac(B, dx, df, Binv=None):
@@ -419,12 +363,12 @@ def broyden_update_jac(B, dx, df, Binv=None):
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning, message="overflow encountered in matmul")
         kI = (y_is - y_ex) / D.ar_numpy.sum(y_ex.mT @ y_ex)
-    B_new = D.ar_numpy.reshape((1 + kI * B * dx) * B, (df.shape[0], dx.shape[0]))
+    B_new = D.ar_numpy.reshape((1 + kI * (B @ dx)) * B, (df.shape[0], dx.shape[0]))
     if Binv is not None:
         Binv_new = Binv + ((dx - Binv @ y_is) / (y_is.mT @ y_is)) @ y_is.mT
         norm_val = D.ar_numpy.linalg.norm(Binv_new @ B_new - D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(B))))
         if norm_val < 0.5:
-            Binv_new = iterative_inverse_7th(B_new, Binv_new, maxiter=3)
+            Binv_new = iterative_left_inverse_8th(B_new, Binv_new)
         return B_new, Binv_new
     else:
         return B_new
@@ -514,15 +458,17 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
     Fn1 = D.ar_numpy.copy(Fn0)
     dx = D.ar_numpy.zeros_like(x)
     dxn = D.ar_numpy.linalg.norm(dx).reshape(tuple())
-    I = D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(Jf1)))
+    identity_matrix = D.ar_numpy.eye(Jf1.shape[-1], like=Jf1)
+    if D.backend_like_dtype(Jf1.dtype) == "torch":
+        identity_matrix = identity_matrix.to(Jf1.device, Jf1.dtype)
     
     f64_type = D.autoray.to_backend_dtype('float64', like=inferred_backend)
-    Jinv = D.ar_numpy.astype(D.ar_numpy.linalg.inv(D.ar_numpy.astype(Jf1, f64_type)), Jf1.dtype)
+    Jinv = D.ar_numpy.astype(D.ar_numpy.linalg.pinv(D.ar_numpy.astype(Jf1, f64_type)), Jf1.dtype)
         
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in matmul")
-        if D.ar_numpy.linalg.norm(Jinv @ Jf1 - I) < 0.5:
-            Jinv = iterative_inverse_7th(Jf1, Jinv, maxiter=3)
+        if D.ar_numpy.linalg.norm(Jinv @ Jf1 - identity_matrix) < 0.5:
+            Jinv = iterative_left_inverse_8th(Jf1, Jinv)
     trust_region = 5.0 if initial_trust_region is None else initial_trust_region
     iteration = 0
     fail_iter = 0
@@ -574,7 +520,7 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
                 trust_region *= 0.25 / tr_ratio
         if iteration % jac_update_rate == 0 or no_progress:
             Jf0, Jf1 = Jf0, fun_jac(x)
-            Jinv = D.ar_numpy.astype(D.ar_numpy.linalg.inv(D.ar_numpy.astype(Jf1, f64_type)), Jf1.dtype)
+            Jinv = D.ar_numpy.astype(D.ar_numpy.linalg.pinv(D.ar_numpy.astype(Jf1, f64_type)), Jf1.dtype)
         else:
             Jf0, (Jf1, Jinv) = Jf1, broyden_update_jac(Jf1, dx, F1 - F0, Jinv)
         xtol = tol * (xdim + D.ar_numpy.linalg.norm(x))
@@ -654,6 +600,8 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200, var_bounds=None):
     dxn = D.ar_numpy.linalg.norm(dx)
 
     trust_region = D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.diag(J0)))
+    if not D.ar_numpy.all(D.ar_numpy.isfinite(trust_region)):
+        raise ValueError("Encountered NaN in jacobian!")
     iteration = 0
     success = False
     for iteration in range(maxiter):
@@ -829,7 +777,7 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
         else:
             x = D.ar_numpy.reshape(x0, (xdim, 1))
     
-    root, (success, iterations, *_, prec) = newtontrustregion(fun, x, jac=fun_jac, tol=tol, verbose=verbose, maxiter=maxiter, jac_update_rate=10, initial_trust_region=0.0)
+    root, (success, iterations, *_, prec) = newtontrustregion(fun, x, jac=fun_jac, tol=tol, verbose=verbose, maxiter=maxiter, jac_update_rate=10, initial_trust_region=1e-4)
     success = success or prec <= D.tol_epsilon(x0.dtype)
     
     x = D.ar_numpy.reshape(root, xshape)

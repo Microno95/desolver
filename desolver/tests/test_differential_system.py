@@ -114,6 +114,7 @@ def test_integration_and_representation_no_jac(dtype_var, backend_var, integrato
         test_tol = D.tol_epsilon(dtype_var) ** 0.5
     if a.integrator.order <= 6:
         test_tol = 128 * test_tol
+    print(test_tol, a.atol, a.rtol)
     
     a.integrate(eta=True)
 

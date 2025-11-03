@@ -5,14 +5,31 @@ import autoray
 
 linear_algebra_exceptions.append(torch._C._LinAlgError)
 
-def __solve_linear_system(A, b, sparse=False):
-    __A = A
-    __b = b
-    if __A.dtype in (torch.float16, torch.bfloat16):
-        __A = __A.float()
-    if __b.dtype in (torch.float16, torch.bfloat16):
-        __b = __b.float()
-    return torch.linalg.solve(__A, __b).to(A.dtype)
+
+def __solve_linear_system(A:torch.Tensor, b:torch.Tensor, sparse=False):
+    """Solves a linear system either exactly when A is invertible, or
+    approximately when A is not invertible"""
+    eps_threshold = torch.finfo(b.dtype).eps**0.5
+    soln = torch.empty_like(A[...,0,:,None])
+    is_square = A.shape[-2] == A.shape[-1]
+    if is_square:
+        use_solve = torch.linalg.det(A).abs() > eps_threshold
+    else:
+        use_solve = torch.zeros_like(soln[...,0,0], dtype=torch.bool)
+    info = torch.ones_like(use_solve, dtype=torch.int)
+    soln, info = torch.linalg.solve_ex(A, b, check_errors=False)
+    use_solve = use_solve & ((info == 0) | torch.all(torch.isfinite(soln[...,0]), dim=-1))
+    use_svd = ~use_solve
+    U,S,Vh = torch.linalg.svd(A, full_matrices=is_square)
+    if A.dim() == 2:
+        soln = (Vh.mT @ torch.linalg.pinv(torch.diag_embed(S)) @ U.mT @ b)
+    else:
+        soln = torch.where(
+            use_svd[...,None,None],
+            torch.bmm(torch.bmm(torch.bmm(Vh.mT, torch.linalg.pinv(torch.diag_embed(S))), U.mT), b),
+            soln,
+        )
+    return soln
 
 
 def to_cpu_wrapper(fn):

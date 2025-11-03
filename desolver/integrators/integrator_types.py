@@ -143,14 +143,14 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
         self.solver_dict.update(dict(
             initial_state=self.stage_values[...,0],
             diff=D.ar_numpy.zeros(sys_dim, **self.array_constructor_kwargs),
-            timestep=D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0],
+            timestep=D.ar_numpy.abs(D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0]),
             dState=self.stage_values[...,0],
             num_step_retries=64
         ))
         if not self._explicit:
             solver_dict_preserved.update(dict(
-                tau0=D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0], tau1=D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0], niter0=0, niter1=0,
-                newton_prec0=D.ar_numpy.zeros((1,), **self.array_constructor_kwargs)[0], newton_prec1=D.ar_numpy.zeros((1,), **self.array_constructor_kwargs)[0],
+                tau0=D.ar_numpy.abs(D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0]), tau1=D.ar_numpy.abs(D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0]), niter0=0, niter1=0,
+                newton_prec0=D.ar_numpy.abs(D.ar_numpy.zeros((1,), **self.array_constructor_kwargs)[0]), newton_prec1=D.ar_numpy.abs(D.ar_numpy.zeros((1,), **self.array_constructor_kwargs)[0]),
                 newton_iterations=32
             ))
             self.solver_dict.update(solver_dict_preserved)
@@ -207,6 +207,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
                     except (*D.linear_algebra_exceptions, ValueError):
                         self._requires_high_precision = True
                         timestep, (self.dTime, self.dState) = self.step(rhs, initial_time, initial_state, constants, trial_timestep)
+                        self._requires_high_precision = False
                     self.solver_dict['diff'] = timestep * self.get_error_estimate()
                     self.solver_dict['timestep'] = self.dTime
                     self.solver_dict['dState'] = self.dState
@@ -299,7 +300,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
             self.stage_values = D.ar_numpy.reshape(aux_root, self.stage_values.shape)
 
         self.dTime = D.ar_numpy.copy(timestep)
-        if self.is_fsal and self.is_explicit:
+        if self.is_fsal:
             self.dState = intermediate_dstate
             self.final_rhs = intermediate_rhs
         else:
@@ -317,7 +318,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
 
     def get_error_estimate(self):
         if self.tableau_final.shape[0] == 2 and self.is_adaptive:
-            return D.ar_numpy.sum((self.tableau_final[0, 1:] - self.tableau_final[1, 1:]) * self.stage_values, axis=-1)
+            return D.ar_numpy.sum(self.tableau_final[0, 1:] * self.stage_values - self.tableau_final[1, 1:] * self.stage_values, axis=-1)
         else:
             return D.ar_numpy.zeros_like(self.dState)
 
