@@ -664,7 +664,7 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200, var_bounds=None):
     x = D.ar_numpy.reshape(x, xshape)
     if var_bounds is not None:
         x = transform_to_unbounded_x(x, *var_bounds)
-    return x, (success, dxn, iteration, D.ar_numpy.reshape(F0, fshape))
+    return x, (success, D.ar_numpy.linalg.norm(F0), iteration, D.ar_numpy.reshape(F0, fshape))
 
 
 def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_scipy=True,
