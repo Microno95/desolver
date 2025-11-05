@@ -46,7 +46,7 @@ __implicit_integration_methods__ = [
     LobattoIIIC2,
     LobattoIIIC4,
     CrankNicolson,
-#     DIRK3LStable,
+    DIRK3LStable,
     RadauIA3,
     RadauIA5,
     RadauIIA3,
