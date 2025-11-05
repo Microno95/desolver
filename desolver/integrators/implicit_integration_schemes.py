@@ -312,13 +312,24 @@ class RadauIIA5(RungeKuttaIntegrator):
 
     tableau_final = numpy.array(
         [[0, (16 - s) / 36, (16 + s) / 36, 1 / 9],
+        #  [0, 0.8052720793239878, -1.916383190435099, 1.111111111111111]], dtype=numpy.float64
          [0, 1 - 7 * s / 12, 1 + 7 * s / 12, -1]], dtype=numpy.float64
     )
 
+    def get_error_estimate(self):
+        if self.is_adaptive:
+            # The error estimate from this method is generally much higher than the actual error by almost 4 orders of magnitude
+            # this leads to overly cautious timestepping and wastes compute
+            return D.ar_numpy.sum(self.stage_values * (self.tableau_final[1][1:] - self.tableau_final[0][1:]), axis=-1)*1e-4
+        else:
+            return D.ar_numpy.zeros_like(self.dState)
+    
     del s
 
 
 class RadauIIA19(RungeKuttaIntegrator):
+    """Using the method of https://www.osti.gov/servlets/purl/1543560 to generate a
+    10-stage, 19th order Embedded Radau Method"""
     
     __order__ = 19.0
 
@@ -462,22 +473,22 @@ class RadauIIA19(RungeKuttaIntegrator):
          0.06014833527874081575865526135099759590938724369183571272716692583,
          0.010000000000000000000000000000000000000000000000000000000000000000],
         [1.0,
-         0.000111677695713657757062698891880706843728654156750323672093847952,
-         -0.000374789055929833804794037217207453893530096760223574238193409412,
-         0.0006820145757646047502809102002793308989941358728074423799166826524,
-         -0.0009706622643735461546458098299827473890710310580707658350230239825,
-         0.00119367247245614804601066322573572560166761645552917586186173174719,
-         -0.0013192871745202003341119720339385000469624189162389242743609897010,
-         0.00132964434372530388245970367166906172190048190748045984144621431750,
-         -0.0012146959224468732879762022162956221166730438181317487188418946093,
-         0.00095624732961073914571404530785949837994570216009761131110084104535,
-         -0.0003938220000000000000000000000000000000000000000000000000000000000
+         -212.77026297225023781282719001687,
+         722.30802184579737480158253286061,
+         -1340.6900863964839664558331734173,
+         1959.5521595582923221165757105769,
+         -2486.2025780776879386751606046559,
+         2840.2058691740274752898985254199,
+         -2954.5453378743358508688166327943,
+         2772.4954333935802134182875588047,
+         -2224.1332186509393918137067267777,
+         923.78000000000000000000000000000
          ]
     ], dtype=numpy.float64)
 
     def get_error_estimate(self):
         if self.is_adaptive:
-            return D.ar_numpy.sum(self.stage_values * self.tableau_final[1][1:], axis=-1)
+            return D.ar_numpy.sum(self.stage_values * self.tableau_final[1][1:], axis=-1)*1e-2
         else:
             return D.ar_numpy.zeros_like(self.dState)
 

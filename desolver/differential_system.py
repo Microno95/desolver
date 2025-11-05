@@ -1233,7 +1233,7 @@ def solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False,
     max_step = options.get("max_step", np.inf)
     min_step = options.get("min_step", 0.0)
     
-    initial_dt = options.get('first_step', 1.0)
+    initial_dt = options.get('first_step', 1e-4)
     initial_dt = D.ar_numpy.minimum(initial_dt, max_step)
     initial_dt = D.ar_numpy.maximum(initial_dt, min_step)
     
