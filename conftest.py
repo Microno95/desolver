@@ -63,7 +63,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
     argnames = sorted([key for key in argvalues_map if key in metafunc.fixturenames])
     argvalues = list(itertools.product(*[argvalues_map[key] for key in argnames]))
     
-    if "dtype_var" and "backend_var" in metafunc.fixturenames:
+    if "dtype_var" in metafunc.fixturenames and "backend_var" in metafunc.fixturenames:
         if np.finfo(np.longdouble).bits > np.finfo(np.float64).bits:
             expansion_map = {
                 "dtype_var": ["longdouble"],
