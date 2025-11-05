@@ -9,6 +9,8 @@ linear_algebra_exceptions.append(torch._C._LinAlgError)
 def __solve_linear_system(A:torch.Tensor, b:torch.Tensor, sparse=False):
     """Solves a linear system either exactly when A is invertible, or
     approximately when A is not invertible"""
+    if b.dtype in {torch.float16, torch.bfloat16}:
+        return __solve_linear_system(A.to(torch.float32), b.to(torch.float32), sparse=sparse).to(b.dtype)
     eps_threshold = torch.finfo(b.dtype).eps**0.5
     soln = torch.empty_like(A[...,0,:,None])
     is_square = A.shape[-2] == A.shape[-1]
