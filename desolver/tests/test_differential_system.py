@@ -115,8 +115,6 @@ def test_integration_and_representation_no_jac(dtype_var, backend_var, integrato
         test_tol = D.tol_epsilon(dtype_var) ** 0.5
     if a.integrator.order <= 6:
         test_tol = 128 * test_tol
-    if a.integrator.is_adaptive and a.integrator.order > 8:
-        a.dt = a.dt * 0.01
     print(test_tol, a.atol, a.rtol)
     
     a.integrate(eta=True)
@@ -894,7 +892,7 @@ def test_solve_stiff_system(integrator, backend_var):
     
     @de.DiffRHS
     def fun(t, state):
-        return -2000*(state - np.cos(t))
+        return -2000*(state - D.ar_numpy.cos(t))
     
     def fun_jac(t, state):
         return D.ar_numpy.array([[-2000]], dtype=dtype_var, like=backend_var)
