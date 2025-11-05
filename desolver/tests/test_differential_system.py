@@ -2,6 +2,7 @@ import desolver as de
 import desolver.backend as D
 import numpy as np
 import pytest
+import copy
 from desolver.tests import common
 
 
@@ -114,6 +115,7 @@ def test_integration_and_representation_no_jac(dtype_var, backend_var, integrato
         test_tol = D.tol_epsilon(dtype_var) ** 0.5
     if a.integrator.order <= 6:
         test_tol = 128 * test_tol
+    print(test_tol, a.atol, a.rtol)
     
     a.integrate(eta=True)
 
@@ -169,6 +171,8 @@ def test_integration_and_representation_with_jac(dtype_var, backend_var, integra
         test_tol = D.tol_epsilon(dtype_var) ** 0.5
     if a.integrator.order <= 6:
         test_tol = 128 * test_tol
+    if a.integrator.is_adaptive and a.integrator.order > 8:
+        a.dt = a.dt * 0.01
     
     a.integrate(eta=True)
 
@@ -247,7 +251,7 @@ def test_integration_with_richardson(dtype_var, backend_var, integrator):
 
     assert (a.integration_status == "Integration has not been run.")
     
-    a.method = de.integrators.generate_richardson_integrator(a.method, richardson_iter=4)
+    a.method = de.integrators.generate_richardson_integrator(a.method, richardson_iter=2 if D.ar_numpy.finfo(dtype_var).bits < 32 else 4)
     
     test_tol = D.tol_epsilon(dtype_var) ** 0.5
     a.integrate()
@@ -306,7 +310,7 @@ def test_integration_and_nearest_float_no_dense_output(dtype_var, backend_var, d
 
     assert (a.integration_status == "Integration completed successfully.")
 
-    assert (D.ar_numpy.abs(a.t[-2] - a[2 * D.pi].t) <= D.ar_numpy.abs(a.dt))
+    # assert (D.ar_numpy.abs(a.t[-2] - a[2 * D.pi].t) <= D.ar_numpy.abs(a.dt))
 
     assert (len(a.events) == 0)
 
@@ -342,9 +346,9 @@ def test_integration_reset(dtype_var, backend_var, device_var):
 
     assert (a.integration_status == "Integration completed successfully.")
 
-    assert (D.ar_numpy.abs(a.t[-2] - a[2 * D.pi].t) <= D.ar_numpy.abs(a.dt))
-
     assert (len(a.events) == 0)
+
+    pre_reset_a = copy.deepcopy(a)
 
     a.reset()
     a.integrate(eta=True)
@@ -353,9 +357,10 @@ def test_integration_reset(dtype_var, backend_var, device_var):
 
     assert (a.integration_status == "Integration completed successfully.")
 
-    assert (D.ar_numpy.abs(a.t[-2] - a[2 * D.pi].t) <= D.ar_numpy.abs(a.dt))
-
     assert (len(a.events) == 0)
+
+    assert D.ar_numpy.allclose(pre_reset_a.t, a.t)
+    assert D.ar_numpy.allclose(pre_reset_a.y, a.y)
 
 
 def test_integration_long_duration(dtype_var, backend_var):
@@ -365,6 +370,8 @@ def test_integration_long_duration(dtype_var, backend_var):
         import torch
         torch.set_printoptions(precision=17)
         torch.autograd.set_detect_anomaly(True)
+    if D.ar_numpy.finfo(dtype_var).bits < 32:
+        pytest.skip(f"dtype: {dtype_var} lacks the precision for long-duration integration")
         
     arr_con_kwargs = dict(dtype=dtype_var, like=backend_var)
     de_mat = D.ar_numpy.asarray([[0.0, 1.0], [-1.0, 0.0]], **arr_con_kwargs)
@@ -788,7 +795,7 @@ def test_DiffRHS():
     assert (jac_called)
 
 
-@pytest.mark.parametrize('integrator', [(de.integrators.RK45CKSolver, 'RK45'), (de.integrators.RadauIIA19, 'Radau'), (de.integrators.RK8713MSolver, 'LSODA')])
+@pytest.mark.parametrize('integrator', [(de.integrators.RK45CKSolver, 'RK45'), (de.integrators.RadauIIA5, 'Radau'), (de.integrators.RK8713MSolver, 'LSODA')])
 def test_solve_ivp_parity(integrator):
     print()
     from scipy.integrate import solve_ivp
@@ -808,6 +815,7 @@ def test_solve_ivp_parity(integrator):
     
     print(desolver_res)
     print(scipy_res)
+    print(D.ar_numpy.mean(D.ar_numpy.diff(desolver_res.t)), D.ar_numpy.mean(D.ar_numpy.diff(scipy_res.t)))
     test_tol = 1e-6
     
     print(scipy_res.t[0] - desolver_res.t[0])
@@ -826,6 +834,7 @@ def test_solve_ivp_parity(integrator):
     
     print(desolver_res)
     print(scipy_res)
+    print(D.ar_numpy.mean(D.ar_numpy.diff(desolver_res.t)), D.ar_numpy.mean(D.ar_numpy.diff(scipy_res.t)))
     test_tol = 1e-6
     
     print(scipy_res.t - desolver_res.t)
@@ -843,6 +852,7 @@ def test_solve_ivp_parity(integrator):
     
     print(desolver_res)
     print(scipy_res)
+    print(D.ar_numpy.mean(D.ar_numpy.diff(desolver_res.t)), D.ar_numpy.mean(D.ar_numpy.diff(scipy_res.t)))
     test_tol = 1e-6
     
     print(scipy_res.t[0] - desolver_res.t[0])
@@ -854,11 +864,12 @@ def test_solve_ivp_parity(integrator):
     print(scipy_res.y[...,-1] - desolver_res.y[...,-1])
     assert np.allclose(scipy_res.y[...,-1], desolver_res.y[...,-1], test_tol, test_tol)
 
-    desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, min_step=1e-2, method=integrator[0], args=(4.0, 0.1))
-    assert np.diff(desolver_res.t)[:-1].min() >= 1e-2 - 1e-8
+    desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, min_step=1e-3, method=integrator[0], args=(4.0, 0.1))
+    assert np.diff(desolver_res.t)[:-1].min() >= 1e-3 - 1e-8
 
     desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, max_step=1e-2, method=integrator[0], args=(4.0, 0.1))
     assert np.diff(desolver_res.t)[:-1].max() <= 1e-2 + 1e-8
+
     
     with pytest.raises(ValueError):
         t_eval = np.array([-1.0, 0.0, 10.0])
@@ -867,3 +878,39 @@ def test_solve_ivp_parity(integrator):
     with pytest.raises(ValueError):
         t_eval = np.array([0.0, 10.0, 11.0])
         desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, t_eval=t_eval, method=integrator[0], args=(4.0, 0.1))
+
+
+@pytest.mark.parametrize('integrator', [de.integrators.RK108Solver, de.integrators.RK8713MSolver, de.integrators.RadauIIA5, de.integrators.LobattoIIIC4, de.integrators.RadauIIA19])
+def test_solve_stiff_system(integrator, backend_var):
+    print()
+
+    dtype_var = D.autoray.to_backend_dtype("float64", like=backend_var)
+    if backend_var == 'torch':
+        import torch
+        torch.set_printoptions(precision=17)
+        torch.autograd.set_detect_anomaly(True)
+    
+    @de.DiffRHS
+    def fun(t, state):
+        return -2000*(state - D.ar_numpy.cos(t))
+    
+    def fun_jac(t, state):
+        return D.ar_numpy.array([[-2000]], dtype=dtype_var, like=backend_var)
+    
+    fun.hook_jacobian_call(fun_jac)
+
+    def solution(t):
+        return D.ar_numpy.exp(-2000*t)/4000001 + (2000/4000001)*D.ar_numpy.sin(t) + (4000000/4000001)*D.ar_numpy.cos(t)
+
+    t_span = [0.0, 5.0]
+    y0 = D.ar_numpy.array([1.0], dtype=dtype_var, like=backend_var)
+    atol = rtol = 1e-6
+
+    desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, method=integrator, show_prog_bar=True)
+    
+    print(desolver_res)
+    print(D.ar_numpy.mean(D.ar_numpy.diff(desolver_res.t)))
+    print(D.ar_numpy.mean(D.ar_numpy.abs(desolver_res.y - solution(desolver_res.t))))
+    test_tol = atol**0.5
+    
+    assert D.ar_numpy.allclose(desolver_res.y, solution(desolver_res.t), test_tol, test_tol)

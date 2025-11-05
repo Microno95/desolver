@@ -47,21 +47,24 @@ class IntegratorTemplate(abc.ABC):
         with D.ar_numpy.no_grad(like=self.solver_dict['initial_state']):
             if self.adaptation_fn and not ignore_custom_adaptation:
                 return self.adaptation_fn(self)
-            initial_state = self.solver_dict['initial_state']
-            diff = self.solver_dict['diff']
             timestep = self.solver_dict['timestep']
             safety_factor = self.solver_dict['safety_factor']
             atol = self.solver_dict['atol']
             rtol = self.solver_dict['rtol']
-            dState = self.solver_dict['dState']
+            filter_mask = D.ar_numpy.isfinite(atol) & D.ar_numpy.isfinite(rtol)
+            initial_state = self.solver_dict['initial_state'][filter_mask]
+            dState = self.solver_dict['dState'][filter_mask]
+            diff = self.solver_dict['diff'][filter_mask]
+            atol = atol[filter_mask]
+            rtol = rtol[filter_mask]
             order = self.solver_dict['order']
             if "system_scaling" in self.solver_dict:
-                self.solver_dict["system_scaling"] = 0.8 * self.solver_dict["system_scaling"] +  0.2 * D.ar_numpy.maximum(D.ar_numpy.abs(initial_state), D.ar_numpy.abs(dState / timestep))
+                self.solver_dict["system_scaling"] = 0.5 * self.solver_dict["system_scaling"] + 0.5 * D.ar_numpy.maximum(D.ar_numpy.abs(initial_state), D.ar_numpy.abs(initial_state + dState))
             else:
-                self.solver_dict["system_scaling"] = D.ar_numpy.maximum(D.ar_numpy.abs(initial_state), D.ar_numpy.abs(dState / timestep))
+                self.solver_dict["system_scaling"] = D.ar_numpy.maximum(D.ar_numpy.abs(initial_state), D.ar_numpy.abs(initial_state + dState))
             total_error_tolerance = (atol + rtol * self.solver_dict["system_scaling"])
             with D.numpy.errstate(divide='ignore'):
-                epsilon_current = D.ar_numpy.reciprocal(D.ar_numpy.linalg.norm(diff / total_error_tolerance))
+                epsilon_current = D.ar_numpy.reciprocal(D.ar_numpy.sqrt(D.ar_numpy.mean((diff / total_error_tolerance)**2)))
             if "epsilon_last" in self.solver_dict:
                 epsilon_last = self.solver_dict["epsilon_last"]
             else:
@@ -80,17 +83,18 @@ class IntegratorTemplate(abc.ABC):
             elif epsilon_last is not None and epsilon_last_last is not None:
                 # Based on the triple product described in https://link.springer.com/article/10.1007/s42967-021-00159-w
                 # Eq. (6) with the coefficients from the second entry of Table 4
-                k1, k2, k3 = self.solver_dict.get("__adapt_k1", 0.55), self.solver_dict.get("__adapt_k2", -0.27), self.solver_dict.get("__adapt_k3", 0.05)
-                k1 = epsilon_current ** (k1 / order)
-                k2 = epsilon_last ** (k2 / order)
-                k3 = epsilon_last_last ** (k3 / order)
-                corr = D.ar_numpy.where(k1 > 0.0, k1, 1.0)
-                corr = corr*D.ar_numpy.where(k2 > 0.0, k2, 1.0)
-                corr = corr*D.ar_numpy.where(k3 > 0.0, k3, 1.0)
+                k1, k2, k3 = self.solver_dict.get("__adapt_k1", 0.38), self.solver_dict.get("__adapt_k2", -0.18), self.solver_dict.get("__adapt_k3", 0.01)
+                k1 = epsilon_current**(k1 / order)
+                k2 = epsilon_last**(k2 / order)
+                k3 = epsilon_last_last**(k3 / order)
+                corr = D.ar_numpy.where((k1 > 0.0) & D.ar_numpy.isfinite(k1), k1, 1.0)
+                corr = corr*D.ar_numpy.where((k2 > 0.0) & D.ar_numpy.isfinite(k2), k2, 1.0)
+                corr = corr*D.ar_numpy.where((k3 > 0.0) & D.ar_numpy.isfinite(k3), k3, 1.0)
                 self.solver_dict["epsilon_last_last"], self.solver_dict["epsilon_last"] = epsilon_last, epsilon_current
-            corr = (1 + D.ar_numpy.arctan((safety_factor * corr - 1)))
+            redo_step = bool(corr < 0.9**2)
+            corr = D.ar_numpy.where(D.ar_numpy.isfinite(epsilon_current), 1 + D.ar_numpy.arctan((safety_factor*corr - 1)), 1.0)
             timestep = corr * timestep
-            return timestep, bool(corr < 0.9**2)
+            return timestep, redo_step
 
     def get_error_estimate(self):
         return 0.0

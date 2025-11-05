@@ -211,7 +211,7 @@ class DenseOutput(object):
         if self.t_eval is None:
             raise ValueError("No interpolant has been added and time interval is not defined!")
         out = deutil.search_bisection_vec(self.t_eval_arr, t)
-        out[out > len(self.y_interpolants) - 1] = len(self.y_interpolants) - 1
+        out = D.ar_numpy.clip(out, max=len(self.y_interpolants) - 1)
         return out
 
     def __call__(self, t):
@@ -362,24 +362,20 @@ class DiffRHS(object):
                     self.__jac_is_wrapped_rhs = False
                 elif inferred_backend == 'numpy':
                     self.__jac_wrapped_rhs_order = 5
-                    self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(0.0, y, **kwargs),
-                                                        base_order=self.__jac_wrapped_rhs_order, flat=False)
+                    self.__jac = lambda _t, y, *_as, **_kws: deutil.JacobianWrapper(lambda x: self(_t, x, *_as, **_kws), base_order=self.__jac_wrapped_rhs_order, flat=False)(y)
                     self.__jac_time = 0.0
                     self.__jac_is_wrapped_rhs = True
                 else:
                     import torch
-                    self.__jac = torch.func.jacrev(self.rhs, argnums=1)
+                    self.__jac = lambda _t, y, *_as, **_kws: torch.func.jacrev(lambda x: self.rhs(_t, x, *_as, **_kws), argnums=0)(y)
                     self.__jac_time = None
                     self.__jac_is_wrapped_rhs = False
             self.__jac_initialised = True
         if self.__jac_is_wrapped_rhs:
             if t != self.__jac_time:
                 self.__jac_time = t
-                self.__jac = deutil.JacobianWrapper(lambda y, **kwargs: self(t, y, **kwargs),
-                                                    base_order=self.__jac_wrapped_rhs_order, flat=False)
-            called_val = self.__jac(y, *args, **kwargs)
-        else:
-            called_val = self.__jac(t, y, *args, **kwargs)
+                self.__jac = lambda _t, y, *_as, **_kws: deutil.JacobianWrapper(lambda x: self(_t, x, *_as, **_kws), base_order=self.__jac_wrapped_rhs_order, flat=False)(y)
+        called_val = self.__jac(t, y, *args, **kwargs)
         self.njev += 1
         return called_val
 
@@ -511,21 +507,30 @@ class OdeSystem(object):
             self.device = None
             
         self.__array_con_kwargs = dict(dtype=y0.dtype, like=self.__inferred_backend)
+        self.__real_array_con_kwargs = dict(dtype=D.ar_numpy.abs(y0).dtype, like=self.__inferred_backend)
         if self.__inferred_backend == 'torch':
             self.__array_con_kwargs['device'] = self.device
+            self.__real_array_con_kwargs['device'] = self.device
 
         self.__rtol = rtol
         self.__atol = atol
         self.__consts = constants if constants is not None else dict()
-        self.__y = D.ar_numpy.clone(y0)[None]
-        self.__t = D.ar_numpy.asarray(t[0], **self.__array_con_kwargs)[None]
+        self.__initial_y__ = y0
+        self.__initial_t0__ = D.ar_numpy.asarray(t[0], **self.__real_array_con_kwargs)
+        self.__initial_tf__ = D.ar_numpy.asarray(t[1], **self.__real_array_con_kwargs)
+        if self.__inferred_backend in ['numpy', 'torch']:
+            self.__y = D.ar_numpy.clone(y0)[None]
+            self.__t = D.ar_numpy.asarray(t[0], **self.__real_array_con_kwargs)[None]
+        else:
+            self.__y = [D.ar_numpy.clone(y0)]
+            self.__t = [D.ar_numpy.asarray(t[0], **self.__real_array_con_kwargs)]
         self.dim = D.ar_numpy.shape(self.__y[0])
         self.counter = 0
-        self.__t0 = D.ar_numpy.asarray(t[0], **self.__array_con_kwargs)
-        self.__tf = D.ar_numpy.asarray(t[1], **self.__array_con_kwargs)
+        self.__t0 = D.ar_numpy.asarray(t[0], **self.__real_array_con_kwargs)
+        self.__tf = D.ar_numpy.asarray(t[1], **self.__real_array_con_kwargs)
         self.__method = integrators.RK45CKSolver
         self.integrator = None
-        self.__dt = D.ar_numpy.asarray(dt, **self.__array_con_kwargs)
+        self.__dt = D.ar_numpy.asarray(dt, **self.__real_array_con_kwargs)
         self.__dt0 = self.dt
 
         self.staggered_mask = None
@@ -542,6 +547,10 @@ class OdeSystem(object):
         self.__fix_dt_dir(self.tf, self.t0)
         self.__events = []
         self.initialise_integrator(preserve_states=False)    
+
+    @property
+    def reinit_args(self):
+        return dict(equ_rhs=self.equ_rhs, y0=self.__initial_y__, t=(self.__initial_t0__, self.__initial_tf__), dense_output=self.__dense_output, dt=self.__dt0, rtol=self.rtol, atol=self.atol, constants=self.constants)
 
     @property
     def sol(self):
@@ -667,7 +676,7 @@ class OdeSystem(object):
 
     @dt.setter
     def dt(self, new_dt):
-        self.__dt = D.ar_numpy.asarray(new_dt, **self.__array_con_kwargs)
+        self.__dt = D.ar_numpy.asarray(new_dt, **self.__real_array_con_kwargs)
         self.__fix_dt_dir(self.tf, self.t0)
         return self.__dt
 
@@ -692,7 +701,7 @@ class OdeSystem(object):
             If the initial integration time is greater than the final time and the integration 
             has been run (successfully or unsuccessfully).
         """
-        new_t0 = D.ar_numpy.asarray(new_t0, **self.__array_con_kwargs)
+        new_t0 = D.ar_numpy.asarray(new_t0, **self.__real_array_con_kwargs)
         if D.ar_numpy.abs(self.tf - new_t0) <= D.epsilon(self.__y[self.counter].dtype):
             raise ValueError("The start time of the integration cannot be greater than or equal to {}!".format(self.tf))
         self.__t0 = new_t0
@@ -719,7 +728,7 @@ class OdeSystem(object):
             If the initial integration time is greater than the final time and the integration 
             has been run (successfully or unsuccessfully).
         """
-        new_tf = D.ar_numpy.asarray(new_tf, **self.__array_con_kwargs)
+        new_tf = D.ar_numpy.asarray(new_tf, **self.__real_array_con_kwargs)
         if D.ar_numpy.abs(self.t0 - new_tf) <= D.epsilon(self.__y[self.counter].dtype):
             raise ValueError("The end time of the integration cannot be equal to the start time: {}!".format(self.t0))
         self.__tf = new_tf
@@ -727,9 +736,9 @@ class OdeSystem(object):
 
     def __fix_dt_dir(self, t1, t0):
         if D.ar_numpy.sign(self.__dt) != D.ar_numpy.sign(t1 - t0):
-            self.__dt = -self.__dt
+            self.__dt = D.ar_numpy.copysign(D.ar_numpy.abs(self.__dt), t1 - t0)
         else:
-            self.__dt = self.__dt
+            self.__dt =  self.__dt
 
     def __alloc_space_steps(self, tf):
         """Returns the number of steps to allocate for a given final integration time
@@ -742,7 +751,7 @@ class OdeSystem(object):
         if D.ar_numpy.to_numpy(tf) == np.inf:
             return 10
         else:
-            return max(1, min(5000, int((tf - self.__t[self.counter]) / self.dt)))
+            return max(1, min(5000, int(D.ar_numpy.abs((tf - self.__t[self.counter]) / self.dt))))
 
     def __allocate_soln_space(self, num_units):
         try:
@@ -752,7 +761,7 @@ class OdeSystem(object):
                     self.__y = D.ar_numpy.concatenate(
                         [self.__y, __new_allocs], axis=0)
                     
-                    __new_allocs = D.ar_numpy.zeros((num_units,) + D.ar_numpy.shape(self.__t[0]), **self.__array_con_kwargs)
+                    __new_allocs = D.ar_numpy.zeros((num_units,) + D.ar_numpy.shape(self.__t[0]), **self.__real_array_con_kwargs)
                     self.__t = D.ar_numpy.concatenate(
                         [self.__t, __new_allocs], axis=0)
                 else:
@@ -899,8 +908,11 @@ class OdeSystem(object):
 
     def reset(self):
         """Resets the system to the initial time."""
+        self.__y = D.ar_numpy.clone(self.__initial_y__)[None]
+        self.__t = D.ar_numpy.asarray(self.__initial_t0__, **self.__real_array_con_kwargs)[None]
+        self.__t0 = D.ar_numpy.asarray(self.__initial_t0__, **self.__real_array_con_kwargs)
+        self.__tf = D.ar_numpy.asarray(self.__initial_tf__, **self.__real_array_con_kwargs)
         self.counter = 0
-        self.__trim_soln_space()
         self.__sol = DenseOutput(None, None)
         self.dt = self.__dt0
         self.equ_rhs.nfev = 0
@@ -979,7 +991,7 @@ class OdeSystem(object):
             if tf == np.inf:
                 tqdm_progress_bar = tqdm(total=None)
             else:
-                tqdm_progress_bar = tqdm(total=int((tf - self.__t[self.counter]) / self.dt) + 1)
+                tqdm_progress_bar = tqdm(total=int(D.ar_numpy.abs((tf - self.__t[self.counter]) / self.dt)) + 1)
         else:
             tqdm_progress_bar = None
 
@@ -994,14 +1006,14 @@ class OdeSystem(object):
         self.__allocate_soln_space(total_steps)
         try:
             while (implicit_integration or (self.dt != 0 and D.ar_numpy.abs(tf - self.__t[self.counter]) >= D.tol_epsilon(self.__y[self.counter].dtype))) and not end_int:
-                if not implicit_integration and D.ar_numpy.abs(self.dt + self.__t[self.counter]) > D.ar_numpy.abs(tf):
+                if not implicit_integration and D.ar_numpy.abs(self.dt) > D.ar_numpy.abs(tf - self.__t[self.counter]):
                     is_final_step = True
                     dt = (tf - self.__t[self.counter])
                 else:
                     is_final_step = False
                     dt = self.dt
                 new_dt, (dTime, dState) = self.integrator(self.equ_rhs, self.__t[self.counter], self.__y[self.counter],
-                                                           self.constants, timestep=dt)
+                                                               self.constants, timestep=dt)
 
                 if self.counter + 1 >= len(self.__y):
                     total_steps = self.__alloc_space_steps(tf - dTime) + 1
@@ -1200,7 +1212,7 @@ class OdeSystem(object):
 
 
 def solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False,
-              events=None, vectorized=False, args=None, **options):
+              events=None, vectorized=False, args=None, kwargs:dict|None=None, **options):
     """
     Drop-in replacement for `scipy.integrate.solve_ivp`, provides a functional
     interface to the `desolver` integration routines.
@@ -1212,30 +1224,40 @@ def solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False,
         while isinstance(fn, DiffRHS):
             fn = fn.rhs
         fn_args_kwargs = inspect.getfullargspec(fn)
-        constants = {key:value for key,value in zip(fn_args_kwargs[0][2:], args)}
+        constants = {key: value for key,value in zip(fn_args_kwargs[0][2:], args)}
+    else:
+        constants = dict()
+    if kwargs is not None:
+        constants.update(kwargs)
         
     max_step = options.get("max_step", np.inf)
     min_step = options.get("min_step", 0.0)
     
-    initial_dt = options.get('first_step', 1.0)
+    initial_dt = options.get('first_step', 1e-4)
     initial_dt = D.ar_numpy.minimum(initial_dt, max_step)
     initial_dt = D.ar_numpy.maximum(initial_dt, min_step)
     
     ode_system = OdeSystem(equ_rhs=fun, y0=y0, t=t_span, dense_output=dense_output, dt=initial_dt,
                            atol=options.get('atol', None), rtol=options.get('rtol', None), constants=constants)
-    
     ode_system.method = method
     callbacks = list(options.get("callbacks", []))
     if "max_step" in options or "min_step" in options:
         def __step_cb(ode_sys):
-            ode_sys.dt = D.ar_numpy.clip(ode_sys.dt, min=min_step, max=max_step)
+            ode_sys.dt = D.ar_numpy.copysign(D.ar_numpy.clip(D.ar_numpy.abs(ode_sys.dt), min=min_step, max=max_step), ode_sys.dt)
         callbacks.append(__step_cb)
+    if "kick_variables" in options:
+        ode_system.set_kick_vars(options["kick_variables"])
     
     integration_options = dict(callback=callbacks, events=events, eta=options.get("show_prog_bar", False))
     if t_eval is None:
         ode_system.integrate(**integration_options)
         t_res = ode_system.t
-        y_res = D.ar_numpy.transpose(ode_system.y, axes=[*range(1, len(ode_system.y.shape)), 0])
+        y_res = ode_system.y
+        if isinstance(t_res, list):
+            t_res = D.ar_numpy.stack(t_res, axis=0)
+        if isinstance(y_res, list):
+            y_res = D.ar_numpy.stack(y_res, axis=0)
+        y_res = D.ar_numpy.transpose(y_res, axes=[*range(1, len(y_res.shape)), 0])
     else:
         t_eval = D.ar_numpy.sort(t_eval)
         if t_eval[0] < t_span[0] or t_eval[-1] > t_span[1]:

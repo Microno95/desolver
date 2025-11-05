@@ -2,6 +2,7 @@ import time
 import functools
 import numpy
 import warnings
+import math
 from desolver import backend as D
 
 __all__ = [
@@ -12,6 +13,13 @@ __all__ = [
     'search_bisection_vec',
     'BlockTimer'
 ]
+
+REAL_TO_COMPLEX_DTYPE = {
+    16: 'complex64',
+    32: 'complex64',
+    64: 'complex128',
+    128: 'complex256'
+}
 
 
 @functools.lru_cache
@@ -28,6 +36,7 @@ def get_finite_difference_weights(dtype, number_of_nodes, order=1):
     if inferred_backend == 'torch':
         weights = weights[:, 0]
     return nodal_points, weights
+
 
 class JacobianWrapper(object):
     """
@@ -61,9 +70,10 @@ class JacobianWrapper(object):
     
     """
 
-    def __init__(self, rhs, base_order=2, richardson_iter=None, adaptive=True, flat=False, atol=None, rtol=None, sample_input=None):
+    def __init__(self, rhs, base_order=2, richardson_iter=None, adaptive=True, flat=False, atol=None, rtol=None, sample_input=None, use_complex_step=False):
         self.rhs = rhs
         self.base_order = base_order
+        self.use_complex_step = use_complex_step and not isinstance(self.rhs, JacobianWrapper)
         if richardson_iter is None:
             self.richardson_iter = 16 - base_order if base_order < 16 else base_order + 1
         else:
@@ -77,35 +87,48 @@ class JacobianWrapper(object):
         self.nodal_points, self.weights = get_finite_difference_weights(numpy.float64 if sample_input is None else sample_input.dtype, self.base_order, order=1)
         self.nodal_points = self.nodal_points[D.ar_numpy.abs(self.weights) > 16 * eps_val]
         self.weights = self.weights[D.ar_numpy.abs(self.weights) > 16 * eps_val]
+        self.complex_differentiable_mask = None
 
-    def estimate(self, y, *args, dy=None, **kwargs):
-        if dy is None:
-            dy = D.epsilon(y.dtype) ** 0.5
+    def estimate(self, y, *args, fd_stepsize=None, **kwargs):
+        if fd_stepsize is None:
+            fd_stepsize = D.epsilon(y.dtype) ** 0.5
         inferred_backend = D.backend_like_dtype(y.dtype)
         unravelled_y = D.ar_numpy.reshape(y, (-1,))
         dy_val = self.rhs(y, *args, **kwargs)
         unravelled_dy = D.ar_numpy.reshape(dy_val, (-1,))
-        jac_con_kwargs = dict(dtype=unravelled_dy.dtype)
+        use_complex_step = self.use_complex_step and D.ar_numpy.all(~D.ar_numpy.iscomplex(y))
+        complex_type = D.autoray.to_backend_dtype(REAL_TO_COMPLEX_DTYPE[int(D.ar_numpy.finfo(unravelled_dy.dtype).bits)], like=y)
+        jac_con_kwargs = dict(dtype=complex_type if use_complex_step else unravelled_dy.dtype)
         if D.backend_like_dtype(unravelled_y.dtype) == 'torch':
             jac_con_kwargs['device'] = unravelled_y.device
         jacobian_y = D.ar_numpy.zeros((*D.ar_numpy.shape(unravelled_dy), *D.ar_numpy.shape(unravelled_y)), **jac_con_kwargs, like=unravelled_dy)
         y_msk = D.ar_numpy.zeros_like(unravelled_y)
         if inferred_backend == 'torch':
-            jacobian_y = jacobian_y.to(dy_val).to(y.device)
+            jacobian_y = jacobian_y.to(y.device)
         for idx, val in enumerate(unravelled_y):
+            use_complex_step_for_idx = use_complex_step
+            if self.complex_differentiable_mask is not None:
+                use_complex_step_for_idx &= self.complex_differentiable_mask[idx]
             y_msk[idx - 1] = 0.0
             y_msk[idx] = 1.0
-            dy_cur = dy
+            dy_cur = fd_stepsize
             if not self.adaptive and (D.ar_numpy.abs(val) > 1.0 or dy_cur > D.ar_numpy.abs(val) > 0.0):
                 dy_cur = dy_cur * val
 
             for A, w in zip(self.nodal_points, self.weights):
-                y_jac = unravelled_y + A * dy_cur * y_msk
-                jacobian_y[:, idx] = jacobian_y[:, idx] + w * D.ar_numpy.reshape(
-                    self.rhs(D.ar_numpy.reshape(y_jac, D.ar_numpy.shape(y)), *args, **kwargs), (-1,))
+                if use_complex_step_for_idx:
+                    y_jac = unravelled_y + A * dy_cur * y_msk * 1j
+                else:
+                    y_jac = unravelled_y + A * dy_cur * y_msk
+                rhs_eval_at_h = D.ar_numpy.reshape(self.rhs(D.ar_numpy.reshape(y_jac, D.ar_numpy.shape(y)), *args, **kwargs), (-1,))
+                jacobian_y[:, idx] = jacobian_y[:, idx] + w * rhs_eval_at_h
 
             jacobian_y[:, idx] = jacobian_y[:, idx] / dy_cur
-
+            
+            if use_complex_step_for_idx:
+                jacobian_y[:, idx] = D.ar_numpy.astype(D.ar_numpy.real(D.ar_numpy.imag(jacobian_y[:, idx])), y.dtype)
+        if use_complex_step:
+            jacobian_y = D.ar_numpy.real(jacobian_y)
         if self.flat:
             if D.ar_numpy.shape(jacobian_y) == (1, 1):
                 return jacobian_y[0, 0]
@@ -114,7 +137,7 @@ class JacobianWrapper(object):
             return jacobian_y.reshape((*D.ar_numpy.shape(dy_val), *D.ar_numpy.shape(y)))
 
     def richardson(self, y, *args, dy=0.5, factor=4.0, **kwargs):
-        A = [[self.estimate(y, dy=dy * (factor ** -m), *args, **kwargs)] for m in range(self.richardson_iter)]
+        A = [[self.estimate(y, fd_stepsize=dy * (factor ** -m), *args, **kwargs)] for m in range(self.richardson_iter)]
         denom = factor ** self.base_order
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', message='overflow encountered', category=RuntimeWarning)
@@ -124,7 +147,7 @@ class JacobianWrapper(object):
         return A[-1][-1]
 
     def adaptive_richardson(self, y, *args, dy=0.5, factor=4, **kwargs):
-        A = [[self.estimate(y, *args, dy=dy, **kwargs)]]
+        A = [[self.estimate(y, *args, fd_stepsize=dy, **kwargs)]]
         if self.richardson_iter == 1:
             return A[0][0]
         factor = 1.0 * factor
@@ -133,7 +156,7 @@ class JacobianWrapper(object):
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', message='overflow encountered', category=RuntimeWarning)
             for m in range(1, self.richardson_iter):
-                A.append([self.estimate(y, *args, dy=dy * (factor ** (-m)), **kwargs)])
+                A.append([self.estimate(y, *args, fd_stepsize=dy * (factor ** (-m)), **kwargs)])
                 for n in range(1, m + 1):
                     A[m].append(A[m][n - 1] + (A[m][n - 1] - A[m - 1][n - 1]) / (denom ** n - 1))
                 if m >= 3:
@@ -142,6 +165,17 @@ class JacobianWrapper(object):
                         self.order = self.base_order + m
                         break
         return A[-2][-1]
+    
+    def check_function_is_complex_differentiable(self, y, *args, **kwargs):
+        self.use_complex_step = False
+        jacobian_y_real = D.ar_numpy.reshape(self.estimate(y, *args, **kwargs, fd_stepsize=1e-4), (-1, math.prod(y.shape))).mT
+        self.use_complex_step = True
+        jacobian_y_complex = D.ar_numpy.reshape(self.estimate(y, *args, **kwargs, fd_stepsize=1e-4), (-1, math.prod(y.shape))).mT
+        
+        self.complex_differentiable_mask = D.ar_numpy.stack([
+            D.ar_numpy.allclose(real_column, complex_column) for real_column, complex_column in zip(jacobian_y_real, jacobian_y_complex)
+        ], axis=0)
+        
 
     def check_converged(self, initial_state, diff, prev_error):
         err_estimate = D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(diff)))
@@ -152,6 +186,8 @@ class JacobianWrapper(object):
             return err_estimate, True
 
     def __call__(self, y, *args, **kwargs):
+        if self.complex_differentiable_mask is None and self.use_complex_step:
+            self.check_function_is_complex_differentiable(y, *args, **kwargs)
         if self.richardson_iter > 0:
             if self.adaptive:
                 out = self.adaptive_richardson(y, *args, **kwargs)
@@ -159,6 +195,7 @@ class JacobianWrapper(object):
                 out = self.richardson(y, *args, **kwargs)
         else:
             out = self.estimate(y, *args, **kwargs)
+        self.complex_differentiable_mask = None
         return out
 
 
@@ -302,8 +339,8 @@ def search_bisection_vec(array, val):
     indices = D.ar_numpy.zeros_like(val, dtype=i64_type)
     msk1 = val <= D.ar_numpy.take(array, jlower, axis=0)
     msk2 = val >= D.ar_numpy.take(array, jupper, axis=0)
-    indices[msk1] = jlower[msk1]
-    indices[msk2] = jupper[msk2]
+    indices = D.ar_numpy.where(msk1, jlower, indices)
+    indices = D.ar_numpy.where(msk2, jupper, indices)
 
     not_conv = (jupper - jlower) > 1
 
@@ -312,8 +349,8 @@ def search_bisection_vec(array, val):
         mid_vals = D.ar_numpy.take(array, jmid, axis=0)
         msk1 = val > mid_vals
         msk2 = val <= mid_vals
-        jlower[msk1] = jmid[msk1]
-        jupper[msk2] = jmid[msk2]
+        jlower = D.ar_numpy.where(msk1, jmid, jlower)
+        jupper = D.ar_numpy.where(msk2, jmid, jupper)
         not_conv = (jupper - jlower) > 1
     else:
         jlower = D.ar_numpy.where(D.ar_numpy.take(array, jlower, axis=0) < val, jupper, jlower)
