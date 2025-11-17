@@ -23,18 +23,35 @@ REAL_TO_COMPLEX_DTYPE = {
 
 
 @functools.lru_cache
-def get_finite_difference_weights(dtype, number_of_nodes, order=1):
+def get_finite_difference_weights(dtype, number_of_nodes, order=1, normalised=True):
+    """
+    Implements the algorithm for the finite difference weights as described in:
+    @misc{fdcc,
+        title={Finite Difference Coefficients Calculator},
+        author={Taylor, Cameron R.},
+        year={2016},
+        howpublished="\url{https://web.media.mit.edu/~crtaylor/calculator.html}"
+    }
+    """
     inferred_backend = D.backend_like_dtype(dtype)
-    nodal_points = D.ar_numpy.linspace(-1, 1, number_of_nodes, dtype="float64")
+    if normalised:
+        nodal_points = D.ar_numpy.linspace(-1, 1, number_of_nodes, dtype="float64")
+    else:
+        nodal_points = D.ar_numpy.linspace(-(number_of_nodes//2), number_of_nodes//2, number_of_nodes, dtype="float64")
     weight_matrix = D.ar_numpy.stack(
         [D.ar_numpy.pow(D.ar_numpy.astype(D.ar_numpy.asarray(nodal_points), "float64"), i) for i in range(len(nodal_points))])
     b_vector = D.ar_numpy.zeros((len(nodal_points),), dtype="float64")
-    b_vector[order] = 1.0
+    if normalised:
+        b_vector[order] = 1.0
+    else:
+        b_vector[order] = math.factorial(order)
     if inferred_backend == 'torch':
         b_vector = b_vector[:, None]
     weights = D.ar_numpy.solve_linear_system(weight_matrix, b_vector)
     if inferred_backend == 'torch':
         weights = weights[:, 0]
+    if not normalised:
+        weights = weights/weights[-1]
     return nodal_points, weights
 
 
