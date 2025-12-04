@@ -30,7 +30,7 @@ def get_finite_difference_weights(dtype, number_of_nodes, order=1, normalised=Tr
         title={Finite Difference Coefficients Calculator},
         author={Taylor, Cameron R.},
         year={2016},
-        howpublished="\url{https://web.media.mit.edu/~crtaylor/calculator.html}"
+        howpublished="\\url{https://web.media.mit.edu/~crtaylor/calculator.html}"
     }
     """
     inferred_backend = D.backend_like_dtype(dtype)
