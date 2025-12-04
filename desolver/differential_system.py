@@ -1230,10 +1230,10 @@ def solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False,
     if kwargs is not None:
         constants.update(kwargs)
         
-    max_step = options.get("max_step", D.ar_numpy.asarray(np.inf, like=y0))
-    min_step = options.get("min_step", D.ar_numpy.asarray(0.0, like=y0))
+    max_step = D.ar_numpy.asarray(options.get("max_step", np.inf), like=y0)
+    min_step = D.ar_numpy.asarray(options.get("min_step", 0.0), like=y0)
     
-    initial_dt = options.get('first_step', D.ar_numpy.asarray(1e-4, like=y0))
+    initial_dt = D.ar_numpy.asarray(options.get('first_step', 1e-4), like=y0)
     initial_dt = D.ar_numpy.minimum(initial_dt, max_step)
     initial_dt = D.ar_numpy.maximum(initial_dt, min_step)
     
@@ -1245,12 +1245,19 @@ def solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False,
         def __step_cb(ode_sys):
             ode_sys.dt = D.ar_numpy.copysign(D.ar_numpy.clip(D.ar_numpy.abs(ode_sys.dt), min=min_step, max=max_step), ode_sys.dt)
         callbacks.append(__step_cb)
+    
     if "kick_variables" in options:
         ode_system.set_kick_vars(options["kick_variables"])
     
     integration_options = dict(callback=callbacks, events=events, eta=options.get("show_prog_bar", False))
     if t_eval is None:
-        ode_system.integrate(**integration_options)
+        try:
+            ode_system.integrate(**integration_options)
+        except (etypes.FailedIntegration, KeyboardInterrupt):
+            if options.get("raise_errors", True):
+                raise
+            else:
+                pass
         t_res = ode_system.t
         y_res = ode_system.y
         if isinstance(t_res, list):
@@ -1264,12 +1271,24 @@ def solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False,
             raise ValueError(f"Expected `t_eval` to be in the range [{t_span[0]}, {t_span[1]}]")
         t_res = []
         y_res = []
-        if integration_options.pop("eta"):
-            t_eval = tqdm(t_eval)
-        for t in t_eval:
-            ode_system.integrate(t=t, **integration_options)
-            t_res.append(ode_system[-1].t)
-            y_res.append(ode_system[-1].y)
+        show_progress = integration_options.pop("eta")
+        if show_progress:
+            time_eval_iter = tqdm(t_eval, total=len(t_eval))
+        else:
+            time_eval_iter = t_eval
+        for t in time_eval_iter:
+            try:
+                ode_system.integrate(t=t, **integration_options)
+            except (etypes.FailedIntegration, KeyboardInterrupt):
+                if options.get("raise_errors", True):
+                    raise
+                else:
+                    break
+            finally:
+                t_res.append(ode_system[-1].t)
+                y_res.append(ode_system[-1].y)
+            if show_progress:
+                time_eval_iter.desc = "{:>10.2f} | {:.2f} | {:<10.2e}".format(t_res[-1], t_eval[-1], ode_system.dt).ljust(8)
         t_res = D.ar_numpy.stack(t_res, axis=0)
         y_res = D.ar_numpy.stack(y_res, axis=-1)
     
