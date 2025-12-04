@@ -4,7 +4,7 @@ from desolver import utilities
 from desolver import exception_types
 from desolver.integrators import utilities as integrator_utilities
 from desolver.integrators import components
-from desolver.utilities.optimizer import broyden_update_jac
+from desolver.utilities.optimizer import broyden_update_jac, estimate_eigenvalues
 
 import warnings
 import abc
@@ -154,29 +154,23 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
                 tau0=D.ar_numpy.abs(D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0]), tau1=D.ar_numpy.abs(D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0]), niter0=0, niter1=0,
                 newton_prec0=D.ar_numpy.abs(D.ar_numpy.zeros((1,), **self.array_constructor_kwargs)[0]), newton_prec1=D.ar_numpy.abs(D.ar_numpy.zeros((1,), **self.array_constructor_kwargs)[0]),
                 newton_tol=D.ar_numpy.min(D.ar_numpy.maximum(D.ar_numpy.ones_like(self.dState)*D.tol_epsilon(self.dtype), D.ar_numpy.min(self.solver_dict['rtol'] + self.solver_dict['atol']))),
-                newton_iterations=32
+                newton_iterations=32,
+                eigval0=D.ar_numpy.abs(D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0]),
+                eigval1=D.ar_numpy.abs(D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0]),
+                jac_refresh_interval=32
             ))
             self.solver_dict.update(solver_dict_preserved)
             self.adaptation_fn = integrator_utilities.implicit_aware_update_timestep
             self.__jac_eye = None
             self.__rhs_jac = None
+            self.__steps_since_jac = 0
+        self.tolerance_failure_count = 0
+        self.tolerance_failure_patience = 4
         self.solver_dict_keep_keys = set(solver_dict_preserved.keys()) | {"num_step_retries"}
 
     def __call__(self, rhs, initial_time, initial_state, constants, timestep):
         self.solver_dict = {k:v for k,v in self.solver_dict.items() if k in self.solver_dict_keep_keys}
-        self.initial_state = D.ar_numpy.copy(initial_state)
-        self.initial_time = D.ar_numpy.copy(initial_time)
-        self.initial_rhs = None
-        
-        if self.final_rhs is not None:
-            self.initial_rhs = self.final_rhs
-            if self.is_fsal:
-                self.stage_values[...,0] = self.final_rhs
-        else:
-            self.initial_rhs = rhs(initial_time, initial_state, **constants)
-
-        if self.is_implicit and self.__rhs_jac is None:
-            self.__rhs_jac = rhs.jac(initial_time, initial_state, **constants)
+        self.pre_step_update_states(rhs, initial_time, initial_state, constants, timestep)
         
         current_timestep = timestep
         try:
@@ -195,6 +189,8 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
             self.solver_dict['initial_time'] = initial_time
             self.solver_dict['timestep'] = self.dTime
             self.solver_dict['dState'] = self.dState
+            if self.is_implicit:
+                self.solver_dict['eigval0'], self.solver_dict['eigval1'] = self.solver_dict['eigval1'], self.__leading_eigval
             timestep, redo_step = self.update_timestep()
             if self.is_implicit and not self.solver_dict.get("newton_iteration_success"):
                 redo_step = True
@@ -219,14 +215,59 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
                     else:
                         break
                 if redo_step:
-                    raise exception_types.FailedToMeetTolerances(
-                        "Failed to integrate system from {} to {} ".format(initial_time, initial_time + self.dTime) +
-                        "to the tolerances required: rtol={}, atol={}".format(self.rtol, self.atol)
-                    )
+                    self.tolerance_failure_count += 1
+                    if self.tolerance_failure_count > self.tolerance_failure_patience:
+                        raise exception_types.FailedToMeetTolerances(
+                            "Failed to integrate system from {} to {} ".format(initial_time, initial_time + self.dTime) +
+                            "to the tolerances required: rtol={}, atol={}".format(self.rtol, self.atol)
+                        )
+                else:
+                    self.tolerance_failure_count = 0
+        
+        self.post_step_update_states(self.final_rhs, self.dState)
         
         self._requires_high_precision = False
 
         return timestep, (self.dTime, self.dState)
+
+
+    def pre_step_update_states(self, rhs, initial_time, initial_state, constants, timestep):
+        self.initial_state = D.ar_numpy.copy(initial_state)
+        self.initial_time = D.ar_numpy.copy(initial_time)
+        self.initial_rhs = None
+        
+        if self.final_rhs is not None:
+            self.initial_rhs = self.final_rhs
+            if self.is_fsal:
+                self.stage_values[...,0] = self.final_rhs
+        else:
+            self.initial_rhs = rhs(initial_time, initial_state, **constants)
+        
+        if self.is_implicit:
+            if self.__rhs_jac is not None and D.ar_numpy.any(~D.ar_numpy.isfinite(self.__rhs_jac)):
+                self.__rhs_jac = None
+            elif self.__steps_since_jac % self.solver_dict['jac_refresh_interval'] == 0:
+                self.__rhs_jac = None
+            if self.__rhs_jac is None:
+                self.__rhs_jac = rhs.jac(initial_time, initial_state, **constants)
+                self.__steps_since_jac = 0
+            self.__leading_eigval = D.ar_numpy.max(D.ar_numpy.abs(estimate_eigenvalues(self.__rhs_jac.reshape(self.numel, self.numel))[0]))
+
+
+    def post_step_update_states(self, final_rhs, dState):
+        if self.is_implicit and self.__rhs_jac is not None and self.initial_rhs is not None:
+            updated_jac = broyden_update_jac(
+                self.__rhs_jac.reshape(self.numel, self.numel),
+                dState.reshape(self.numel, 1),
+                (final_rhs - self.initial_rhs).reshape(self.numel, 1)
+            ).reshape(self.__rhs_jac.shape)
+            if D.ar_numpy.any(~D.ar_numpy.isfinite(self.__rhs_jac)):
+                self.__rhs_jac = None
+            elif D.ar_numpy.linalg.norm(updated_jac) > D.ar_numpy.linalg.norm(self.__rhs_jac) + D.ar_numpy.maximum(D.ar_numpy.linalg.norm(self.initial_rhs), D.ar_numpy.linalg.norm(final_rhs)):
+                self.__rhs_jac = None
+            else:
+                self.__rhs_jac = updated_jac
+                self.__steps_since_jac += 1
         
 
     def algebraic_system(self, next_state, rhs, initial_time, initial_state, timestep, constants):
@@ -278,8 +319,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
                     tol=self.solver_dict.get("newton_tol", D.tol_epsilon(self.dtype)),
                     maxiter=self.solver_dict.get("newton_iterations", 32),
                     additional_args=(rhs, initial_time, initial_state, timestep, constants),
-                    use_scipy=False)
-            self.solver_dict["newton_iteration_success"] = self.solver_dict["newton_iteration_success"] and prec < self.solver_dict.get("newton_tol", D.tol_epsilon(self.dtype))
+                    use_scipy=True)
             if not self.solver_dict["newton_iteration_success"]:
                 self.__rhs_jac = None
             self.solver_dict.update(dict(
@@ -308,13 +348,6 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
         else:
             self.dState = timestep * D.ar_numpy.sum(self.stage_values * self.tableau_final[0, 1:], axis=-1)
             self.final_rhs = rhs(initial_time + self.dTime, initial_state + self.dState, **constants)
-        
-        if self.is_implicit and self.__rhs_jac is not None and self.initial_rhs is not None:
-            self.__rhs_jac = broyden_update_jac(
-                self.__rhs_jac.reshape(self.numel, self.numel),
-                self.dState.reshape(self.numel, 1),
-                (self.final_rhs - self.initial_rhs).reshape(self.numel, 1)
-            ).reshape(self.__rhs_jac.shape)
 
         return timestep, (self.dTime, self.dState)
 
@@ -446,8 +479,8 @@ def generate_richardson_integrator(basis_integrator, richardson_iter=2):
             for i in self.dim:
                 self.numel *= int(i)
             self.dtype = kwargs.get("dtype", D.ar_numpy.float64)
-            self.rtol = kwargs.get("rtol") if kwargs.get("rtol", None) is not None else 32 * D.epsilon()
-            self.atol = kwargs.get("atol") if kwargs.get("atol", None) is not None else 32 * D.epsilon()
+            self.rtol = kwargs.get("rtol") if kwargs.get("rtol", None) is not None else 32 * D.epsilon(self.dtype)
+            self.atol = kwargs.get("atol") if kwargs.get("atol", None) is not None else 32 * D.epsilon(self.dtype)
             self.device = kwargs.get("device", None)
             self.array_constructor_kwargs = dict(dtype=self.dtype)
             self.array_constructor_kwargs['like'] = D.backend_like_dtype(self.dtype)
@@ -486,6 +519,7 @@ def generate_richardson_integrator(basis_integrator, richardson_iter=2):
                 self.stage_values = self.stage_values.to(self.device)
             
             self._adaptive = True
+            self._adaptivity_enabled = True
 
             self.__interpolants = None
             self.__interpolant_times = None
