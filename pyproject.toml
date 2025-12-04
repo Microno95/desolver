@@ -97,6 +97,7 @@ extra-dependencies = [
 [tool.hatch.envs.hatch-test]
 installer = "uv"
 parallel = true
+randomize = true
 default-args = ["desolver"]
 features = [
   "test"
