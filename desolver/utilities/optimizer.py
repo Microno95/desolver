@@ -358,12 +358,38 @@ def iterative_left_inverse_8th(A, Ainv0, maxiter=10):
 
 
 def broyden_update_jac(B, dx, df, Binv=None):
+    """
+    Brodyen-style update for the Hessian matrix of a function using the SR1 update formula
+
+    Parameters
+    ----------
+    B : np.ndarray|torch.Tensor, (fdim, xdim)
+        Matrix to update, generally an approximation to the Hessian
+    dx : np.ndarray|torch.Tensor, (xdim, 1)
+        The change in the evaluation point
+    df : np.ndarray|torch.Tensor, (fdim, 1)
+        The change in the function value
+    Binv : np.ndarray|torch.Tensor, (xdim, fdim)
+        Inverse of the matrix to update, ignored if None
+
+    Returns
+    -------
+    B[, Binv]
+        returns the updated Hessian matrix [and its inverse]
+    """
     y_ex = B @ dx
     y_is = df
+    # with warnings.catch_warnings():
+    #     warnings.filterwarnings("ignore", category=RuntimeWarning, message="overflow encountered in matmul")
+    #     kI = (y_is - y_ex) / D.ar_numpy.sum(y_ex.mT @ y_ex)
+    # B_new = D.ar_numpy.reshape((1 + kI @ (B @ dx)) * B, (df.shape[0], dx.shape[0]))
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning, message="overflow encountered in matmul")
-        kI = (y_is - y_ex) / D.ar_numpy.sum(y_ex.mT @ y_ex)
-    B_new = D.ar_numpy.reshape((1 + kI * (B @ dx)) * B, (df.shape[0], dx.shape[0]))
+        kI = (y_is - y_ex)
+    # # SR1 update formula
+    B_new = D.ar_numpy.reshape(B + (kI @ kI.mT) / (kI.mT @ dx + D.tol_epsilon(dx.dtype)), (df.shape[0], dx.shape[0]))
+    # BFGS update formula
+    # B_new = D.ar_numpy.reshape(B + y_is @ y_is.mT / (y_is.mT @ dx) - (y_ex @ y_ex.mT)/(dx.mT @ y_ex), (df.shape[0], dx.shape[0]))
     if Binv is not None:
         Binv_new = Binv + ((dx - Binv @ y_is) / (y_is.mT @ y_is)) @ y_is.mT
         norm_val = D.ar_numpy.linalg.norm(Binv_new @ B_new - D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(B))))
@@ -374,7 +400,170 @@ def broyden_update_jac(B, dx, df, Binv=None):
         return B_new
 
 
-def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac_update_rate=20, initial_trust_region=None, var_bounds=None):
+def estimate_eigenvalues(matrix_A, num_initial_vecs=None, tol=None, estimate_smallest=True):
+    """
+    Estimates dominant eigenvalues of a matrix using subspace iterations and the Rayleigh-Ritz method
+
+    Parameters
+    ----------
+    matrix_A : np.ndarray|torch.Tensor, (fdim, xdim)
+        Matrix whose eigenvalues are to be estimated
+    num_initial_vecs : int, >0
+        The number of dominant eigenvalues to estimate
+    tol : float
+        The numerical tolerance for convergence
+    estimate_smallest : bool
+        Estimate the smallest eigenvalues as well. Smallest in magnitude for a positive-definite matrix, most negative real component for an indefinite one
+
+    Returns
+    -------
+    (np.ndarray|torch.Tensor, np.ndarray|torch.Tensor)
+        Returns the eigenvalues and eigenvectors associated with the matrix
+    """
+    if matrix_A.shape[-1] < 32:
+        return D.ar_numpy.linalg.eig(matrix_A)
+    else:
+        if num_initial_vecs is None:
+            num_initial_vecs = max(8, min(matrix_A.shape[-1]//4, 4))
+        num_initial_vecs = min(num_initial_vecs, matrix_A.shape[-1])
+        if tol is None:
+            tol = D.tol_epsilon(matrix_A.dtype)**0.5
+        V0 = D.ar_numpy.zeros_like(matrix_A[...,:num_initial_vecs])
+        for i in range(num_initial_vecs):
+            V0[i,i] = 1
+        V1 = D.ar_numpy.copy(V0)
+        for iter_count in range(matrix_A.shape[-1]*32):
+            Y0 = matrix_A@V0
+            if iter_count > 1 and iter_count % matrix_A.shape[-1] == 0:
+                eigvals_V0 = D.ar_numpy.linalg.eigvals(V0.mT.conj()@matrix_A@V0)
+                eigvals_V1 = D.ar_numpy.linalg.eigvals(V1.mT.conj()@matrix_A@V0)
+                if D.ar_numpy.linalg.norm(eigvals_V0 - eigvals_V1) < tol:
+                    break
+            V1, _ = D.ar_numpy.linalg.qr(Y0, mode='reduced')
+            V0, V1 = V1, V1
+        eigvals, eigvecs = D.ar_numpy.linalg.eig(V0.mT.conj()@matrix_A@V0)
+        if D.autoray.infer_backend(matrix_A) == 'torch':
+            eigvecs = V0.to(eigvecs.dtype)@eigvecs
+        else:
+            eigvecs = V0@eigvecs
+        if estimate_smallest:
+            ident = D.ar_numpy.eye(matrix_A.shape[0], like=matrix_A)
+            if D.autoray.infer_backend(matrix_A) == 'torch':
+                ident = ident.to(matrix_A)
+            max_eigval = D.ar_numpy.max(D.ar_numpy.abs(eigvals))
+            eigvals_smallest, eigvecs_smallest = estimate_eigenvalues(max_eigval*ident - matrix_A, num_initial_vecs=num_initial_vecs, tol=tol, estimate_smallest=False)
+            eigvals = D.ar_numpy.concatenate([eigvals, max_eigval-eigvals_smallest], axis=-1)
+            eigvecs = D.ar_numpy.concatenate([eigvecs, -eigvecs_smallest], axis=-1)
+        return eigvals, eigvecs
+
+
+def cg_minimize(vp_fn, residual_fn, x0, max_iter=None, tol=None, verbose=0):
+    """
+    Conjugate Gradient minimisation of a linear least-squares problem
+
+    Parameters
+    ----------
+    vp_fn : callable
+        The vector product function, should return A@v for a given vector v
+    residual_fn : callable
+        The residual function, should return f - Av for a given matrix-vector product Av=A@V
+    x0 : np.ndarray|torch.Tensor
+        The starting value for the minimisation
+    max_iter : int, >0
+        Maximum number of iterations for the minimisation
+    tol : float
+        The numerical tolerance of the algorithm
+    verbose : int
+        Print progress on the minimisation
+
+    Returns
+    -------
+    np.ndarray|torch.Tensor
+        Returns the value of `x` that minimizes |f - A@x|^2
+    """
+    if max_iter is None:
+        max_iter = x0.shape[0]*4
+    if tol is None:
+        tol = D.tol_epsilon(x0.dtype)
+
+    x_0 = x0
+    dir_0 = residual_0 = residual_fn(x_0, vp_fn(x_0))
+    Ad_0 = vp_fn(dir_0)
+    
+    res_norm_0 = (residual_0.mT @ residual_0)
+    alpha_0 = res_norm_0 / (dir_0.mT @ Ad_0)
+
+    x_1 = x_0 + alpha_0 * dir_0
+    residual_1 = residual_0 - alpha_0*Ad_0
+    res_norm_1 = residual_1.mT @ residual_1
+    beta_1 = res_norm_1 / res_norm_0
+    dir_1 = residual_1 + beta_1*dir_0
+
+    dir_0, dir_1 = dir_1, None
+    residual_0, residual_1 = residual_1, None
+    x_0, x_1 = x_1, None
+    res_norm_0, res_norm_1 = res_norm_1, None
+
+    iteration_idx = 0
+    while (D.ar_numpy.sqrt(res_norm_0) > tol) and iteration_idx < max_iter:
+        Ad_0 = vp_fn(dir_0)
+        
+        alpha_0 = res_norm_0 / (dir_0.mT @ Ad_0)
+        x_1 = x_0 + alpha_0 * dir_0
+        residual_1 = residual_0 - alpha_0*Ad_0
+        res_norm_1 = residual_1.mT @ residual_1
+        beta_1 = D.ar_numpy.where(D.ar_numpy.sqrt(res_norm_0) > tol, res_norm_1 / res_norm_0, 0.0)
+        dir_1 = residual_1 + beta_1*dir_0
+
+        dir_0, dir_1 = dir_1, None
+        residual_0, residual_1 = residual_1, None
+        x_0, x_1 = x_1, None
+        res_norm_0, res_norm_1 = res_norm_1, None
+
+        if verbose > 0 and (iteration_idx % verbose == 0):
+            print(f"[cgmin-{iteration_idx+1}/{max_iter}] |F|={res_norm_0.item():.16f}")
+        iteration_idx += 1
+    
+    return x_0
+
+
+def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac_update_rate=20, initial_trust_region=None, var_bounds=None, force_use_cg=False):
+    """
+    Newton Trust-region method for the root-finding problem of a nonlinear function `f`.
+
+    Parameters
+    ----------
+    f : callable
+        Function whose roots are to be found
+    x0 : np.ndarray|torch.Tensor
+        The starting point for the optimisation
+    jac : callable
+        The jacobian function that returns df/dx
+    tol : float
+        The numerical tolerance of the algorithm
+    verbose : int
+        Print outputs at `verbose` interval iterations
+    maxiter : int, >0
+        Maximum iterations of the algorithm
+    jac_update_rate : int
+        The rate at which `jac` is evaluated to replace the Broyden update jacobian. This is useful when the jacobian approximation with Broyden updates strays too far from the true jacobian.
+    initial_trust_region : float
+        The initial size of the trust-region, automatically determined from the dominant eigenvalues of the jacobian
+    var_bounds : (np.ndarray|torch.Tensor, np.ndarray|torch.Tensor) -> (min(x), max(x))
+        Box constraints on the parameter values, uses a periodic sine transformation of the variables
+    force_use_cg : bool
+        The underlying least-squares problem at each step is solved using direct methods below a certain problem size, and conjugate-gradient above a matrix size (xdim*fdim) of 4096. This flag forces the solver to always use Conjuage-Gradient.
+
+    Returns
+    -------
+    np.ndarray|torch.Tensor, (bool, int, int, int, np.ndarray|torch.Tensor)
+        Returns the value of `x` that best solves f(x)=0 in a least-squares sense along with a tuple containing: 
+            * success of the optimisation
+            * number of iterations
+            * number of function evaluations
+            * number of jacobian evaluations
+            * residual of the solution, |f(x)-0|
+    """
     x0 = D.ar_numpy.asarray(x0)
     if tol is None:
         tol = D.tol_epsilon(x0.dtype)
@@ -388,7 +577,8 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
         else:
             jac_vec = None
         res = newtontrustregion(f_vec, D.ar_numpy.atleast_1d(x0), jac_vec, tol=tol, verbose=verbose, 
-                                     maxiter=maxiter, initial_trust_region=initial_trust_region, var_bounds=var_bounds)
+                                     maxiter=maxiter, initial_trust_region=initial_trust_region, var_bounds=var_bounds, 
+                                     force_use_cg=False)
         return D.ar_numpy.reshape(res[0], xshape), res[1]
     xdim = 1
     for __d in xshape:
@@ -469,7 +659,15 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
         warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in matmul")
         if D.ar_numpy.linalg.norm(Jinv @ Jf1 - identity_matrix) < 0.5:
             Jinv = iterative_left_inverse_8th(Jf1, Jinv)
-    trust_region = 5.0 if initial_trust_region is None else initial_trust_region
+    if initial_trust_region is None:
+        trust_region = D.ar_numpy.maximum(
+            D.ar_numpy.max(D.ar_numpy.abs(estimate_eigenvalues(D.ar_numpy.astype(Jf1, f64_type), tol=1e-2)[0])),
+            D.ar_numpy.linalg.norm(Jf0)
+        )
+        if not D.ar_numpy.all(D.ar_numpy.isfinite(trust_region)):
+            raise ValueError("Encountered NaN in jacobian!")
+    else:
+        trust_region = initial_trust_region
     iteration = 0
     fail_iter = 0
 
@@ -479,7 +677,16 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
             dJ = Jf1 - Jf0
             df = (df.mT @ df).item() ** 0.5
             dJ = D.ar_numpy.sum(dJ ** 2) ** 0.5
-            print(f"[ntr-{iteration}]: x = {D.ar_numpy.to_numpy(x)}, f = {D.ar_numpy.to_numpy(F1)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn1)}, ||dF|| = {D.ar_numpy.to_numpy(df)}, ||dJ|| = {D.ar_numpy.to_numpy(dJ)}")
+            ostring = []
+            if xdim < 4:
+                if var_bounds is not None:
+                    ostring.append(f"x = {D.ar_numpy.to_numpy(transform_to_unbounded_x(x, *var_bounds))}")
+                else:
+                    ostring.append(f"x = {D.ar_numpy.to_numpy(x)}")
+            if fdim < 4:
+                ostring.append(f"f = {D.ar_numpy.to_numpy(F1)}")
+            ostring = ", ".join(ostring)
+            print(f"[ntr-{iteration}]: ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn1)}, ||dF|| = {D.ar_numpy.to_numpy(df)}, ||dJ|| = {D.ar_numpy.to_numpy(dJ)}, {ostring}")
         sparse = (1.0 - D.ar_numpy.sum(D.ar_numpy.abs(Jf1) > 0) / (xdim * fdim)) <= 0.7
         P = Jf1
         diagP = D.ar_numpy.diag(trust_region * D.ar_numpy.diag(P))
@@ -487,7 +694,19 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
             warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in matmul")
             warnings.filterwarnings("ignore", category=scipy.linalg.LinAlgWarning)
             warnings.filterwarnings("ignore", category=scipy.sparse.linalg.MatrixRankWarning)
-            dx = D.ar_numpy.reshape(D.ar_numpy.solve_linear_system(Jinv @ (P + diagP), -Jinv @ F1, sparse=sparse), (xdim, 1))
+            if xdim*fdim >= 4096 or force_use_cg:
+                JinvF1 = -Jinv @ F1
+                JinvPdP = Jinv @ (P + diagP)
+                dx = D.ar_numpy.reshape(cg_minimize(
+                    lambda v0: JinvPdP @ v0,
+                    lambda f0, jv0: JinvF1 - jv0,
+                    x0=x,
+                    max_iter=xdim*fdim*4,
+                    tol=tol*0.1,
+                    verbose=verbose > 0
+                ), (xdim, 1))
+            else:
+                dx = D.ar_numpy.reshape(D.ar_numpy.solve_linear_system(Jinv @ (P + diagP), -Jinv @ F1, sparse=sparse), (xdim, 1))
         no_progress = True
         F0 = F1
         Fn0 = Fn1
@@ -529,7 +748,16 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
         convergence_failure = not D.ar_numpy.isfinite(dxn) or fail_iter > 2
         if success or convergence_failure:
             if verbose:
-                print(f"[ntr-finished]: x = {D.ar_numpy.to_numpy(x)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn1)}, ||dF|| = {D.ar_numpy.to_numpy(df)}")
+                ostring = []
+                if xdim < 4:
+                    if var_bounds is not None:
+                        ostring.append(f"x = {D.ar_numpy.to_numpy(transform_to_unbounded_x(x, *var_bounds))}")
+                    else:
+                        ostring.append(f"x = {D.ar_numpy.to_numpy(x)}")
+                if fdim < 4:
+                    ostring.append(f"f = {D.ar_numpy.to_numpy(F1)}")
+                ostring = ", ".join(ostring)
+                print(f"[ntr-finished]: ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn1)}, ||dF|| = {D.ar_numpy.to_numpy(df)}, {ostring}")
             break
     x = D.ar_numpy.reshape(x, xshape)
     if var_bounds is not None:
@@ -537,7 +765,38 @@ def newtontrustregion(f, x0, jac=None, tol=None, verbose=False, maxiter=200, jac
     return x, (success and not convergence_failure, iteration, nfev, njev, Fn1)
 
 
-def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200, var_bounds=None):
+def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200, var_bounds=None, force_use_cg=False):
+    """
+    A trust-region, hybrid Gauss-Newton and secant method root-finding algorithm, similar to the `hybrj` solver found in `MINPACK`.
+
+    Parameters
+    ----------
+    f : callable
+        Function whose roots are to be found
+    x0 : np.ndarray|torch.Tensor
+        The starting point for the optimisation
+    jac : callable
+        The jacobian function that returns df/dx
+    tol : float
+        The numerical tolerance of the algorithm
+    verbose : int
+        Print outputs at `verbose` interval iterations
+    maxiter : int, >0
+        Maximum iterations of the algorithm
+    var_bounds : (np.ndarray|torch.Tensor, np.ndarray|torch.Tensor) -> (min(x), max(x))
+        Box constraints on the parameter values, uses a periodic sine transformation of the variables
+    force_use_cg : bool
+        The underlying least-squares problem at each step is solved using direct methods below a certain problem size, and conjugate-gradient above a matrix size (xdim*fdim) of 4096. This flag forces the solver to always use Conjuage-Gradient.
+
+    Returns
+    -------
+    np.ndarray|torch.Tensor, (bool, np.ndarray|torch.Tensor, int, np.ndarray|torch.Tensor)
+        Returns the value of `x` that best solves f(x)=0 in a least-squares sense along with a tuple containing: 
+            * success of the optimisation
+            * residual of the solution, |f(x)-0|
+            * number of iterations
+            * the value of f(x) at the best x
+    """
     x0 = D.ar_numpy.asarray(x0)
     if tol is None:
         tol = D.tol_epsilon(x0.dtype)
@@ -593,13 +852,19 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200, var_bounds=None):
         fun_jac = transform_to_bounded_jac(fun_jac, *var_bounds)
         x = transform_to_bounded_x(x, *var_bounds)
     
+    low_precision_dtype = D.ar_numpy.finfo(x0.dtype).bits < 32
     F0 = fun(x)
     F1 = D.ar_numpy.copy(F0)
     J0 = fun_jac(x)
     dx = D.ar_numpy.zeros_like(x)
     dxn = D.ar_numpy.linalg.norm(dx)
+    f64_type = D.autoray.to_backend_dtype('float64', like=inferred_backend)
 
-    trust_region = D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.diag(J0)))
+    trust_region = D.ar_numpy.maximum(
+        D.ar_numpy.max(D.ar_numpy.abs(estimate_eigenvalues(D.ar_numpy.astype(J0, f64_type), tol=1e-2)[0])),
+        D.ar_numpy.linalg.norm(J0)
+    )
+    trust_region = 1.0/trust_region
     if not D.ar_numpy.all(D.ar_numpy.isfinite(trust_region)):
         raise ValueError("Encountered NaN in jacobian!")
     iteration = 0
@@ -608,16 +873,40 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200, var_bounds=None):
         if verbose:
             df = D.ar_numpy.linalg.norm(F1 - F0)
             Fn0 = D.ar_numpy.linalg.norm(F0)
-            print(f"[hybrj-{iteration}]: tr = {D.ar_numpy.to_numpy(trust_region)}, x = {D.ar_numpy.to_numpy(x)}, f = {D.ar_numpy.to_numpy(F1)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn0)}, ||dF|| = {D.ar_numpy.to_numpy(df)}")
+            ostring = []
+            if xdim < 4:
+                if var_bounds is not None:
+                    ostring.append(f"x = {D.ar_numpy.to_numpy(transform_to_unbounded_x(x, *var_bounds))}")
+                else:
+                    ostring.append(f"x = {D.ar_numpy.to_numpy(x)}")
+            if fdim < 4:
+                ostring.append(f"f = {D.ar_numpy.to_numpy(F1)}")
+            if ostring:
+                ostring = ", " + ", ".join(ostring)
+            else:
+                ostring = ""
+            print(f"[hybrj-{iteration}]: tr = {D.ar_numpy.to_numpy(trust_region)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, ||F|| = {D.ar_numpy.to_numpy(Fn0)}, ||dF|| = {D.ar_numpy.to_numpy(df)}{ostring}")
         Jt_mul_F = J0.mT @ F0
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in matmul")
             warnings.filterwarnings("ignore", category=scipy.linalg.LinAlgWarning)
             warnings.filterwarnings("ignore", category=scipy.sparse.linalg.MatrixRankWarning)
-            dx_gn = -D.ar_numpy.solve_linear_system(J0.mT @ J0, Jt_mul_F)
-        dx_sd = -Jt_mul_F
-        tparam = -dx_sd.mT @ Jt_mul_F / D.ar_numpy.linalg.norm(J0 @ dx_sd) ** 2
+            # dx_gn = -D.ar_numpy.solve_linear_system(J0.mT @ J0, Jt_mul_F)
+            if (not low_precision_dtype and (xdim*fdim >= 4096 or force_use_cg)):
+                dx_gn = -D.ar_numpy.reshape(cg_minimize(
+                    lambda v0: (J0 @ v0),
+                    lambda f0, jv0: F0 - jv0,
+                    x0=x,
+                    max_iter=xdim*fdim*4,
+                    tol=tol*0.1,
+                    verbose=verbose > 0
+                ), (xdim, 1))
+            else:
+                dx_gn = -D.ar_numpy.solve_linear_system(J0, F0)
+            
         xtol = tol * (xdim + D.ar_numpy.linalg.norm(x))
+        dx_sd = -Jt_mul_F
+        tparam = -dx_sd.mT @ Jt_mul_F / (D.ar_numpy.linalg.norm(J0 @ dx_sd) ** 2 + xtol)
         if D.ar_numpy.all(D.ar_numpy.linalg.norm(dx_gn) <= trust_region) or D.ar_numpy.linalg.norm(dx_gn - tparam * dx_sd) < xtol:
             dx = dx_gn
         elif D.ar_numpy.all(D.ar_numpy.linalg.norm(dx_sd) >= trust_region):
@@ -644,7 +933,7 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200, var_bounds=None):
             x = __x
             F1 = F0
             F0 = __f
-            success = D.ar_numpy.linalg.norm(F0) < tol or dxn <= xtol
+            success = D.ar_numpy.linalg.norm(F0) < tol * fdim or dxn <= xtol * xdim
         if no_progress:
             J0 = fun_jac(x)
         else:
@@ -655,11 +944,23 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200, var_bounds=None):
             trust_region = D.ar_numpy.maximum(trust_region, 3 *  D.ar_numpy.linalg.norm(dx_gn))
         elif D.ar_numpy.max(gain) < 0.25:
             trust_region = trust_region * 0.5
-            success = success or trust_region <= xtol
+            success = success or trust_region <= xtol * xdim
         if success:
             if verbose:
                 Fn0 = D.ar_numpy.linalg.norm(F0)
-                print(f"[hybrj-finished]: ||F|| = {D.ar_numpy.to_numpy(Fn0)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}, x = {D.ar_numpy.to_numpy(x)}, F = {D.ar_numpy.to_numpy(F0)}")
+                ostring = []
+                if xdim < 4:
+                    if var_bounds is not None:
+                        ostring.append(f"x = {D.ar_numpy.to_numpy(transform_to_unbounded_x(x, *var_bounds))}")
+                    else:
+                        ostring.append(f"x = {D.ar_numpy.to_numpy(x)}")
+                if fdim < 4:
+                    ostring.append(f"f = {D.ar_numpy.to_numpy(F1)}")
+                if ostring:
+                    ostring = ", " + ", ".join(ostring)
+                else:
+                    ostring = ""
+                print(f"[hybrj-finished]: ||F|| = {D.ar_numpy.to_numpy(Fn0)}, ||dx|| = {D.ar_numpy.to_numpy(dxn)}{ostring}")
             break
     x = D.ar_numpy.reshape(x, xshape)
     if var_bounds is not None:
@@ -668,7 +969,44 @@ def hybrj(f, x0, jac, tol=None, verbose=False, maxiter=200, var_bounds=None):
 
 
 def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_scipy=True,
-                    additional_args=tuple(), additional_kwargs=dict(), var_bounds=None):
+                    additional_args=tuple(), additional_kwargs=dict(), var_bounds=None, force_use_cg=False):
+    """
+    Uses a variety of algorithms to solve for the roots of a nonlinear function. If available, uses `scipy` solvers first,
+    and if those do not succeed or support the data-type, switches the `hybrj` and `newtontrustregion` above.
+
+    Parameters
+    ----------
+    f : callable
+        Function whose roots are to be found
+    x0 : np.ndarray|torch.Tensor
+        The starting point for the optimisation
+    jac : Optional[callable]
+        The jacobian function that returns df/dx
+    tol : float
+        The numerical tolerance of the algorithm
+    verbose : int
+        Print outputs at `verbose` interval iterations
+    maxiter : int, >0
+        Maximum iterations of the algorithm
+    use_scipy : bool
+        Whether to try using scipy to solve the problem
+    additional_args, additional_kwargs : (tuple(), dict())
+        Additional positional and keyword arguments to pass to `f` and `jac`
+    var_bounds : (np.ndarray|torch.Tensor, np.ndarray|torch.Tensor) -> (min(x), max(x))
+        Box constraints on the parameter values, uses a periodic sine transformation of the variables
+    force_use_cg : bool
+        The underlying least-squares problem at each step is solved using direct methods below a certain problem size, and conjugate-gradient above a matrix size (xdim*fdim) of 4096. This flag forces the solver to always use Conjuage-Gradient.
+
+    Returns
+    -------
+    np.ndarray|torch.Tensor, (bool, int, int, int, np.ndarray|torch.Tensor)
+        Returns the value of `x` that best solves f(x)=0 in a least-squares sense along with a tuple containing: 
+            * success of the optimisation
+            * number of iterations
+            * number of function evaluations
+            * number of jacobian evaluations
+            * residual of the solution, |f(x)-0|
+    """
     x0 = D.ar_numpy.asarray(x0)    
     if tol is None:
         tol = D.tol_epsilon(x0.dtype)
@@ -767,7 +1105,7 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
         else:
             x = D.ar_numpy.reshape(x0, (xdim, 1))
     else:
-        root, (success, prec, iterations, F) = hybrj(fun, x, fun_jac, tol=tol, verbose=verbose, maxiter=maxiter)
+        root, (success, prec, iterations, F) = hybrj(fun, x, fun_jac, tol=tol, verbose=verbose, maxiter=maxiter, force_use_cg=force_use_cg)
         success = success or D.ar_numpy.linalg.norm(F) <= D.tol_epsilon(x0.dtype)
         if success:
             x = D.ar_numpy.reshape(root, xshape)
@@ -777,7 +1115,7 @@ def nonlinear_roots(f, x0, jac=None, tol=None, verbose=False, maxiter=200, use_s
         else:
             x = D.ar_numpy.reshape(x0, (xdim, 1))
     
-    root, (success, iterations, *_, prec) = newtontrustregion(fun, x, jac=fun_jac, tol=tol, verbose=verbose, maxiter=maxiter, jac_update_rate=10, initial_trust_region=1e-4)
+    root, (success, iterations, *_, prec) = newtontrustregion(fun, x, jac=fun_jac, tol=tol, verbose=verbose, maxiter=maxiter, jac_update_rate=10, initial_trust_region=None, force_use_cg=force_use_cg)
     success = success or prec <= D.tol_epsilon(x0.dtype)
     
     x = D.ar_numpy.reshape(root, xshape)
