@@ -52,27 +52,27 @@ def generate_problems_kind_10(n):
     return fn4
 
 def fn5(x):
-    return 2*x*np.exp(-2) - 2*D.ar_numpy.exp(-2*x) + 1
+    return 2*x*D.ar_numpy.exp(-2) - 2*D.ar_numpy.exp(-2*x) + 1
 
 def fn5_jac(x):
-    return 2*np.exp(-2) + 4*D.ar_numpy.exp(-2*x)
+    return 2*D.ar_numpy.exp(-2) + 4*D.ar_numpy.exp(-2*x)
 
 fn5.jac = fn5_jac
 fn5.root_interval = [0.0, 1.0]
 fn5.min_precision = 16
 
 def fn6(x):
-    return np.where(
+    return D.ar_numpy.where(
         x == 0,
         0.0,
-        x*np.exp(-x**-2)
+        x*D.ar_numpy.exp(-x**-2)
     )
 
 def fn6_jac(x):
-    return np.where(
+    return D.ar_numpy.where(
         x == 0,
         0.0,
-        np.exp(-1/x**2) + 2*np.exp(-1/x**2)/x**2
+        D.ar_numpy.exp(-1/x**2) + 2*D.ar_numpy.exp(-1/x**2)/x**2
     )
 
 fn6.jac = fn6_jac

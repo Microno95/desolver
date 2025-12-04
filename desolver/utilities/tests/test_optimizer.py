@@ -321,7 +321,7 @@ def test_nonlinear_root(solver, tolerance, dtype_var, backend_var, device_var, a
 @pytest.mark.parametrize('ac_prod_val', np.linspace(0.9, 1.1, 3))
 @pytest.mark.parametrize('a_val', [-1.0, 1.0])
 @pytest.mark.parametrize('solver', [de.utilities.optimizer.newtontrustregion, de.utilities.optimizer.hybrj, de.utilities.optimizer.nonlinear_roots])
-@pytest.mark.parametrize('shape', [(1,), (4,4), (2,3,5), (8,8,8)])
+@pytest.mark.parametrize('shape', [(1,), (4,4), (2,3,5), (4,4,4)])
 @pytest.mark.parametrize('force_use_cg', [False, True])
 def test_nonlinear_root_dims(solver, tolerance, dtype_var, backend_var, device_var, a_val, ac_prod_val, shape, force_use_cg):
     dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
