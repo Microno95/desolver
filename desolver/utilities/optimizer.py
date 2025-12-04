@@ -420,6 +420,8 @@ def estimate_eigenvalues(matrix_A, num_initial_vecs=None, tol=None, estimate_sma
     (np.ndarray|torch.Tensor, np.ndarray|torch.Tensor)
         Returns the eigenvalues and eigenvectors associated with the matrix
     """
+    if D.ar_numpy.finfo(matrix_A.dtype).bits > 64:
+        return estimate_eigenvalues(D.ar_numpy.astype(matrix_A, D.autoray.to_backend_dtype('float64', like=matrix_A)), num_initial_vecs=None, tol=None, estimate_smallest=True)
     if matrix_A.shape[-1] < 32:
         return D.ar_numpy.linalg.eig(matrix_A)
     else:
