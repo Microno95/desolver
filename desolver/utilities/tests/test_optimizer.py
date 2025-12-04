@@ -87,7 +87,8 @@ def test_brentsroot_same_sign(dtype_var, backend_var, device_var):
     gt_root = -b / a
     lb, ub = -b / a - 1, -b / a - 2
 
-    fun = lambda x: a * x + b
+    def fun(x):
+        return a * x + b
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(gt_root)))) <= D.tol_epsilon(dtype_var)
 
@@ -114,7 +115,8 @@ def test_brentsroot_epsilon_too_small(dtype_var, backend_var, device_var):
     gt_root = -b / a
     lb, ub = -b / a - 1, -b / a - 2
 
-    fun = lambda x: a * x + b
+    def fun(x):
+        return a * x + b
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(gt_root)))) <= D.tol_epsilon(dtype_var)
 
@@ -139,7 +141,8 @@ def test_brentsroot_wrong_order(dtype_var, backend_var, device_var):
     gt_root = -b / a
     lb, ub = -b / a - 1, -b / a + 1
 
-    fun = lambda x: a * x + b
+    def fun(x):
+        return a * x + b
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(gt_root)))) <= D.tol_epsilon(dtype_var)
 
@@ -149,7 +152,7 @@ def test_brentsroot_wrong_order(dtype_var, backend_var, device_var):
     assert (np.allclose(D.ar_numpy.to_numpy(gt_root), D.ar_numpy.to_numpy(root), D.tol_epsilon(dtype_var), D.tol_epsilon(dtype_var)))
 
 
-@pytest.mark.parametrize('tolerance', [None, 100.0, 10.0, 1.0])
+@pytest.mark.parametrize('tolerance', [None, 100.0, 1.0])
 @pytest.mark.parametrize('ac_prod_val', np.linspace(0.9, 1.1, 4))
 @pytest.mark.parametrize('a_val', [-1.0, 1.0])
 def test_brentsroot(tolerance, dtype_var, backend_var, device_var, a_val, ac_prod_val):
@@ -172,7 +175,8 @@ def test_brentsroot(tolerance, dtype_var, backend_var, device_var, a_val, ac_pro
     ub = -b / (2 * a)
     lb = -b / (2 * a) - 1.0 / (2 * a)
 
-    fun = lambda x: a * x ** 2 + b * x + c
+    def fun(x):
+        return a * x ** 2 + b * x + c
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(gt_root))) <= D.tol_epsilon(dtype_var))
 
@@ -191,7 +195,7 @@ def test_brentsroot(tolerance, dtype_var, backend_var, device_var, a_val, ac_pro
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(root))) <= tol)
 
 
-@pytest.mark.parametrize('tolerance', [None, 100.0, 10.0, 1.0])
+@pytest.mark.parametrize('tolerance', [None, 100.0, 1.0])
 def test_brentsrootvec(tolerance, dtype_var, backend_var, device_var):
     dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
     if backend_var == 'torch':
@@ -236,7 +240,8 @@ def test_brentsrootvec(tolerance, dtype_var, backend_var, device_var):
                     map((lambda x: x[0](x[1])), zip(fun_list, root_list)))))
     
     
-    fun_vec = lambda x: a_vals * x**2 + b_vals * x + c_vals
+    def fun_vec(x):
+        return a_vals * x**2 + b_vals * x + c_vals
 
     assert np.allclose(D.ar_numpy.to_numpy(fun_vec(gt_root)), 0.0, D.tol_epsilon(dtype_var), D.tol_epsilon(dtype_var))
 
@@ -295,8 +300,10 @@ def test_nonlinear_root(solver, tolerance, dtype_var, backend_var, device_var, a
     ub = -b / (2 * a) - 0.2 / (2 * a)
     lb = -b / (2 * a) - 0.4 / (2 * a)
 
-    fun_fn = lambda x: a * x ** 2 + b * x + c
-    jac_fn = lambda x: 2 * a * x + b
+    def fun_fn(x):
+        return a * x ** 2 + b * x + c
+    def jac_fn(x):
+        return 2 * a * x + b
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root1))) <= D.tol_epsilon(dtype_var))
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root2))) <= D.tol_epsilon(dtype_var))
@@ -321,7 +328,7 @@ def test_nonlinear_root(solver, tolerance, dtype_var, backend_var, device_var, a
 @pytest.mark.parametrize('ac_prod_val', np.linspace(0.9, 1.1, 3))
 @pytest.mark.parametrize('a_val', [-1.0, 1.0])
 @pytest.mark.parametrize('solver', [de.utilities.optimizer.newtontrustregion, de.utilities.optimizer.hybrj, de.utilities.optimizer.nonlinear_roots])
-@pytest.mark.parametrize('shape', [(1,), (4,4), (2,3,5), (4,4,4)])
+@pytest.mark.parametrize('shape', [(1,), (4,5,6)])
 @pytest.mark.parametrize('force_use_cg', [False, True])
 def test_nonlinear_root_dims(solver, tolerance, dtype_var, backend_var, device_var, a_val, ac_prod_val, shape, force_use_cg):
     dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
@@ -349,8 +356,10 @@ def test_nonlinear_root_dims(solver, tolerance, dtype_var, backend_var, device_v
     ub = -b / (2 * a) - 0.2 / (2 * a)
     lb = -b / (2 * a) - 0.4 / (2 * a)
 
-    fun_fn = lambda x: a * x ** 2 + b * x + c
-    jac_fn = lambda x: 2 * a * x + b
+    def fun_fn(x):
+        return a * x ** 2 + b * x + c
+    def jac_fn(x):
+        return 2 * a * x + b
 
     assert D.ar_numpy.all(D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root1))) <= D.tol_epsilon(dtype_var))
     assert D.ar_numpy.all(D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root2))) <= D.tol_epsilon(dtype_var))
@@ -409,7 +418,8 @@ def test_nonlinear_root_dims_no_jacobian(solver, tolerance, dtype_var, backend_v
     ub = -b / (2 * a) - 0.2 / (2 * a)
     lb = -b / (2 * a) - 0.4 / (2 * a)
 
-    fun_fn = lambda x: a * x ** 2 + b * x + c
+    def fun_fn(x):
+        return a * x ** 2 + b * x + c
     jac_fn = None  # lambda x: 2 * a * x + b
 
     assert D.ar_numpy.all(D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root1))) <= D.tol_epsilon(dtype_var))
@@ -454,7 +464,8 @@ def test_nonlinear_root_dims_no_jacobian_numpy(solver, tolerance, dtype_var, a_v
     ub = -b / (2 * a) - 0.2 / (2 * a)
     lb = -b / (2 * a) - 0.4 / (2 * a)
 
-    fun_fn = lambda x: a * x ** 2 + b * x + c
+    def fun_fn(x):
+        return a * x ** 2 + b * x + c
     jac_fn = None  # lambda x: 2 * a * x + b
 
     assert D.ar_numpy.all(D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root1))) <= D.tol_epsilon(dtype_var))

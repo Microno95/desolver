@@ -1,6 +1,5 @@
 import desolver.backend as D
 import pytest
-import numpy as np
 
 # Defines test functions to benchmark against #
 

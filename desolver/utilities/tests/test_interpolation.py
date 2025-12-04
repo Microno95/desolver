@@ -1,8 +1,5 @@
-import desolver as de
 from desolver.utilities.interpolation import CubicHermiteInterp
 import desolver.backend as D
-import numpy as np
-import pytest
 
 
 def test_cubic_interpolation(dtype_var, backend_var):
@@ -14,8 +11,6 @@ def test_cubic_interpolation(dtype_var, backend_var):
     
     assert (D.ar_numpy.allclose(test_interp.tshift, t0))
     assert (D.ar_numpy.allclose(test_interp.trange, (t1 - t0)))
-    
-    test_t = D.ar_numpy.asarray([-1.0, 0.0, 1.0], dtype=dtype_var, like=backend_var)
     
     assert (D.ar_numpy.allclose(test_interp(t0), p0))
     assert (D.ar_numpy.allclose(test_interp.grad(t0), m0))

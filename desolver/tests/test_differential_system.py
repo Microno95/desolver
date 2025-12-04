@@ -467,7 +467,7 @@ def test_not_enough_time_values(dtype_var, backend_var):
 
         y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
 
-        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0,), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+        de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0,), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
                          atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
 
 
@@ -512,7 +512,7 @@ def test_non_callable_rhs(dtype_var, backend_var):
 
         y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
 
-        a = de.OdeSystem(de_mat, y0=y_init, dense_output=False, t=(0,), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+        de.OdeSystem(de_mat, y0=y_init, dense_output=False, t=(0,), dt=0.01, rtol=D.tol_epsilon(dtype_var) ** 0.5,
                          atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
 
 
@@ -712,7 +712,7 @@ def test_not_callable_rhs(dtype_var, backend_var):
     y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)
 
     with pytest.raises(TypeError):
-        a = de.OdeSystem(None, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+        de.OdeSystem(None, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
                             atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
 
 
@@ -737,7 +737,7 @@ def test_incompatible_shape(dtype_var, backend_var):
     y_init = D.ar_numpy.asarray([1., 0.], **arr_con_kwargs)[None]
 
     with pytest.raises(RuntimeError if backend_var == "torch" else ValueError):
-        a = de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
+        de.OdeSystem(rhs, y0=y_init, dense_output=False, t=(0, 2*D.pi), dt=-0.5, rtol=D.tol_epsilon(dtype_var) ** 0.5,
                             atol=D.tol_epsilon(dtype_var) ** 0.5, constants=dict(k=1.0))
     
 

@@ -323,9 +323,9 @@ def iterative_right_inverse_8th(A, Ainv0, maxiter=10):
     """
     From http://dx.doi.org/10.1016/j.amc.2017.08.010, Eq. 7.1
     """
-    I = D.ar_numpy.diag(D.ar_numpy.ones_like(A[...,:,0]))
+    identity_matrix = D.ar_numpy.diag(D.ar_numpy.ones_like(A[...,:,0]))
     Vn = Ainv0
-    initial_norm = D.ar_numpy.linalg.norm(A @ Vn - I)
+    initial_norm = D.ar_numpy.linalg.norm(A @ Vn - identity_matrix)
     c1 = 0.25*((27-2*93**0.5)**0.5 + 1)
     c2 = 0.25*(1 - (27-2*93**0.5)**0.5)
     c3 = (5*93**0.5 - 93)/496
@@ -334,15 +334,15 @@ def iterative_right_inverse_8th(A, Ainv0, maxiter=10):
     mu = 3/8
     psi = 321/1984
     for i in range(maxiter):
-        Kn = I - A @ Vn
+        Kn = identity_matrix - A @ Vn
         Kn2 = Kn@Kn
         Kn4 = Kn2@Kn2
-        Mk = (I+c1*Kn2+Kn4)@(I+c2*Kn2+Kn4)
+        Mk = (identity_matrix+c1*Kn2+Kn4)@(identity_matrix+c2*Kn2+Kn4)
         Tk = Mk + c3*Kn2
         Sk = Mk + d1*Kn2 + d2*Kn4
-        Vn1_1d2 = Vn@((I + Kn)@(Tk@Sk + mu*Kn2 + psi*Kn4))
+        Vn1_1d2 = Vn@((identity_matrix + Kn)@(Tk@Sk + mu*Kn2 + psi*Kn4))
         Vn1 = Vn1_1d2@A@Vn1_1d2
-        new_norm = D.ar_numpy.linalg.norm(A @ Vn1 - I)
+        new_norm = D.ar_numpy.linalg.norm(A @ Vn1 - identity_matrix)
         if new_norm < D.tol_epsilon(A.dtype):
             Vn = Vn1
             break
