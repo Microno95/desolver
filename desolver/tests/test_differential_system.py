@@ -615,12 +615,12 @@ def test_mixed_environment(integrator, datatype):
     t_span = [0.0, 10.0]
     np_y0 = np.array([0.0, 1.0], dtype=D.autoray.to_backend_dtype(datatype, like='numpy'))
     torch_y0 = torch.tensor(np_y0, dtype=D.autoray.to_backend_dtype(datatype, like='torch'))
-    atol = rtol = 512*D.tol_epsilon(D.autoray.to_backend_dtype(datatype, like='numpy'))**0.5
+    atol = rtol = D.tol_epsilon(D.autoray.to_backend_dtype(datatype, like='numpy'))**0.5
     
-    ode_sys_numpy = de.OdeSystem(np_rhs, y0=np_y0, dense_output=False, t=t_span, dt=0.001, atol=atol, rtol=rtol)
+    ode_sys_numpy = de.OdeSystem(np_rhs, y0=np_y0, dense_output=False, t=t_span, dt=1e-3)
     ode_sys_numpy.set_kick_vars([False, True])
     ode_sys_numpy.method = integrator
-    ode_sys_torch = de.OdeSystem(torch_rhs, y0=torch_y0, dense_output=False, t=t_span, dt=0.001, atol=atol, rtol=rtol)
+    ode_sys_torch = de.OdeSystem(torch_rhs, y0=torch_y0, dense_output=False, t=t_span, dt=1e-3)
     ode_sys_numpy.set_kick_vars([False, True])
     ode_sys_torch.method = integrator
     
@@ -904,13 +904,13 @@ def test_solve_stiff_system(integrator, backend_var):
 
     t_span = [0.0, 5.0]
     y0 = D.ar_numpy.array([1.0], dtype=dtype_var, like=backend_var)
-    atol = rtol = 1e-6
+    atol = rtol = 1e-8
 
     desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, method=integrator, show_prog_bar=True)
     
     print(desolver_res)
     print(D.ar_numpy.mean(D.ar_numpy.diff(desolver_res.t)))
     print(D.ar_numpy.mean(D.ar_numpy.abs(desolver_res.y - solution(desolver_res.t))))
-    test_tol = atol**0.5
+    test_tol = (10*atol)**0.5
     
     assert D.ar_numpy.allclose(desolver_res.y, solution(desolver_res.t), test_tol, test_tol)
