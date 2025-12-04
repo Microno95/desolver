@@ -31,7 +31,20 @@ def implicit_aware_update_timestep(integrator: TableauIntegrator):
                 tau2 = D.ar_numpy.ones_like(integrator.solver_dict['timestep'])*10.0
         else:
             tau2 = D.ar_numpy.ones_like(integrator.solver_dict['timestep'])
-        # # ---- #
+        # ---- #
+        # Adjust the timestep according to leading eigenvalue (where available)
+        tau3 = D.ar_numpy.ones_like(integrator.solver_dict['timestep'])
+        if integrator.solver_dict['eigval1'] > 0.0:
+            with D.numpy.errstate(divide='ignore'):
+                epsilon_current = (integrator.solver_dict['eigval0'] / integrator.solver_dict['eigval1'])
+            tau3 = tau3*D.ar_numpy.where(D.ar_numpy.isfinite(epsilon_current), epsilon_current, 1.0)
+        tau3 = D.ar_numpy.clip(tau3, min=0.1, max=2.0)
+        # ---- #
+        if tau2 is None:
+            tau = tau3
+        else:
+            tau = D.ar_numpy.minimum(tau2, tau3)
+        # ---- #
         # # Adjust the timestep according to the precision achieved by the 
         # # nonlinear system solver at each timestep
         # tau3 = D.ar_numpy.ones_like(integrator.solver_dict['timestep'])
