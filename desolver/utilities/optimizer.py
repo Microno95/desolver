@@ -382,14 +382,16 @@ def broyden_update_jac(B, dx, df, Binv=None):
     # with warnings.catch_warnings():
     #     warnings.filterwarnings("ignore", category=RuntimeWarning, message="overflow encountered in matmul")
     #     kI = (y_is - y_ex) / D.ar_numpy.sum(y_ex.mT @ y_ex)
-    # B_new = D.ar_numpy.reshape((1 + kI @ (B @ dx)) * B, (df.shape[0], dx.shape[0]))
+    # B_new = D.ar_numpy.reshape((B + (B @ kI) @ (B @ dx)), (df.shape[0], dx.shape[0]))
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning, message="overflow encountered in matmul")
         kI = (y_is - y_ex)
-    # # SR1 update formula
-    B_new = D.ar_numpy.reshape(B + (kI @ kI.mT) / (kI.mT @ dx + D.tol_epsilon(dx.dtype)), (df.shape[0], dx.shape[0]))
+    # SR1 update formula
+    denominator = (kI.mT @ dx)
+    update_diff = D.ar_numpy.where(denominator != 0.0, (kI @ kI.mT) / (kI.mT @ dx), 0.0)
     # BFGS update formula
-    # B_new = D.ar_numpy.reshape(B + y_is @ y_is.mT / (y_is.mT @ dx) - (y_ex @ y_ex.mT)/(dx.mT @ y_ex), (df.shape[0], dx.shape[0]))
+    # update_diff = y_is @ y_is.mT / (y_is.mT @ dx) - (y_ex @ y_ex.mT) / (dx.mT @ y_ex)
+    B_new = D.ar_numpy.reshape(B + update_diff, (df.shape[0], dx.shape[0]))
     if Binv is not None:
         Binv_new = Binv + ((dx - Binv @ y_is) / (y_is.mT @ y_is)) @ y_is.mT
         norm_val = D.ar_numpy.linalg.norm(Binv_new @ B_new - D.ar_numpy.diag(D.ar_numpy.ones_like(D.ar_numpy.diag(B))))
