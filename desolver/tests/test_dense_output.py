@@ -143,4 +143,4 @@ def test_dense_output(dtype_var, backend_var, use_richardson_extrapolation):
     if "float16" not in str(dtype_var):
         np.random.seed(42)
         sample_points = D.ar_numpy.asarray(np.random.uniform(a.t[0], a.t[-1], 8), dtype=dtype_var, like=backend_var)
-        assert D.ar_numpy.allclose(a.sol(sample_points), analytic_soln(sample_points, y_init).mT, D.tol_epsilon(dtype_var) ** 0.5, D.tol_epsilon(dtype_var) ** 0.5)
+        assert D.ar_numpy.allclose(a.sol(sample_points), analytic_soln(sample_points, y_init), D.tol_epsilon(dtype_var) ** 0.5, D.tol_epsilon(dtype_var) ** 0.5)

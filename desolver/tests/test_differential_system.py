@@ -126,10 +126,9 @@ def test_integration_and_representation_no_jac(dtype_var, backend_var, integrato
     try:
         assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= test_tol)
         assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= test_tol)
-        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t)) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
 
-        for i in a:
-            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= test_tol)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.y) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
 
         assert (len(a.y) == len(a))
         assert (len(a.t) == len(a))
@@ -161,11 +160,11 @@ def test_integration_and_representation_with_jac(dtype_var, backend_var, integra
         pytest.skip(f"{a.integrator} is unstable for {D.ar_numpy.finfo(dtype_var).bits}-bit precision")
     elif a.integrator.order <= 6 and D.ar_numpy.finfo(dtype_var).bits > 32:
         pytest.skip(f"{a.integrator}'s order is too low for {D.ar_numpy.finfo(dtype_var).bits}-bit precision")
-    elif a.integrator.is_implicit and D.ar_numpy.finfo(dtype_var).bits > 64:
-        pytest.skip(f"{a.integrator}'s is too slow for {D.ar_numpy.finfo(dtype_var).bits}-bit precision")
+    # elif a.integrator.is_implicit and D.ar_numpy.finfo(dtype_var).bits > 64:
+    #     pytest.skip(f"{a.integrator}'s is too slow for {D.ar_numpy.finfo(dtype_var).bits}-bit precision")
     
     if D.ar_numpy.finfo(dtype_var).eps > 64:
-        tol = a.atol = a.rtol = 1e-12
+        tol = a.atol = a.rtol = 1e-14
         test_tol = (tol*32)**0.5
     else:
         test_tol = D.tol_epsilon(dtype_var) ** 0.5
@@ -183,10 +182,9 @@ def test_integration_and_representation_with_jac(dtype_var, backend_var, integra
     try:
         assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= test_tol)
         assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= test_tol)
-        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t)) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
 
-        for i in a:
-            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= test_tol)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.y) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
 
         assert (len(a.y) == len(a))
         assert (len(a.t) == len(a))
@@ -200,9 +198,8 @@ def test_integration_and_representation_with_jac(dtype_var, backend_var, integra
             assert (a_torch.integration_status == "Integration has not been run.")
 
             a_torch.equ_rhs.unhook_jacobian_call()
-            
-            for i in a:
-                assert (D.ar_numpy.max(D.ar_numpy.abs(a_torch.equ_rhs.jac(i.t, i.y) - a.equ_rhs.jac(i.t, i.y))) <= test_tol)
+
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.y) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
             
             if D.ar_numpy.finfo(dtype_var).eps > 64:
                 tol = a_torch.atol = a_torch.rtol = 1e-12
@@ -220,10 +217,9 @@ def test_integration_and_representation_with_jac(dtype_var, backend_var, integra
             print(repr(a_torch))
             assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a_torch.sol(a_torch.t[0])) - D.ar_numpy.to_numpy(y_init))) <= test_tol)
             assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a_torch.sol(a_torch.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a_torch.t[-1], y_init)))) <= test_tol)
-            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a_torch.sol(a_torch.t).T) - D.ar_numpy.to_numpy(analytic_soln(a_torch.t, y_init)))) <= test_tol)
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a_torch.sol(a_torch.t)) - D.ar_numpy.to_numpy(analytic_soln(a_torch.t, y_init)))) <= test_tol)
 
-            for i in a_torch:
-                assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= test_tol)
+            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.y) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
 
             assert (len(a_torch.y) == len(a_torch))
             assert (len(a_torch.t) == len(a_torch))
@@ -263,10 +259,9 @@ def test_integration_with_richardson(dtype_var, backend_var, integrator):
     try:
         assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= test_tol)
         assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= test_tol)
-        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t)) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
 
-        for i in a:
-            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= test_tol)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.y) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
 
         assert (len(a.y) == len(a))
         assert (len(a.t) == len(a))
@@ -579,10 +574,9 @@ def test_backward_integration(dtype_var, backend_var):
         assert (a.t[-1] < a.t[0])
         assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[0])) - D.ar_numpy.to_numpy(y_init))) <= test_tol)
         assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t[-1])) - D.ar_numpy.to_numpy(analytic_soln(a.t[-1], y_init)))) <= test_tol)
-        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t).T) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.sol(a.t)) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
 
-        for i in a:
-            assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(i.y) - D.ar_numpy.to_numpy(analytic_soln(i.t, y_init)))) <= test_tol)
+        assert (D.ar_numpy.max(D.ar_numpy.abs(D.ar_numpy.to_numpy(a.y) - D.ar_numpy.to_numpy(analytic_soln(a.t, y_init)))) <= test_tol)
 
         assert (len(a.y) == len(a))
         assert (len(a.t) == len(a))

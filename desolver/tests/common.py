@@ -55,7 +55,7 @@ def set_up_basic_system(dtype_var, backend_var, integrator=None, hook_jacobian=F
         return D.ar_numpy.stack([
             c2 * D.ar_numpy.sin(t) + c1 * D.ar_numpy.cos(t) + t,
             c2 * D.ar_numpy.cos(t) - c1 * D.ar_numpy.sin(t) + 1
-        ])
+        ], axis=-1)
 
     y_init = D.ar_numpy.array([1., 0.], dtype=dtype_var, like=backend_var)
 
@@ -66,7 +66,7 @@ def set_up_basic_system(dtype_var, backend_var, integrator=None, hook_jacobian=F
         integrator = a.method
     else:
         a.method = integrator
-    dt = D.epsilon(dtype_var)**(1.0/(2+a.integrator.order))/(2*D.pi)
+    dt = D.epsilon(dtype_var)**(1.0/(3+a.integrator.order))/(2*D.pi)
     a.dt = dt
 
     return de_mat, rhs, analytic_soln, y_init, dt, a

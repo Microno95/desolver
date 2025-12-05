@@ -90,14 +90,16 @@ def torch_solve_ivp(fun, t_span, y0, method='RK45', events=None, vectorized=Fals
             
             def augmented_reverse_fn(t, y, **kwargs):
                 if const_total_dim is not None:
-                    _y, _cot, _ = ctx.dense_sol(t).detach(), *torch.split(y, [y_dim, const_total_dim])
+                    _y, _cot, _ = torch.split(y, [y_dim, y_dim, const_total_dim])
+                    # _y, _cot, _ = ctx.dense_sol(t), *torch.split(y, [y_dim, const_total_dim])
                 else:
-                    _y, _cot = ctx.dense_sol(t).detach(), *torch.split(y, [y_dim])
+                    _y, _cot = torch.split(y, [y_dim, y_dim])
+                    # _y, _cot = ctx.dense_sol(t), *torch.split(y, [y_dim])
                 _y, _cot = _y.view(y_shape), _cot.view(y_shape)
                 _dydt, vjp = torch.func.vjp(wrapped_rhs, t, _y, [kwargs[key] for key in tensor_constants])
                 _, _dcotdt, _dargs_dt = vjp(_cot, retain_graph=torch.is_grad_enabled())
                 ret_dydt = torch.cat([
-                    # _dydt.view(-1),
+                    _dydt.view(-1),
                     -torch.cat([
                         _dcotdt.view(-1),
                         *[i.view(-1) for i in _dargs_dt]
@@ -112,7 +114,7 @@ def torch_solve_ivp(fun, t_span, y0, method='RK45', events=None, vectorized=Fals
             cot_tf, adj_tf = cot_split[0]
             
             augmented_y = torch.cat([
-                # evaluation_states[...,nearest_state_index].view(-1),
+                evaluation_states[...,-1].view(-1),
                 cot_split[0][1].view(-1),
             ], dim=-1)
 
@@ -122,30 +124,41 @@ def torch_solve_ivp(fun, t_span, y0, method='RK45', events=None, vectorized=Fals
                     *[torch.zeros_like(constants[key].view(-1)) for key in tensor_constants]
                 ], dim=-1)
             
-            options["atol"], options["rtol"] = options.get("adjoint_atol", ctx.atol), options.get("adjoint_rtol", ctx.rtol)
-            # options["atol"] = torch.cat([
-            #     torch.ones_like(y0.view(-1))*options["atol"],
-            #     torch.ones_like(augmented_y[y_dim:])*torch.inf
-            # ], dim=-1)
-            # options["rtol"] = torch.cat([
-            #     torch.ones_like(y0.view(-1))*options["rtol"],
-            #     torch.ones_like(augmented_y[y_dim:])*torch.inf
-            # ], dim=-1)
+            # options["atol"], options["rtol"] = options.get("adjoint_atol", ctx.atol), options.get("adjoint_rtol", ctx.rtol)
+            options["atol"], options["rtol"] = ctx.atol, ctx.rtol
+            if torch.is_tensor(ctx.atol):
+                adj_atol = torch.min(ctx.atol)
+            else:
+                adj_atol = ctx.atol
+            if torch.is_tensor(ctx.rtol):
+                adj_rtol = torch.min(ctx.rtol)
+            else:
+                adj_rtol = ctx.rtol
+            options["atol"] = torch.cat([
+                torch.ones_like(y0.view(-1))*options["atol"],
+                torch.ones_like(augmented_y[y_dim:])*options.get("adjoint_atol", adj_atol)
+            ], dim=-1)
+            options["rtol"] = torch.cat([
+                torch.ones_like(y0.view(-1))*options["rtol"],
+                torch.ones_like(augmented_y[y_dim:])*options.get("adjoint_rtol", adj_rtol)
+            ], dim=-1)
             for cot_t0, cot_state in cot_split[1:]:
                 res = torch_solve_ivp(augmented_reverse_fn, t_span=[cot_tf, cot_t0], y0=augmented_y, method=method, kwargs={key: constants[key] for key in tensor_constants}, **options)
                 cot_tf = res.t[-1]
                 augmented_y = res.y[...,-1] + torch.cat([
-                    # torch.zeros_like(y0.view(-1)),
+                    torch.zeros_like(y0.view(-1)),
                     cot_state.view(-1),
                     *[torch.zeros_like(constants[key].view(-1)) for key in tensor_constants]
                 ], dim=-1)
             
             if const_total_dim is not None:
-                y_t0, adj_t0, args_tf = ctx.dense_sol(evaluation_times[0]), *torch.split(augmented_y, [y_dim, const_total_dim])
+                # y_t0, adj_t0, args_tf = ctx.dense_sol(evaluation_times[0]), *torch.split(augmented_y, [y_dim, const_total_dim])
+                y_t0, adj_t0, args_tf = torch.split(augmented_y, [y_dim, y_dim, const_total_dim])
                 args_tf = torch.split(args_tf, const_dims)
                 args_tf = {key: v.view(s) for key,s,v in zip(tensor_constants, const_shapes, args_tf)}
             else:
-                y_t0, adj_t0 = ctx.dense_sol(evaluation_times[0]), *torch.split(augmented_y, [y_dim])
+                # y_t0, adj_t0 = ctx.dense_sol(evaluation_times[0]), *torch.split(augmented_y, [y_dim])
+                y_t0, adj_t0 = torch.split(augmented_y, [y_dim, y_dim])
                 args_tf = None
             
             rhs_at_t0 = wrapped_rhs(
@@ -210,18 +223,40 @@ def torch_solve_ivp(fun, t_span, y0, method='RK45', events=None, vectorized=Fals
             
             def wrapped_rhs(t, y, *args):
                 _constants = {key: value for key,value in zip(tensor_constants, args)}
-                return fun(t, y, **_constants, **non_tensor_constants)
+                res = fun(t, y, **_constants, **non_tensor_constants)
+                return res, res.clone()
             
+            wrapped_rhs_w_jac = torch.func.jacrev(wrapped_rhs, argnums=(1,*range(2, 2+len(tensor_constants))), has_aux=True)
+
+            forward_mode_ad_supported = True
+            use_autograd_functional = True
+
             def augmented_forward_fn(t, y, **kwargs):
+                nonlocal forward_mode_ad_supported, use_autograd_functional
                 if const_total_dim is not None:
                     _y, _tan, _kwargs_tangents = torch.split(y, [y_dim, y_dim, const_total_dim])
                     _kwargs_tangents = torch.split(_kwargs_tangents, const_dims)
-                    _kwargs_tangents = [i.view(j) for j,i in zip(const_shapes, _kwargs_tangents)]
                 else:
                     _y, _tan = torch.split(y, [y_dim, y_dim])
                     _kwargs_tangents = []
-                _y, _tan = _y.view(y_shape), _tan.view(y_shape)
-                _dydt, _dtandt = torch.autograd.functional.jvp(wrapped_rhs, (t, _y, *[kwargs[key] for key in tensor_constants]), (torch.zeros_like(t), _tan, *_kwargs_tangents))
+                _y = _y.view(y_shape)
+                if use_autograd_functional:
+                    try:
+                        _dydt, _dtandt = torch.autograd.functional.jvp(wrapped_rhs, (t, _y, *[kwargs[key] for key in tensor_constants]), (torch.zeros_like(t), _tan.view(y_shape), *[i.view(j) for j,i in zip(const_shapes, _kwargs_tangents)]))
+                        _dydt = _dydt[0]
+                        _dtandt = _dtandt[0]
+                    except RuntimeError:
+                        use_autograd_functional = False
+                if not use_autograd_functional:
+                    if forward_mode_ad_supported:
+                        try:
+                            _dydt, _dtandt = torch.func.jvp(wrapped_rhs, (t, _y, *[kwargs[key] for key in tensor_constants]), (torch.zeros_like(t), _tan, *_kwargs_tangents))
+                        except RuntimeError:
+                            forward_mode_ad_supported = False
+                    if not forward_mode_ad_supported:
+                        (_dy2dtdy, *_dy2dtdk), _dydt = wrapped_rhs_w_jac(t, _y, *[kwargs[key] for key in tensor_constants])
+                        _dtandt = torch.sum(_dy2dtdy.flatten(start_dim=len(y_shape)) * _tan.view(y_dim), dim=-1)
+                        _dtandt = _dtandt + sum(torch.sum(_dy2dtdtan.flatten(start_dim=-len(_kw_tan_shape)).view(y_dim, _kw_tan.shape[0]) * _kw_tan.view(1, -1), dim=-1) for _dy2dtdtan, _kw_tan, _kw_tan_shape in zip(_dy2dtdk, _kwargs_tangents, const_shapes))
                 ret_dydt = torch.cat([
                     _dydt.view(-1),
                     _dtandt.view(-1),
@@ -239,10 +274,10 @@ def torch_solve_ivp(fun, t_span, y0, method='RK45', events=None, vectorized=Fals
             
             rhs_at_t0 = wrapped_rhs(
                 t_span[0], y0.view(y_shape), *[constants[key] for key in tensor_constants]
-            )
+            )[0]
             rhs_at_tf = wrapped_rhs(
                 t_span[1], evaluation_states[...,-1].view(y_shape), *[constants[key] for key in tensor_constants]
-            )
+            )[0]
             
             augmented_y = torch.cat([
                 y0.view(-1),
@@ -256,15 +291,23 @@ def torch_solve_ivp(fun, t_span, y0, method='RK45', events=None, vectorized=Fals
                 ], dim=-1)
             
             options["atol"], options["rtol"] = ctx.atol, ctx.rtol
+            if torch.is_tensor(ctx.atol):
+                adj_atol = torch.min(ctx.atol)
+            else:
+                adj_atol = ctx.atol
+            if torch.is_tensor(ctx.rtol):
+                adj_rtol = torch.min(ctx.rtol)
+            else:
+                adj_rtol = ctx.rtol
             options["atol"] = torch.cat([
                 torch.ones_like(y0.view(-1))*options["atol"],
-                torch.ones_like(augmented_y[y_dim:])*torch.inf
+                torch.ones_like(augmented_y[y_dim:])*options.get("adjoint_atol", adj_atol)
             ], dim=-1)
             options["rtol"] = torch.cat([
                 torch.ones_like(y0.view(-1))*options["rtol"],
-                torch.ones_like(augmented_y[y_dim:])*torch.inf
+                torch.ones_like(augmented_y[y_dim:])*options.get("adjoint_rtol", adj_rtol)
             ], dim=-1)
-            res = torch_solve_ivp(augmented_forward_fn, t_span=(tan_t0, t_span[1]), y0=augmented_y, method=method, events=events, kwargs={key: constants[key] for key in tensor_constants}, **options)
+            res = torch_solve_ivp(augmented_forward_fn, t_span=(tan_t0, t_span[1]), y0=augmented_y, method=method, events=events, t_eval=evaluation_times, kwargs={key: constants[key] for key in tensor_constants}, **options)
             if const_total_dim is not None:
                 state_tangents = torch.split(res.y, [y_dim, y_dim, const_total_dim])[1].reshape(*y_shape, -1).clone().contiguous()
             else:

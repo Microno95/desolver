@@ -157,7 +157,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
                 newton_iterations=32,
                 eigval0=D.ar_numpy.abs(D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0]),
                 eigval1=D.ar_numpy.abs(D.ar_numpy.ones((1,), **self.array_constructor_kwargs)[0]),
-                jac_refresh_interval=32
+                jac_refresh_interval=1024
             ))
             self.solver_dict.update(solver_dict_preserved)
             self.adaptation_fn = integrator_utilities.implicit_aware_update_timestep
@@ -353,7 +353,7 @@ class RungeKuttaIntegrator(TableauIntegrator, abc.ABC):
 
     def get_error_estimate(self):
         if self.tableau_final.shape[0] == 2 and self.is_adaptive:
-            return D.ar_numpy.sum(self.tableau_final[0, 1:] * self.stage_values - self.tableau_final[1, 1:] * self.stage_values, axis=-1)
+            return D.ar_numpy.sum((self.tableau_final[0, 1:] - self.tableau_final[1, 1:]) * self.stage_values, axis=-1)
         else:
             return D.ar_numpy.zeros_like(self.dState)
 

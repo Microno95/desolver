@@ -92,7 +92,7 @@ class IntegratorTemplate(abc.ABC):
                 corr = corr*D.ar_numpy.where((k3 > 0.0) & D.ar_numpy.isfinite(k3), k3, 1.0)
                 self.solver_dict["epsilon_last_last"], self.solver_dict["epsilon_last"] = epsilon_last, epsilon_current
             redo_step = bool(corr < 0.9**2)
-            corr = D.ar_numpy.where(D.ar_numpy.isfinite(epsilon_current), 1 + D.ar_numpy.arctan((safety_factor*corr - 1)), 1.0)
+            corr = D.ar_numpy.where(~D.ar_numpy.isnan(epsilon_current), 1 + D.ar_numpy.arctan((safety_factor*corr - 1)), 1.0)
             timestep = corr * timestep
             return timestep, redo_step
 

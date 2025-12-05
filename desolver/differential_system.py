@@ -1,4 +1,5 @@
 import collections
+import warnings
 
 from tqdm.auto import tqdm
 
@@ -1267,8 +1268,17 @@ def solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False,
         y_res = D.ar_numpy.transpose(y_res, axes=[*range(1, len(y_res.shape)), 0])
     else:
         t_eval = D.ar_numpy.sort(t_eval)
-        if t_eval[0] < t_span[0] or t_eval[-1] > t_span[1]:
-            raise ValueError(f"Expected `t_eval` to be in the range [{t_span[0]}, {t_span[1]}]")
+        if ode_system.t0 < ode_system.tf:
+            if t_eval[0] < ode_system.t0 - D.epsilon(ode_system.t0.dtype) or t_eval[-1] > ode_system.tf + D.epsilon(ode_system.tf.dtype):
+                warnings.warn(f"Expected `t_eval` to be in the range [{ode_system.t0}, {t_span[1]}], got: [{t_eval[0]}, {t_eval[-1]}], expanding integration domain to match")
+                if t_eval[0] < ode_system.t0:
+                    ode_system.integrate(t=t_eval[0])
+        else:
+            t_eval = D.ar_numpy.flip(t_eval)
+            if t_eval[0] > ode_system.t0 + D.epsilon(ode_system.t0.dtype) or t_eval[-1] < ode_system.tf - D.epsilon(ode_system.tf.dtype):
+                warnings.warn(f"Expected `t_eval` to be in the range [{ode_system.t0}, {ode_system.tf}], got: [{t_eval[0]}, {t_eval[-1]}], expanding integration domain to match")
+                if t_eval[0] > ode_system.t0:
+                    ode_system.integrate(t=t_eval[0])
         t_res = []
         y_res = []
         show_progress = integration_options.pop("eta")
