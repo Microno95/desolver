@@ -11,6 +11,11 @@ try:
     __AVAILABLE_BACKENDS__.append("torch")
 except ImportError:
     pass
+try:
+    from desolver.backend.jax_backend import *
+    __AVAILABLE_BACKENDS__.append("jax")
+except ImportError:
+    pass
 
 print("Using `autoray` backend", file=sys.stderr)
 
