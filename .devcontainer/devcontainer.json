@@ -93,7 +93,7 @@
 	// "updateContentCommand": "",
 
 	// 10. Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo apt -qq update && sudo apt install -qq ffmpeg -y"
+	"postCreateCommand": "sudo apt-get -qq update && sudo apt-get install -qq ffmpeg -y && echo \"Completed Successfully\""
 
 	// 11. Use 'postStartCommand' to run a command each time the container starts successfully.
 	// "postStartCommand": "",

@@ -73,3 +73,5 @@ autoray.register_function("torch", "solve_linear_system", __solve_linear_system)
 autoray.register_function("torch", "copyto", copyto)
 autoray.register_function("torch", "place", place)
 autoray.autoray._FUNC_ALIASES[('torch', 'copy')] = 'clone'
+
+autoray.register_function("torch", "linalg.solve_triangular", torch.linalg.solve_triangular)

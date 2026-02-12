@@ -30,3 +30,5 @@ def __no_grad_ctx():
 autoray.register_function("numpy", "no_grad", __no_grad_ctx)
 autoray.register_function("builtins", "no_grad", __no_grad_ctx)
 autoray.register_function("numpy", "clone", numpy.copy)
+
+autoray.register_function("numpy", "linalg.solve_triangular", scipy.linalg.solve_triangular)

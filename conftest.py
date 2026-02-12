@@ -13,6 +13,7 @@ def available_backends():
     available_backends = ["numpy"]
     try:
         import torch
+        torch.cuda.set_per_process_memory_fraction(0.1, device=None)
         available_backends.append("torch")
     except ImportError:
         pass
@@ -29,6 +30,21 @@ def available_device_var():
         pass
     return available_device_var
 
+
+@pytest.fixture(autouse=True)
+def torch_cleanup():
+    try:
+        import torch
+        import gc
+        torch.cuda.set_per_process_memory_fraction(0.1, device=None)
+    except ImportError:
+        torch = None
+    
+    yield
+
+    if torch is not None:
+        gc.collect()
+        torch.cuda.empty_cache()
 
 # Arrange
 @pytest.fixture(scope='function', params=explicit_methods())

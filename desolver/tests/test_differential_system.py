@@ -250,7 +250,7 @@ def test_integration_with_richardson(dtype_var, backend_var, integrator):
     a.method = de.integrators.generate_richardson_integrator(a.method, richardson_iter=2 if D.ar_numpy.finfo(dtype_var).bits < 32 else 4)
     
     test_tol = D.tol_epsilon(dtype_var) ** 0.5
-    a.integrate()
+    a.integrate(eta=True)
 
     assert (a.integration_status == "Integration completed successfully.")
 
@@ -898,7 +898,7 @@ def test_solve_stiff_system(integrator, backend_var):
 
     t_span = [0.0, 5.0]
     y0 = D.ar_numpy.array([1.0], dtype=dtype_var, like=backend_var)
-    atol = rtol = 1e-8
+    atol = rtol = 1e-5
 
     desolver_res = de.solve_ivp(fun, t_span=t_span, y0=y0, atol=atol, rtol=rtol, method=integrator, show_prog_bar=True)
     

@@ -597,7 +597,7 @@ def generate_richardson_integrator(basis_integrator, richardson_iter=2):
                     while new_timestep < next_timestep:
                         next_timestep /= 2.0
                 else:
-                    while (0.8 * new_timestep + 0.2 * timestep) > 2 * next_timestep:
+                    while (0.8 * new_timestep + 0.2 * timestep) > next_timestep:
                         next_timestep *= 2.0
                     redo_step = False
             else:

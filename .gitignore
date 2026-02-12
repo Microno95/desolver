@@ -8,3 +8,5 @@ dist/
 **/.fileid.db
 **/.ipynb_checkpoints
 test-*.ipynb
+experimentation
+issues-debugging
