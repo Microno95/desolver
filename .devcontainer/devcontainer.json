@@ -41,7 +41,7 @@
 		"ghcr.io/schlich/devcontainer-features/powerlevel10k:1": {},
 		"ghcr.io/nils-geistmann/devcontainers-features/zsh:0": {
 			"setLocale": true,
-			"theme": "agnoster",
+			"theme": "robbyrussell",
 			"plugins": "git docker",
 			"desiredLocale": "en_US.UTF-8 UTF-8"
 		},
@@ -93,7 +93,7 @@
 	// "updateContentCommand": "",
 
 	// 10. Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo apt -qq update && sudo apt install -qq ffmpeg -y"
+	"postCreateCommand": "sudo apt-get -qq update && sudo apt-get install -qq ffmpeg -y && echo \"Completed Successfully\""
 
 	// 11. Use 'postStartCommand' to run a command each time the container starts successfully.
 	// "postStartCommand": "",

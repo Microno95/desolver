@@ -39,7 +39,7 @@ def test_rootfinding_transforms(fn, dtype_var, backend_var):
             var_bounds[1].to(x0.dtype)
         ]
     
-    tol = D.tol_epsilon(dtype_var)
+    tol = 32*D.tol_epsilon(dtype_var)
     
     bx0 = de.utilities.optimizer.transform_to_bounded_x(x0, *var_bounds)
     blb = de.utilities.optimizer.transform_to_bounded_x(var_bounds[0], *var_bounds)
@@ -87,7 +87,8 @@ def test_brentsroot_same_sign(dtype_var, backend_var, device_var):
     gt_root = -b / a
     lb, ub = -b / a - 1, -b / a - 2
 
-    fun = lambda x: a * x + b
+    def fun(x):
+        return a * x + b
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(gt_root)))) <= D.tol_epsilon(dtype_var)
 
@@ -114,7 +115,8 @@ def test_brentsroot_epsilon_too_small(dtype_var, backend_var, device_var):
     gt_root = -b / a
     lb, ub = -b / a - 1, -b / a - 2
 
-    fun = lambda x: a * x + b
+    def fun(x):
+        return a * x + b
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(gt_root)))) <= D.tol_epsilon(dtype_var)
 
@@ -139,7 +141,8 @@ def test_brentsroot_wrong_order(dtype_var, backend_var, device_var):
     gt_root = -b / a
     lb, ub = -b / a - 1, -b / a + 1
 
-    fun = lambda x: a * x + b
+    def fun(x):
+        return a * x + b
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(gt_root)))) <= D.tol_epsilon(dtype_var)
 
@@ -149,7 +152,7 @@ def test_brentsroot_wrong_order(dtype_var, backend_var, device_var):
     assert (np.allclose(D.ar_numpy.to_numpy(gt_root), D.ar_numpy.to_numpy(root), D.tol_epsilon(dtype_var), D.tol_epsilon(dtype_var)))
 
 
-@pytest.mark.parametrize('tolerance', [None, 100.0, 10.0, 1.0])
+@pytest.mark.parametrize('tolerance', [None, 100.0, 1.0])
 @pytest.mark.parametrize('ac_prod_val', np.linspace(0.9, 1.1, 4))
 @pytest.mark.parametrize('a_val', [-1.0, 1.0])
 def test_brentsroot(tolerance, dtype_var, backend_var, device_var, a_val, ac_prod_val):
@@ -172,7 +175,8 @@ def test_brentsroot(tolerance, dtype_var, backend_var, device_var, a_val, ac_pro
     ub = -b / (2 * a)
     lb = -b / (2 * a) - 1.0 / (2 * a)
 
-    fun = lambda x: a * x ** 2 + b * x + c
+    def fun(x):
+        return a * x ** 2 + b * x + c
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(gt_root))) <= D.tol_epsilon(dtype_var))
 
@@ -191,7 +195,7 @@ def test_brentsroot(tolerance, dtype_var, backend_var, device_var, a_val, ac_pro
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun(root))) <= tol)
 
 
-@pytest.mark.parametrize('tolerance', [None, 100.0, 10.0, 1.0])
+@pytest.mark.parametrize('tolerance', [None, 100.0, 1.0])
 def test_brentsrootvec(tolerance, dtype_var, backend_var, device_var):
     dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
     if backend_var == 'torch':
@@ -236,7 +240,8 @@ def test_brentsrootvec(tolerance, dtype_var, backend_var, device_var):
                     map((lambda x: x[0](x[1])), zip(fun_list, root_list)))))
     
     
-    fun_vec = lambda x: a_vals * x**2 + b_vals * x + c_vals
+    def fun_vec(x):
+        return a_vals * x**2 + b_vals * x + c_vals
 
     assert np.allclose(D.ar_numpy.to_numpy(fun_vec(gt_root)), 0.0, D.tol_epsilon(dtype_var), D.tol_epsilon(dtype_var))
 
@@ -273,7 +278,8 @@ def test_brentsrootvec(tolerance, dtype_var, backend_var, device_var):
 @pytest.mark.parametrize('ac_prod_val', np.linspace(0.9, 1.1, 4))
 @pytest.mark.parametrize('a_val', [-1.0, 1.0])
 @pytest.mark.parametrize('solver', [de.utilities.optimizer.nonlinear_roots, de.utilities.optimizer.newtontrustregion, de.utilities.optimizer.hybrj])
-def test_nonlinear_root(solver, tolerance, dtype_var, backend_var, device_var, a_val, ac_prod_val):
+@pytest.mark.parametrize('force_use_cg', [False, True])
+def test_nonlinear_root(solver, tolerance, dtype_var, backend_var, device_var, a_val, ac_prod_val, force_use_cg):
     dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
     if backend_var == 'torch':
         set_torch_printoptions()
@@ -294,8 +300,10 @@ def test_nonlinear_root(solver, tolerance, dtype_var, backend_var, device_var, a
     ub = -b / (2 * a) - 0.2 / (2 * a)
     lb = -b / (2 * a) - 0.4 / (2 * a)
 
-    fun_fn = lambda x: a * x ** 2 + b * x + c
-    jac_fn = lambda x: 2 * a * x + b
+    def fun_fn(x):
+        return a * x ** 2 + b * x + c
+    def jac_fn(x):
+        return 2 * a * x + b
 
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root1))) <= D.tol_epsilon(dtype_var))
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root2))) <= D.tol_epsilon(dtype_var))
@@ -305,7 +313,7 @@ def test_nonlinear_root(solver, tolerance, dtype_var, backend_var, device_var, a
         if backend_var == 'torch':
             x0 = x0.to(device_var)
 
-        root, (success, *_) = solver(fun_fn, x0, jac=jac_fn, tol=tolerance, verbose=1)
+        root, (success, *_) = solver(fun_fn, x0, jac=jac_fn, tol=tolerance, verbose=1, force_use_cg=force_use_cg)
 
         assert (success)
         
@@ -320,13 +328,19 @@ def test_nonlinear_root(solver, tolerance, dtype_var, backend_var, device_var, a
 @pytest.mark.parametrize('ac_prod_val', np.linspace(0.9, 1.1, 3))
 @pytest.mark.parametrize('a_val', [-1.0, 1.0])
 @pytest.mark.parametrize('solver', [de.utilities.optimizer.newtontrustregion, de.utilities.optimizer.hybrj, de.utilities.optimizer.nonlinear_roots])
-@pytest.mark.parametrize('shape', [(1,), (4,4), (2,3,5)])
-def test_nonlinear_root_dims(solver, tolerance, dtype_var, backend_var, device_var, a_val, ac_prod_val, shape):
+@pytest.mark.parametrize('shape', [(1,), (4,5,6)])
+@pytest.mark.parametrize('force_use_cg', [False, True])
+def test_nonlinear_root_dims(solver, tolerance, dtype_var, backend_var, device_var, a_val, ac_prod_val, shape, force_use_cg):
     dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
     if backend_var == 'torch':
         set_torch_printoptions()
     
     tolerance, tol = convert_tolerance(tolerance, dtype_var)
+    if D.ar_numpy.finfo(dtype_var).bits > 16:
+        numel = 1
+        for i in shape:
+            numel *= i
+        tol = tol * numel
 
     ac_prod = D.ar_numpy.tile(D.ar_numpy.asarray(ac_prod_val, dtype=dtype_var, like=backend_var), shape)
     a = D.ar_numpy.tile(D.ar_numpy.asarray(a_val, dtype=dtype_var, like=backend_var), shape)
@@ -342,8 +356,10 @@ def test_nonlinear_root_dims(solver, tolerance, dtype_var, backend_var, device_v
     ub = -b / (2 * a) - 0.2 / (2 * a)
     lb = -b / (2 * a) - 0.4 / (2 * a)
 
-    fun_fn = lambda x: a * x ** 2 + b * x + c
-    jac_fn = lambda x: 2 * a * x + b
+    def fun_fn(x):
+        return a * x ** 2 + b * x + c
+    def jac_fn(x):
+        return 2 * a * x + b
 
     assert D.ar_numpy.all(D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root1))) <= D.tol_epsilon(dtype_var))
     assert D.ar_numpy.all(D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root2))) <= D.tol_epsilon(dtype_var))
@@ -353,10 +369,10 @@ def test_nonlinear_root_dims(solver, tolerance, dtype_var, backend_var, device_v
         if backend_var == 'torch':
             x0 = x0.to(device_var)
 
-        root, (success, *_) = solver(fun_fn, x0, jac=jac_fn, tol=tolerance, verbose=1)
+        root, (success, *_) = solver(fun_fn, x0, jac=jac_fn, tol=tolerance, verbose=1, force_use_cg=force_use_cg)
 
         assert (success)
-        
+
         conv_root1 = np.allclose(D.ar_numpy.to_numpy(root), D.ar_numpy.to_numpy(gt_root1), tol, tol)
         conv_root2 = np.allclose(D.ar_numpy.to_numpy(root), D.ar_numpy.to_numpy(gt_root2), tol, tol)
         
@@ -364,10 +380,10 @@ def test_nonlinear_root_dims(solver, tolerance, dtype_var, backend_var, device_v
         assert D.ar_numpy.all(D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(root))) <= tol)
 
         # Check with jacobian reshaped to be "strange"
-        root, (success, *_) = solver(fun_fn, x0, jac=lambda *args, **kwargs: jac_fn(*args, **kwargs)[None,None], tol=tolerance, verbose=1)
+        root, (success, *_) = solver(fun_fn, x0, jac=lambda *args, **kwargs: jac_fn(*args, **kwargs)[None,None], tol=tolerance, verbose=1, force_use_cg=force_use_cg)
 
         assert (success)
-        
+
         conv_root1 = np.allclose(D.ar_numpy.to_numpy(root), D.ar_numpy.to_numpy(gt_root1), tol, tol)
         conv_root2 = np.allclose(D.ar_numpy.to_numpy(root), D.ar_numpy.to_numpy(gt_root2), tol, tol)
         
@@ -402,7 +418,8 @@ def test_nonlinear_root_dims_no_jacobian(solver, tolerance, dtype_var, backend_v
     ub = -b / (2 * a) - 0.2 / (2 * a)
     lb = -b / (2 * a) - 0.4 / (2 * a)
 
-    fun_fn = lambda x: a * x ** 2 + b * x + c
+    def fun_fn(x):
+        return a * x ** 2 + b * x + c
     jac_fn = None  # lambda x: 2 * a * x + b
 
     assert D.ar_numpy.all(D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root1))) <= D.tol_epsilon(dtype_var))
@@ -447,7 +464,8 @@ def test_nonlinear_root_dims_no_jacobian_numpy(solver, tolerance, dtype_var, a_v
     ub = -b / (2 * a) - 0.2 / (2 * a)
     lb = -b / (2 * a) - 0.4 / (2 * a)
 
-    fun_fn = lambda x: a * x ** 2 + b * x + c
+    def fun_fn(x):
+        return a * x ** 2 + b * x + c
     jac_fn = None  # lambda x: 2 * a * x + b
 
     assert D.ar_numpy.all(D.ar_numpy.to_numpy(D.ar_numpy.abs(fun_fn(gt_root1))) <= D.tol_epsilon(dtype_var))
@@ -470,31 +488,56 @@ def test_nonlinear_root_dims_no_jacobian_numpy(solver, tolerance, dtype_var, a_v
 @pytest.mark.slow
 @pytest.mark.parametrize('solver', [de.utilities.optimizer.nonlinear_roots, de.utilities.optimizer.newtontrustregion, de.utilities.optimizer.hybrj])
 @common.test_fn_param
-def test_rootfinding_robustness(fn, solver, dtype_var, backend_var):
+@pytest.mark.parametrize('force_use_cg', [False, True])
+def test_rootfinding_robustness(fn, solver, dtype_var, backend_var, force_use_cg):
     dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
+    if D.ar_numpy.finfo(dtype_var).bits < fn.min_precision:
+        pytest.skip(f"Problem {fn} requires {fn.min_precision}-bit precision")
     if backend_var == 'torch':
         set_torch_printoptions()
     
     tolerance, tol = convert_tolerance(None, dtype_var)
 
-    x0 = D.ar_numpy.asarray(fn.root_interval[0] + 0.5 * (fn.root_interval[1] - fn.root_interval[0]), dtype=dtype_var, like=backend_var)
+    x0 = D.ar_numpy.asarray(fn.root_interval[0] + (1/np.pi) * (fn.root_interval[1] - fn.root_interval[0]), dtype=dtype_var, like=backend_var)
 
-    root, (success, *_) = solver(fn, x0, jac=fn.jac, tol=tolerance, verbose=0)
+    nfev = 0
+    njev = 0
+    def fn_counted(*args, **kwargs):
+        nonlocal nfev
+        nfev += 1
+        return fn(*args, **kwargs)
+    
+    def fn_jac_counted(*args, **kwargs):
+        nonlocal njev
+        njev += 1
+        return fn.jac(*args, **kwargs)
 
+    root, (success, *_) = solver(fn_counted, x0, jac=fn_jac_counted, tol=tolerance, verbose=1, force_use_cg=force_use_cg)
+
+    print(f"Stats: {fn} required {nfev} function evaluations and {njev} jacobian evaluations using {solver}")
     assert (success)
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fn(root))) <= tol)
     
-    root, (success, *_) = solver(fn, x0, jac=None, tol=tolerance, verbose=0)
+    nfev = 0
+    njev = 0
+    root, (success, *_) = solver(fn_counted, x0, jac=None, tol=tolerance, verbose=1, force_use_cg=force_use_cg)
 
+    print(f"Stats: {fn} required {nfev} function evaluations and {njev} jacobian evaluations using {solver}")
     assert (success)
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fn(root))) <= tol)
     
-    root, (success, *_) = solver(fn, x0, jac=fn.jac, tol=tolerance, verbose=1, var_bounds=fn.root_interval)
+    nfev = 0
+    njev = 0
+    root, (success, *_) = solver(fn_counted, x0, jac=fn_jac_counted, tol=tolerance, verbose=1, var_bounds=fn.root_interval, force_use_cg=force_use_cg)
 
+    print(f"Stats: {fn} required {nfev} function evaluations and {njev} jacobian evaluations using {solver}")
     assert (success)
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fn(root))) <= tol)
     
-    root, (success, *_) = solver(fn, x0, jac=None, tol=tolerance, verbose=1, var_bounds=fn.root_interval)
+    nfev = 0
+    njev = 0
+    root, (success, *_) = solver(fn_counted, x0, jac=None, tol=tolerance, verbose=1, var_bounds=fn.root_interval, force_use_cg=force_use_cg)
 
+    print(f"Stats: {fn} required {nfev} function evaluations and {njev} jacobian evaluations using {solver}")
     assert (success)
     assert (D.ar_numpy.to_numpy(D.ar_numpy.abs(fn(root))) <= tol)

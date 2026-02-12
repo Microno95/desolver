@@ -13,6 +13,7 @@ def available_backends():
     available_backends = ["numpy"]
     try:
         import torch
+        torch.cuda.set_per_process_memory_fraction(0.1, device=None)
         available_backends.append("torch")
     except ImportError:
         pass
@@ -30,6 +31,21 @@ def available_device_var():
     return available_device_var
 
 
+@pytest.fixture(autouse=True)
+def torch_cleanup():
+    try:
+        import torch
+        import gc
+        torch.cuda.set_per_process_memory_fraction(0.1, device=None)
+    except ImportError:
+        torch = None
+    
+    yield
+
+    if torch is not None:
+        gc.collect()
+        torch.cuda.empty_cache()
+
 # Arrange
 @pytest.fixture(scope='function', params=explicit_methods())
 def explicit_integrators(request):
@@ -46,6 +62,11 @@ def integrators(request):
     return request.param
 
 
+@pytest.fixture(scope='function', params=[None] if "torch" in available_backends() else [])
+def pytorch_only(request):
+    return request.param
+
+
 def pytest_generate_tests(metafunc: pytest.Metafunc):
     autodiff_needed = "requires_autodiff" in metafunc.fixturenames
     
@@ -58,7 +79,7 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
     argnames = sorted([key for key in argvalues_map if key in metafunc.fixturenames])
     argvalues = list(itertools.product(*[argvalues_map[key] for key in argnames]))
     
-    if "dtype_var" and "backend_var" in metafunc.fixturenames:
+    if "dtype_var" in metafunc.fixturenames and "backend_var" in metafunc.fixturenames:
         if np.finfo(np.longdouble).bits > np.finfo(np.float64).bits:
             expansion_map = {
                 "dtype_var": ["longdouble"],
@@ -82,4 +103,5 @@ def pytest_generate_tests(metafunc: pytest.Metafunc):
             raise TypeError("Test configuration requests autodiff, but no dynamic backend specified!")
         argnames.append("requires_autodiff")
         argvalues = [(*aval, True) for aval in argvalues if len(aval) > 1 and aval[1] not in ["numpy"]]
+    
     metafunc.parametrize(argnames, argvalues)

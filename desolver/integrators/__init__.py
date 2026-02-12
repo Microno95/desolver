@@ -9,6 +9,13 @@ from .implicit_integration_schemes import *
 
 __available_methods = dict()
 
+
+def register_integrator(new_integrator:IntegratorTemplate):
+    __available_methods.update(dict([(new_integrator.__name__, new_integrator)]))
+    if hasattr(new_integrator, "__alt_names__"):
+        __available_methods.update(dict([(alt_name, new_integrator) for alt_name in new_integrator.__alt_names__]))
+
+
 __explicit_integration_methods__ = [
     RK1412Solver,
     RK108Solver,
@@ -40,7 +47,7 @@ __implicit_integration_methods__ = [
     LobattoIIIC2,
     LobattoIIIC4,
     CrankNicolson,
-#     DIRK3LStable,
+    DIRK3LStable,
     RadauIA3,
     RadauIA5,
     RadauIIA3,
@@ -48,16 +55,12 @@ __implicit_integration_methods__ = [
     RadauIIA19
 ]
 
-__available_methods.update(dict(
-    [(func.__name__, func) for func in __explicit_integration_methods__ if hasattr(func, "__alt_names__")] +
-    [(alt_name, func)      for func in __explicit_integration_methods__ if hasattr(func, "__alt_names__") for alt_name in func.__alt_names__]))
 
-__available_methods.update(dict(
-    [(func.__name__, func) for func in __implicit_integration_methods__ if hasattr(func, "__alt_names__")] +
-    [(alt_name, func)      for func in __implicit_integration_methods__ if hasattr(func, "__alt_names__") for alt_name in func.__alt_names__]))
+for func in __explicit_integration_methods__ + __implicit_integration_methods__:
+    register_integrator(func)
 
 
-def available_methods(names=True):
+def available_methods(names=True)->list[IntegratorTemplate]|dict[str, IntegratorTemplate]:
     if names:
         return sorted(set(__available_methods.keys()))
     else:

@@ -1,6 +1,5 @@
 import desolver as de
 import desolver.backend as D
-import numpy as np
 import pytest
 
 
@@ -44,8 +43,10 @@ def test_jacobian_wrapper_non_callable(dtype_var, backend_var, device_var):
 
 def test_jacobian_wrapper_exact(dtype_var, backend_var, device_var):
     dtype_var = D.autoray.to_backend_dtype(dtype_var, like=backend_var)
-    rhs     = lambda x: D.ar_numpy.exp(-x)
-    drhs_exact = lambda x: -D.ar_numpy.exp(-x)
+    def rhs(x):
+        return D.ar_numpy.exp(-x)
+    def drhs_exact(x):
+        return -D.ar_numpy.exp(-x)
     
     x = D.ar_numpy.asarray(0.0, dtype=dtype_var, like=backend_var)
     if backend_var == "torch":
@@ -69,7 +70,7 @@ def test_blocktimer():
         assert (test.start_time is None and not test.start_now)
 
     with de.utilities.BlockTimer(start_now=False) as test:
-        assert (isinstance(test.start_now, bool) and test.start_now == False)
+        assert (isinstance(test.start_now, bool) and not test.start_now)
         assert (test.start_time is None)
         assert (test.end_time is None)
         test.start()
@@ -78,7 +79,7 @@ def test_blocktimer():
         test.end()
         assert (isinstance(test.end_time, float))
         assert (isinstance(test.elapsed(), float) and test.elapsed() > 0)
-        assert (test.stopped == True)
+        assert (test.stopped)
         test.restart_timer()
         assert (test.end_time is None)
-        assert (test.stopped == False)
+        assert (not test.stopped)
