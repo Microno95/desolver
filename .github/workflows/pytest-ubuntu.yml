@@ -51,14 +51,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --requirement build-requirements.txt
       - name: Test All backend
-        run: hatch test --all --cover -- -vx
-      - name: Rename file 
-        run: mv coverage/.coverage coverage/.coverage.${{ matrix.python-version }}.${{ matrix.os }}
+        run: hatch test --all --cover-xml --cover-xml-output coverage/.coverage.${{ matrix.python-version }}.${{ matrix.os }}.xml -- -vx 
       - name: Upload coverage data
         uses: actions/upload-artifact@v7
         with:
-          name: .coverage.${{ matrix.python-version }}.${{ matrix.os }}
-          path: coverage/.coverage.${{ matrix.python-version }}.${{ matrix.os }}
+          name: .coverage.${{ matrix.python-version }}.${{ matrix.os }}.xml
+          path: coverage/.coverage.${{ matrix.python-version }}.${{ matrix.os }}.xml
           include-hidden-files: true
           if-no-files-found: ignore
   coverage:
@@ -88,7 +86,7 @@ jobs:
         run: uv tool install 'coverage[toml]'
       - name: Combine coverage
         run: |
-          coverage combine .coverage.*
+          coverage combine .coverage.*.xml
 
           # Report and write to summary.
           coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
