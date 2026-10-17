@@ -145,7 +145,7 @@ def handle_events(sol_tuple, events, consts, direction, is_terminal, attributes)
                 down & (direction < 0) |
                 either & (direction == 0))
     
-    active_events = D.ar_numpy.reshape(D.ar_numpy.nonzero(mask), (-1,))
+    active_events = D.ar_numpy.nonzero(mask)[0]
 
     roots = roots[active_events]
     evs = [events[idx] for idx in active_events]
@@ -1253,4 +1253,3 @@ def solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False,
                      y_events=ode_system.events, nfev=ode_system.nfev, njev=ode_system.njev,
                      status=ode_system.integration_status, message=ode_system.integration_status,
                      success=ode_system.success, ode_system=ode_system)
-    
