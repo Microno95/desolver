@@ -65,8 +65,8 @@ test = [
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cu126", marker = "sys_platform == 'win32'" },
-  { index = "pytorch-cu126", marker = "sys_platform == 'linux'" },
+  { index = "pytorch-cu130", marker = "sys_platform == 'win32'" },
+  { index = "pytorch-cu130", marker = "sys_platform == 'linux'" },
   { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
 ]
 
@@ -76,9 +76,23 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [[tool.uv.index]]
-name = "pytorch-cu126"
-url = "https://download.pytorch.org/whl/cu126"
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
+
+[tool.hatch.envs.default]
+dependencies = [
+    'numpy>=2',
+    'tqdm>=4.47.0',
+    'scipy>=1.15.0',
+    'autoray>=0.7.0',
+    'einops>=0.8.0'
+]
+
+[tool.hatch.envs.torch]
+extra-dependencies = [
+  "torch>=2.5.0"
+]
 
 [tool.hatch.envs.dev]
 installer = "uv"
@@ -95,7 +109,7 @@ extra-dependencies = [
 
 [tool.hatch.envs.hatch-test]
 installer = "uv"
-parallel = true
+#parallel = true
 default-args = ["desolver"]
 features = [
   "test"
@@ -133,7 +147,7 @@ exclude = [
 packages = ["desolver/"]
 
 [tool.coverage.run]
-parallel = true
+#parallel = true
 branch = true
 relative_files = true
 source = ["desolver"]
